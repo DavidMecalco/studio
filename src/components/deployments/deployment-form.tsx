@@ -51,6 +51,8 @@ interface DeploymentFormProps {
   onDeploymentCreated: (newLog: DeploymentLogEntry) => void;
 }
 
+const NONE_VALUE_SENTINEL = "__NONE_SENTINEL__";
+
 export function DeploymentForm({ users, tickets, onDeploymentCreated }: DeploymentFormProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -202,30 +204,39 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
 
             <FormField
               control={form.control}
-              name="ticketIds"
+              name="ticketIds" // This is an array in the form schema
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Associated Jira Tickets (Optional)</FormLabel>
-                  <Select onValueChange={(value) => field.onChange(value ? value.split(',') : [])} value={field.value?.join(',')}>
+                  <FormLabel>Associated Jira Ticket (Optional)</FormLabel>
+                  <Select
+                    onValueChange={(selectedValue) => {
+                      if (selectedValue === NONE_VALUE_SENTINEL) {
+                        field.onChange([]); // No tickets selected
+                      } else if (selectedValue) {
+                        field.onChange([selectedValue]); // Single ticket selected, stored as array
+                      } else {
+                        field.onChange([]); 
+                      }
+                    }}
+                    value={
+                      field.value && field.value.length > 0
+                        ? field.value[0] 
+                        : NONE_VALUE_SENTINEL 
+                    }
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select tickets (multi-select via comma or dropdown component)" />
+                        <SelectValue placeholder="Select a ticket or None" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        {/* Basic select. For multi-select, a more complex component or comma-separated input is needed.
-                            ShadCN's default Select is single-select. For now, we imply it's one or a custom multi-select.
-                            The form schema handles it as array, which needs manual handling or a proper multi-select component.
-                            Simplifying for now: just select one or show example.
-                        */}
-                        <SelectItem value="">None</SelectItem>
-                        {tickets.map(ticket => (
-                            <SelectItem key={ticket.id} value={ticket.id}>
-                                {ticket.id} - {ticket.title}
-                            </SelectItem>
-                        ))}
+                      <SelectItem value={NONE_VALUE_SENTINEL}>None</SelectItem>
+                      {tickets.map(ticket => (
+                        <SelectItem key={ticket.id} value={ticket.id}>
+                          {ticket.id} - {ticket.title}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
-                    {/* This is a simplified multi-select UX. A proper multi-select component would be better. */}
                   </Select>
                   <FormMessage />
                 </FormItem>
