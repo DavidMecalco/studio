@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -25,6 +26,7 @@ const deploymentEnvironments: DeploymentEnvironment[] = ['DEV', 'QA', 'PROD', 'S
 const deploymentStatuses: DeploymentStatus[] = ['Success', 'Failure', 'In Progress', 'Pending'];
 const fileTypes: Array<DeploymentLogEntry['filesDeployed'][0]['type']> = ['script', 'xml', 'report', 'other'];
 
+const NO_TICKET_SELECTED_VALUE = "__NO_TICKET_DEPLOYMENT__";
 
 const fileSchema = z.object({
   name: z.string().min(1, "File name is required."),
@@ -276,10 +278,19 @@ export default function DeploymentsPage() {
                 render={({ field }) => (
                     <FormItem>
                         <FormLabel>Associated Jira Tickets (Optional)</FormLabel>
-                         <Select onValueChange={(value) => field.onChange(value ? [value] : [])} > {/* Simplified to single select for now */}
+                         <Select 
+                            value={field.value && field.value.length > 0 ? field.value[0] : NO_TICKET_SELECTED_VALUE}
+                            onValueChange={(selectedValue) => {
+                                if (selectedValue === NO_TICKET_SELECTED_VALUE) {
+                                    field.onChange([]);
+                                } else {
+                                    field.onChange(selectedValue ? [selectedValue] : []);
+                                }
+                            }}
+                         >
                             <FormControl><SelectTrigger><SelectValue placeholder="Select a ticket to associate" /></SelectTrigger></FormControl>
                             <SelectContent>
-                                <SelectItem value="">-- No Ticket --</SelectItem>
+                                <SelectItem value={NO_TICKET_SELECTED_VALUE}>-- No Ticket --</SelectItem>
                                 {jiraTickets.map(ticket => (
                                     <SelectItem key={ticket.id} value={ticket.id}>{ticket.id} - {ticket.title}</SelectItem>
                                 ))}
