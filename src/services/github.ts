@@ -25,7 +25,7 @@ export interface GitHubCommit {
 }
 
 // Helper to generate a date within the last month
-constgetRandomPastDateISO = () => {
+const getRandomPastDateISO = () => {
   const now = new Date();
   const randomDaysAgo = Math.floor(Math.random() * 30); // 0 to 29 days ago
   now.setDate(now.getDate() - randomDaysAgo);
