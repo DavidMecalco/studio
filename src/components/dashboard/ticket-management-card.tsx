@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, type ReactNode } from 'react';
@@ -24,9 +25,11 @@ const ticketStatusOptions: { value: JiraTicketStatus; label: string }[] = [
   { value: 'Cerrado', label: 'Cerrado' },
 ];
 
+const UNASSIGNED_VALUE = "__UNASSIGNED__"; // Sentinel value for unassigned
+
 const formSchema = z.object({
   ticketId: z.string().min(1, "Seleccione un ticket."),
-  assigneeId: z.string().optional(), // Optional, allow unassigning
+  assigneeId: z.string().optional(), 
   newStatus: z.custom<JiraTicketStatus>(
     (val) => ticketStatusOptions.some(opt => opt.value === val), 
     "Seleccione un estado válido."
@@ -50,7 +53,7 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
     resolver: zodResolver(formSchema),
     defaultValues: {
       ticketId: "",
-      assigneeId: "",
+      assigneeId: UNASSIGNED_VALUE, // Use sentinel value
       newStatus: undefined,
     },
   });
@@ -63,14 +66,14 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
       if (ticket) {
         form.reset({
           ticketId: ticket.id,
-          assigneeId: ticket.assigneeId || "",
+          assigneeId: ticket.assigneeId || UNASSIGNED_VALUE, // Use sentinel value
           newStatus: ticket.status,
         });
       }
     } else {
-       form.reset({ // Reset other fields if no ticket is selected
+       form.reset({ 
           ticketId: "",
-          assigneeId: "",
+          assigneeId: UNASSIGNED_VALUE, // Use sentinel value
           newStatus: undefined,
        });
     }
@@ -82,10 +85,12 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
 
 
   async function onSubmit(values: TicketManagementFormValues) {
+    const actualAssigneeId = values.assigneeId === UNASSIGNED_VALUE ? "" : values.assigneeId;
+    
     const result = await updateJiraTicketAction(
       values.ticketId,
       values.newStatus,
-      values.assigneeId
+      actualAssigneeId 
     );
 
     if (result.success && result.ticket) {
@@ -95,12 +100,12 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
       });
       // Update local tickets state
       setTickets(prevTickets => prevTickets.map(t => t.id === result.ticket!.id ? result.ticket! : t));
-      form.reset({ // Reset form preserving selected ticket for potential further edits
+      form.reset({ 
           ticketId: values.ticketId,
-          assigneeId: result.ticket.assigneeId || "",
+          assigneeId: result.ticket.assigneeId || UNASSIGNED_VALUE, // Use sentinel value
           newStatus: result.ticket.status,
       });
-      router.refresh(); // Refresh server components data
+      router.refresh(); 
     } else {
       toast({
         title: "Error al Actualizar",
@@ -161,7 +166,7 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">-- Sin Asignar --</SelectItem>
+                          <SelectItem value={UNASSIGNED_VALUE}>-- Sin Asignar --</SelectItem>
                           {users.map(user => (
                             <SelectItem key={user.id} value={user.id}>
                               {user.name}
