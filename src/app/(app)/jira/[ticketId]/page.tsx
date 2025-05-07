@@ -1,10 +1,10 @@
 
-import { getJiraTicket, type JiraTicket } from '@/services/jira';
+import { getJiraTicket, getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, TicketIcon, GithubIcon } from 'lucide-react';
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -36,8 +36,8 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
           The ticket with ID <span className="font-mono">{params.ticketId}</span> could not be found.
         </p>
         <Button asChild>
-          <Link href="/">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go back to Dashboard
+          <Link href="/jira">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Go back to Jira Tickets
           </Link>
         </Button>
       </div>
@@ -50,8 +50,8 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
     <div className="space-y-8">
       <div>
         <Button asChild variant="outline" size="sm" className="mb-4">
-          <Link href="/" className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          <Link href="/jira" className="flex items-center gap-1">
+            <ArrowLeft className="h-4 w-4" /> Back to Jira Tickets
           </Link>
         </Button>
         <Card className="shadow-lg rounded-xl">
@@ -98,11 +98,8 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 }
 
 export async function generateStaticParams() {
-  // In a real app, fetch all ticket IDs to pre-render.
-  // For now, using mock IDs.
   const tickets = await getJiraTickets();
   return tickets.map((ticket) => ({
     ticketId: ticket.id,
   }));
 }
-
