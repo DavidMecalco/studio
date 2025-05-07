@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog } from "lucide-react";
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
@@ -17,6 +17,7 @@ const adminNavItems = [
   { href: "/jira", label: "Jira Tickets", icon: Ticket },
   { href: "/github", label: "GitHub Commits", icon: Github },
   { href: "/maximo", label: "Maximo Mgmt", icon: Server },
+  { href: "/admin-profile", label: "Admin Profile", icon: ShieldCheck }, 
   // { href: "/settings", label: "Settings", icon: Settings }, // Example for future
 ];
 
@@ -59,3 +60,4 @@ export function SidebarNav() {
     </SidebarMenu>
   );
 }
+

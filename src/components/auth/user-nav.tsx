@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth-context";
-import { LogOut, User as UserIcon, UserCog } from "lucide-react"; 
+import { LogOut, User as UserIcon, UserCog, ShieldCheck } from "lucide-react"; 
 import Link from "next/link";
 
 export function UserNav() {
@@ -60,7 +60,15 @@ export function UserNav() {
             </Link>
           </DropdownMenuItem>
         )}
-        {user.role === 'client' && <DropdownMenuSeparator />}
+        {user.role === 'admin' && (
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/admin-profile">
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              <span>Admin Profile</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {(user.role === 'client' || user.role === 'admin') && <DropdownMenuSeparator />}
         <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
