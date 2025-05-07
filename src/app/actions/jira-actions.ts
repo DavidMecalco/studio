@@ -30,10 +30,11 @@ export async function updateJiraTicketAction(
   try {
     const updatedTicket = await updateJiraTicket(ticketId, newStatus, newAssigneeId);
     if (updatedTicket) {
-      revalidatePath("/dashboard"); // Revalidate dashboard to show updated KPIs
-      revalidatePath(`/jira/${ticketId}`); // Revalidate specific ticket page
-      revalidatePath("/jira"); // Revalidate jira list page
-      revalidatePath("/my-tickets"); // Revalidate client's ticket list page
+      revalidatePath("/dashboard"); 
+      revalidatePath(`/jira/${ticketId}`); 
+      revalidatePath("/jira"); 
+      revalidatePath("/my-tickets"); 
+      revalidatePath("/profile"); // Revalidate profile if relevant
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
@@ -51,14 +52,12 @@ interface CreateJiraTicketResult {
   error?: string;
 }
 
-// This interface should align with CreateTicketDialogFormValues but be specific to what the action expects
 export interface CreateTicketActionFormValues {
   title: string;
   description: string;
   priority: JiraTicketPriority;
-  requestingUserId: string; // Username of the client/user creating
-  // For admin/dev roles, these might be set:
-  provider?: JiraTicketProvider;
+  requestingUserId: string; 
+  provider?: JiraTicketProvider; // Now correctly passed from dialog for both roles
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
 }
@@ -77,15 +76,14 @@ export async function createJiraTicketAction(
   }
 
   try {
-    // The CreateJiraTicketData type in jira.ts service now matches this structure.
     const createData: CreateJiraTicketData = {
       title: data.title,
       description: data.description,
       priority: data.priority,
       requestingUserId: data.requestingUserId,
-      provider: data.provider, // Will be undefined if client role
-      branch: data.branch, // Will be undefined if client role
-      attachmentNames: data.attachmentNames || [], // Will be empty if client role
+      provider: data.provider, // This will be set if client is TLA/FEMA, or if admin sets it
+      branch: data.branch, // Will be undefined if client role or not set by admin
+      attachmentNames: data.attachmentNames || [], 
     };
 
     const newTicket = await createJiraTicketService(createData);
@@ -93,6 +91,7 @@ export async function createJiraTicketAction(
       revalidatePath("/dashboard");
       revalidatePath("/jira");
       revalidatePath("/my-tickets");
+      revalidatePath("/profile"); // Revalidate profile if relevant
       return { success: true, ticket: newTicket };
     } else {
       return { success: false, error: "No se pudo crear el ticket. Error de la API." };

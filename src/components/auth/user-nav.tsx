@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth-context";
-import { LogOut, User as UserIcon } from "lucide-react"; 
+import { LogOut, User as UserIcon, UserCog } from "lucide-react"; 
 import Link from "next/link";
 
 export function UserNav() {
@@ -46,12 +46,21 @@ export function UserNav() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.username}</p>
-            {/* <p className="text-xs leading-none text-muted-foreground">
-              {user.email || "user@example.com"}
-            </p> */}
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.role === 'client' ? user.company : 'Administrator'}
+            </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {user.role === 'client' && (
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/profile">
+              <UserCog className="mr-2 h-4 w-4" />
+              <span>My Profile</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {user.role === 'client' && <DropdownMenuSeparator />}
         <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>

@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks } from "lucide-react";
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
@@ -21,8 +21,9 @@ const adminNavItems = [
 ];
 
 const clientNavItems = [
-   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Clients might see a simplified dashboard
+   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, 
    { href: "/my-tickets", label: "My Tickets", icon: ListChecks },
+   { href: "/profile", label: "My Profile", icon: UserCog },
 ];
 
 

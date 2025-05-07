@@ -4,11 +4,15 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { JiraTicketProvider } from '@/services/jira'; // For company type alignment
 
-interface User {
+export interface User {
   id: string; // Will store the username for mock simplicity
   username: string;
   role: 'admin' | 'client';
+  company?: JiraTicketProvider | 'Other Company'; // Aligned with JiraTicketProvider for TLA/FEMA
+  phone?: string;
+  position?: string;
   // email?: string; // Add other user properties as needed
 }
 
@@ -32,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('authUser');
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
+        const parsedUser = JSON.parse(storedUser) as User; // Cast to User
         // Basic validation of stored user structure
         if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.role) {
            setUser(parsedUser);
@@ -52,8 +56,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const role = username.toLowerCase().startsWith('client') ? 'client' : 'admin';
-    // For mock simplicity, use username as the ID. In a real app, ID would be from backend.
-    const mockUser: User = { id: username, username, role }; 
+    let company: User['company'] = 'Other Company';
+    let phone = 'N/A';
+    let position = 'N/A';
+
+    if (role === 'client') {
+      position = 'Client User';
+      if (username.toLowerCase().includes('tla')) {
+        company = 'TLA';
+        phone = '555-0101';
+      } else if (username.toLowerCase().includes('fema')) {
+        company = 'FEMA';
+        phone = '555-0202';
+      } else {
+        // Default for other clients
+        phone = '555-0303';
+      }
+    } else { // admin
+      position = 'System Administrator';
+      company = 'Maximo Corp' as User['company']; // Admin's company
+      phone = '555-0000';
+    }
+    
+    const mockUser: User = { id: username, username, role, company, phone, position }; 
     
     setUser(mockUser);
     localStorage.setItem('authUser', JSON.stringify(mockUser));

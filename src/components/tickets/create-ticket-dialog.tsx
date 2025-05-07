@@ -108,7 +108,7 @@ export function CreateTicketDialog() {
         description: "",
         priority: undefined,
         requestingUserId: user.username,
-        provider: undefined,
+        provider: undefined, // Provider for admin will be selected; for client, it's derived
         branch: undefined,
       });
     }
@@ -154,19 +154,27 @@ export function CreateTicketDialog() {
 
     const attachmentNames = user.role === 'admin' ? selectedFiles.map(file => file.name) : [];
     
-    const ticketData = {
+    let providerForAction: JiraTicketProvider | undefined = undefined;
+    if (user.role === 'client') {
+        // For clients, derive provider from their company if it's TLA or FEMA
+        if (user.company === 'TLA' || user.company === 'FEMA') {
+            providerForAction = user.company;
+        }
+    } else if (user.role === 'admin') {
+        providerForAction = values.provider;
+    }
+
+    const ticketDataForAction = {
       title: values.title!,
       description: values.description!,
       priority: values.priority!,
-      requestingUserId: values.requestingUserId!, // This should be correctly set from form/user
-      ...(user.role === 'admin' && { // Only include these for admin
-        provider: values.provider,
-        branch: values.branch,
-        attachmentNames,
-      }),
+      requestingUserId: user.username!,
+      provider: providerForAction, 
+      branch: user.role === 'admin' ? values.branch : undefined,
+      attachmentNames: user.role === 'admin' ? attachmentNames : [],
     };
 
-    const result = await createJiraTicketAction(ticketData);
+    const result = await createJiraTicketAction(ticketDataForAction);
 
     if (result.success && result.ticket) {
       toast({
@@ -186,7 +194,7 @@ export function CreateTicketDialog() {
     setIsSubmitting(false);
   }
   
-  if (!user) return null; // Don't render if no user (though layout should prevent this)
+  if (!user) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -229,7 +237,7 @@ export function CreateTicketDialog() {
                 <FormItem>
                   <FormLabel>Usuario Solicitante</FormLabel>
                   <FormControl>
-                    <Input {...field} readOnly={user.role === 'client'} disabled={user.role === 'client'} />
+                    <Input {...field} readOnly disabled value={user.username} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

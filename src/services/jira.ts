@@ -1,3 +1,4 @@
+
 /**
  * Represents the possible statuses of a Jira ticket.
  */
@@ -5,6 +6,7 @@ export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuel
 
 /**
  * Represents the possible providers for a Jira ticket.
+ * These can also represent client company names for repository mapping.
  */
 export type JiraTicketProvider = 'TLA' | 'FEMA';
 
@@ -48,6 +50,7 @@ export interface JiraTicket {
   lastUpdated?: string;
   /**
    * The provider associated with the ticket (e.g., TLA, FEMA).
+   * For client-created tickets, this might reflect their company.
    */
   provider?: JiraTicketProvider;
   /**
@@ -65,7 +68,7 @@ export interface JiraTicket {
   /**
    * The ID (username for mock) of the user who requested/created the ticket.
    */
-  requestingUserId: string; // Using username as ID for mock simplicity
+  requestingUserId: string; 
   /**
    * The GitLab repository associated with the ticket.
    */
@@ -84,7 +87,7 @@ let mockJiraTickets: JiraTicket[] = [
     provider: 'TLA',
     branch: 'DEV',
     priority: 'Media',
-    requestingUserId: 'Alice Wonderland', // Example requesting user
+    requestingUserId: 'Alice Wonderland', 
     gitlabRepository: 'maximo-tla',
   },
   {
@@ -120,8 +123,9 @@ let mockJiraTickets: JiraTicket[] = [
     assigneeId: 'user-1',
     lastUpdated: '2024-07-25T12:00:00Z',
     priority: 'Baja',
-    requestingUserId: 'client-user1',
-    gitlabRepository: 'maximo-generic',
+    requestingUserId: 'client-tla1', // Simulating a client from TLA
+    provider: 'TLA', // Provider inferred from client
+    gitlabRepository: 'maximo-tla',
   },
   {
     id: 'MAX-202',
@@ -142,7 +146,8 @@ let mockJiraTickets: JiraTicket[] = [
     assigneeId: 'user-2',
     lastUpdated: '2024-07-20T17:00:00Z',
     priority: 'Baja',
-    requestingUserId: 'client-user2',
+    requestingUserId: 'client-fema1', // Simulating a client from FEMA
+    provider: 'FEMA', // Provider inferred from client
     gitlabRepository: 'maximo-fema',
   },
 ];
@@ -154,9 +159,8 @@ let mockJiraTickets: JiraTicket[] = [
  * @returns A promise that resolves to an array of JiraTicket objects.
  */
 export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 300));
-  let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); // Return a deep copy
+  let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); 
   if (requestingUserId) {
     tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
   }
@@ -169,7 +173,6 @@ export async function getJiraTickets(requestingUserId?: string): Promise<JiraTic
  * @returns A promise that resolves to a JiraTicket object or null if not found.
  */
 export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null> {
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 200));
   const ticket = mockJiraTickets.find((ticket) => ticket.id === ticketId);
   return ticket ? JSON.parse(JSON.stringify(ticket)) : null;
@@ -187,7 +190,6 @@ export async function updateJiraTicket(
   newStatus: JiraTicketStatus,
   newAssigneeId?: string
 ): Promise<JiraTicket | null> {
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 500));
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) {
@@ -197,7 +199,7 @@ export async function updateJiraTicket(
   const updatedTicket = {
     ...mockJiraTickets[ticketIndex],
     status: newStatus,
-    assigneeId: newAssigneeId === '' ? undefined : newAssigneeId, // Handle unassigning
+    assigneeId: newAssigneeId === '' ? undefined : newAssigneeId, 
     lastUpdated: new Date().toISOString(),
   };
   mockJiraTickets[ticketIndex] = updatedTicket;
@@ -211,48 +213,48 @@ export interface CreateJiraTicketData {
   title: string;
   description: string;
   priority: JiraTicketPriority;
-  requestingUserId: string; // Username of the client/user creating
-  // For admin/dev roles, these might be set:
-  provider?: JiraTicketProvider;
+  requestingUserId: string; 
+  provider?: JiraTicketProvider; // This can be the client's company
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
-  assigneeId?: string; // Optional: if assigning upon creation
+  assigneeId?: string; 
 }
 
 /**
  * Asynchronously creates a new Jira ticket.
+ * GitLab repository is determined by the 'provider' field (client's company).
  * @param ticketData The data for the new ticket.
  * @returns A promise that resolves to the created JiraTicket object.
  */
 export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket> {
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 600));
   
-  const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; // Generate a new mock ID like MAS-1234
+  const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
 
   let gitlabRepository = 'maximo-generic'; // Default repository
-  // Determine repository based on provider or requestingUserId pattern for mock
-  if (ticketData.provider === 'TLA' || ticketData.requestingUserId.toLowerCase().includes('tla')) {
+  if (ticketData.provider === 'TLA') {
     gitlabRepository = 'maximo-tla';
-  } else if (ticketData.provider === 'FEMA' || ticketData.requestingUserId.toLowerCase().includes('fema')) {
+  } else if (ticketData.provider === 'FEMA') {
     gitlabRepository = 'maximo-fema';
   }
+  // If provider is undefined (e.g., an admin creating a generic ticket, or a client from a non-TLA/FEMA company),
+  // it defaults to 'maximo-generic'.
 
   const newTicket: JiraTicket = {
     id: newTicketId,
     title: ticketData.title,
     description: ticketData.description,
-    status: 'Abierto', // Default status for new tickets
+    status: 'Abierto', 
     priority: ticketData.priority,
     requestingUserId: ticketData.requestingUserId,
     gitlabRepository: gitlabRepository,
-    provider: ticketData.provider, // Keep if provided by admin
-    branch: ticketData.branch, // Keep if provided by admin
-    attachmentNames: ticketData.attachmentNames || [], // Keep if provided by admin
+    provider: ticketData.provider,
+    branch: ticketData.branch, 
+    attachmentNames: ticketData.attachmentNames || [], 
     assigneeId: ticketData.assigneeId,
     lastUpdated: new Date().toISOString(),
   };
   
-  mockJiraTickets.unshift(newTicket); // Add to the beginning of the array
+  mockJiraTickets.unshift(newTicket); 
   return JSON.parse(JSON.stringify(newTicket));
 }
