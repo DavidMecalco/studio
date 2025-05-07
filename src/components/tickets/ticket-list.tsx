@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowRight, Ticket as TicketIcon, GitBranch } from 'lucide-react'; 
+import { ArrowRight, Ticket as TicketIcon, GitBranch, User } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 
 interface TicketListProps {
@@ -12,9 +12,16 @@ interface TicketListProps {
   title?: string;
   maxItems?: number;
   showRequestingUser?: boolean; // To conditionally show this column
+  showAssignee?: boolean; // To conditionally show assignee
 }
 
-export function TicketList({ tickets, title = "Jira Tickets", maxItems, showRequestingUser = true }: TicketListProps) {
+export function TicketList({ 
+    tickets, 
+    title = "Jira Tickets", 
+    maxItems, 
+    showRequestingUser = true,
+    showAssignee = false 
+}: TicketListProps) {
   const displayedTickets = maxItems ? tickets.slice(0, maxItems) : tickets;
 
   if (!displayedTickets.length) {
@@ -48,6 +55,7 @@ export function TicketList({ tickets, title = "Jira Tickets", maxItems, showRequ
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
               {showRequestingUser && <TableHead>Requesting User</TableHead>}
+              {showAssignee && <TableHead>Assigned To</TableHead>}
               <TableHead>Repository</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -84,6 +92,17 @@ export function TicketList({ tickets, title = "Jira Tickets", maxItems, showRequ
                    </Badge>
                 </TableCell>
                 {showRequestingUser && <TableCell>{ticket.requestingUserId}</TableCell>}
+                {showAssignee && (
+                  <TableCell>
+                    {ticket.assigneeId ? (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <User className="h-3 w-3" /> {ticket.assigneeId}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   {ticket.gitlabRepository ? (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -2,8 +2,9 @@
 import type { GitHubCommit } from '@/services/github';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { GitCommit, GithubIcon } from 'lucide-react';
+import { GitCommit, GithubIcon, FileText } from 'lucide-react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 interface CommitListProps {
   commits: GitHubCommit[];
@@ -44,6 +45,18 @@ export function CommitList({ commits, title = "GitHub Commits", maxItems }: Comm
                 <p className="text-sm text-muted-foreground">
                   SHA: <span className="font-mono text-xs">{commit.sha.substring(0, 7)}</span> by {commit.author}
                 </p>
+                {commit.filesChanged && commit.filesChanged.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-xs text-muted-foreground font-medium">Files changed:</p>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {commit.filesChanged.map(file => (
+                        <Badge key={file} variant="secondary" className="text-xs font-normal flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> {file}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

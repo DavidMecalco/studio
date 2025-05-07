@@ -1,38 +1,125 @@
 
+"use client"; 
+
+import { useEffect, useState } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Ticket } from 'lucide-react';
+import { Ticket, Users } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
+// Potentially add a filter component here for technicians to filter by assignee
+// import { TicketFilterControls } from '@/components/tickets/ticket-filter-controls'; 
 
-async function getPageData() {
-  // Admin view: fetch all tickets
-  const jiraTickets: JiraTicket[] = await getJiraTickets();
-  return { jiraTickets };
-}
+export default function JiraPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
+  // const [filteredTickets, setFilteredTickets] = useState<JiraTicket[]>([]); // For future filtering
+  const [isLoading, setIsLoading] = useState(true);
+  // const [currentFilter, setCurrentFilter] = useState<'all' | 'my-assigned'>('all'); // Example filter state
 
-export default async function JiraPage() {
-  const { jiraTickets } = await getPageData();
+  useEffect(() => {
+    async function fetchTickets() {
+      if (user) { // Admins (technicians) can see this page
+        setIsLoading(true);
+        const tickets = await getJiraTickets();
+        setAllTickets(tickets);
+        // setFilteredTickets(tickets); // Initially show all
+        setIsLoading(false);
+      }
+    }
+    if (!authLoading) {
+        fetchTickets();
+    }
+  }, [user, authLoading]);
+
+  // Example filter logic (can be expanded)
+  // useEffect(() => {
+  //   if (currentFilter === 'my-assigned' && user) {
+  //     setFilteredTickets(allTickets.filter(ticket => ticket.assigneeId === user.id));
+  //   } else {
+  //     setFilteredTickets(allTickets);
+  //   }
+  // }, [currentFilter, allTickets, user]);
+
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Ticket className="h-8 w-8 text-primary" /> Jira Tickets (Admin/Technician View)
+            </h1>
+            <p className="text-muted-foreground">
+              Track and manage latest updates and issues from Jira.
+            </p>
+          </div>
+        </div>
+        <Card className="bg-card shadow-lg rounded-xl">
+          <CardHeader>
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (user?.role !== 'admin') {
+     return (
+        <div className="space-y-8 text-center py-10">
+            <Users className="h-16 w-16 mx-auto text-destructive" />
+            <h1 className="text-2xl font-semibold">Access Denied</h1>
+            <p className="text-muted-foreground">This page is for admin/technician users only.</p>
+        </div>
+     )
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Ticket className="h-8 w-8 text-primary" /> Jira Tickets (Admin View)
+            <Ticket className="h-8 w-8 text-primary" /> Jira Tickets (Admin/Technician View)
           </h1>
           <p className="text-muted-foreground">
-            Track the latest updates and issues from Jira.
+            Track and manage latest updates and issues from Jira. Technicians can view assigned tickets and manage development.
           </p>
         </div>
+        {/* 
+        // Future filter controls
+        <TicketFilterControls
+            currentFilter={currentFilter}
+            onFilterChange={setCurrentFilter}
+            hasAssignedOption={true} 
+        /> 
+        */}
       </div>
 
       <Card className="bg-card shadow-lg rounded-xl">
         <CardHeader>
-          <CardTitle>All Jira Tickets</CardTitle>
-          <CardDescription>Browse and manage all available Jira tickets.</CardDescription>
+          <CardTitle>
+            {/* {currentFilter === 'my-assigned' ? 'My Assigned Jira Tickets' : 'All Jira Tickets'} */}
+            All Jira Tickets 
+          </CardTitle>
+          <CardDescription>
+            {/* {currentFilter === 'my-assigned' ? 'Tickets assigned to you.' : 'Browse and manage all available Jira tickets.'} */}
+            Browse and manage all available Jira tickets. Click 'View' to see details and manage development.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <TicketList tickets={jiraTickets} title="" />
+          <TicketList 
+            tickets={allTickets /* replace with filteredTickets when filter is active */} 
+            title="" 
+            showRequestingUser={true} 
+            showAssignee={true} // New prop to show assignee
+            />
         </CardContent>
       </Card>
     </div>

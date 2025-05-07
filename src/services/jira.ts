@@ -82,12 +82,12 @@ let mockJiraTickets: JiraTicket[] = [
     title: 'Implement feature X',
     description: 'Details about feature X implementation, including backend and frontend changes.',
     status: 'En Progreso',
-    assigneeId: 'user-1',
+    assigneeId: 'admin', // Default assignee for an admin/technician user
     lastUpdated: '2024-07-28T10:00:00Z',
     provider: 'TLA',
     branch: 'DEV',
     priority: 'Media',
-    requestingUserId: 'Alice Wonderland', 
+    requestingUserId: 'client-tla1', 
     gitlabRepository: 'maximo-tla',
   },
   {
@@ -95,12 +95,12 @@ let mockJiraTickets: JiraTicket[] = [
     title: 'Fix bug Y in login module',
     description: 'Users are unable to login with valid credentials. Issue seems to be related to token validation.',
     status: 'Resuelto',
-    assigneeId: 'user-2',
+    assigneeId: 'admin',
     lastUpdated: '2024-07-27T15:30:00Z',
     provider: 'FEMA',
     branch: 'QA',
     priority: 'Alta',
-    requestingUserId: 'Bob The Builder',
+    requestingUserId: 'client-fema1',
     gitlabRepository: 'maximo-fema',
   },
   {
@@ -112,7 +112,7 @@ let mockJiraTickets: JiraTicket[] = [
     provider: 'TLA',
     branch: 'PROD',
     priority: 'Alta',
-    requestingUserId: 'Alice Wonderland',
+    requestingUserId: 'client-tla2',
     gitlabRepository: 'maximo-tla',
   },
   {
@@ -120,11 +120,11 @@ let mockJiraTickets: JiraTicket[] = [
     title: 'Update documentation for API v2',
     description: 'Review and update all relevant sections of the API documentation to reflect v2 changes.',
     status: 'Pendiente',
-    assigneeId: 'user-1',
+    assigneeId: 'admin',
     lastUpdated: '2024-07-25T12:00:00Z',
     priority: 'Baja',
-    requestingUserId: 'client-tla1', // Simulating a client from TLA
-    provider: 'TLA', // Provider inferred from client
+    requestingUserId: 'client-tla1', 
+    provider: 'TLA', 
     gitlabRepository: 'maximo-tla',
   },
   {
@@ -132,22 +132,22 @@ let mockJiraTickets: JiraTicket[] = [
     title: 'Perform security audit on user module',
     description: 'Conduct a thorough security audit focusing on authentication and authorization mechanisms.',
     status: 'En espera del visto bueno',
-    assigneeId: 'user-3',
+    assigneeId: 'another-admin', // Different admin for variety
     lastUpdated: '2024-07-26T11:00:00Z',
     priority: 'Media',
-    requestingUserId: 'Charlie Brown',
-    gitlabRepository: 'maximo-tla',
+    requestingUserId: 'client-generic1',
+    gitlabRepository: 'maximo-generic',
   },
   {
     id: 'MAX-303',
     title: 'Refactor reporting service',
     description: 'Improve performance and maintainability of the current reporting service.',
     status: 'Cerrado',
-    assigneeId: 'user-2',
+    assigneeId: 'admin',
     lastUpdated: '2024-07-20T17:00:00Z',
     priority: 'Baja',
-    requestingUserId: 'client-fema1', // Simulating a client from FEMA
-    provider: 'FEMA', // Provider inferred from client
+    requestingUserId: 'client-fema1', 
+    provider: 'FEMA', 
     gitlabRepository: 'maximo-fema',
   },
 ];
@@ -179,16 +179,16 @@ export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null
 }
 
 /**
- * Asynchronously updates a Jira ticket's status and assignee.
+ * Asynchronously updates a Jira ticket's status and/or assignee.
  * @param ticketId The ID of the ticket to update.
- * @param newStatus The new status for the ticket.
- * @param newAssigneeId The ID of the new assignee (optional).
+ * @param newStatus The new status for the ticket. If undefined, status is not changed.
+ * @param newAssigneeId The ID of the new assignee. If undefined, assignee is not changed. If an empty string, ticket is unassigned.
  * @returns A promise that resolves to the updated JiraTicket object or null if not found.
  */
 export async function updateJiraTicket(
   ticketId: string,
-  newStatus: JiraTicketStatus,
-  newAssigneeId?: string
+  newStatus?: JiraTicketStatus,
+  newAssigneeId?: string // undefined means don't change, "" means unassign
 ): Promise<JiraTicket | null> {
   await new Promise(resolve => setTimeout(resolve, 500));
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
@@ -196,11 +196,25 @@ export async function updateJiraTicket(
     return null;
   }
   
+  const currentTicket = mockJiraTickets[ticketIndex];
+  const updatedTicketDetails: Partial<JiraTicket> = {};
+
+  if (newStatus !== undefined) {
+    updatedTicketDetails.status = newStatus;
+  }
+  
+  if (newAssigneeId !== undefined) {
+    updatedTicketDetails.assigneeId = newAssigneeId === "" ? undefined : newAssigneeId;
+  }
+  
+  // Only update if there are changes
+  if (Object.keys(updatedTicketDetails).length > 0) {
+    updatedTicketDetails.lastUpdated = new Date().toISOString();
+  }
+
   const updatedTicket = {
-    ...mockJiraTickets[ticketIndex],
-    status: newStatus,
-    assigneeId: newAssigneeId === '' ? undefined : newAssigneeId, 
-    lastUpdated: new Date().toISOString(),
+    ...currentTicket,
+    ...updatedTicketDetails,
   };
   mockJiraTickets[ticketIndex] = updatedTicket;
   return JSON.parse(JSON.stringify(updatedTicket));
@@ -214,7 +228,7 @@ export interface CreateJiraTicketData {
   description: string;
   priority: JiraTicketPriority;
   requestingUserId: string; 
-  provider?: JiraTicketProvider; // This can be the client's company
+  provider?: JiraTicketProvider; 
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
   assigneeId?: string; 
@@ -222,7 +236,7 @@ export interface CreateJiraTicketData {
 
 /**
  * Asynchronously creates a new Jira ticket.
- * GitLab repository is determined by the 'provider' field (client's company).
+ * GitLab repository is determined by the 'provider' field (client's company or admin selection).
  * @param ticketData The data for the new ticket.
  * @returns A promise that resolves to the created JiraTicket object.
  */
@@ -231,14 +245,12 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
   
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
 
-  let gitlabRepository = 'maximo-generic'; // Default repository
+  let gitlabRepository = 'maximo-generic'; 
   if (ticketData.provider === 'TLA') {
     gitlabRepository = 'maximo-tla';
   } else if (ticketData.provider === 'FEMA') {
     gitlabRepository = 'maximo-fema';
   }
-  // If provider is undefined (e.g., an admin creating a generic ticket, or a client from a non-TLA/FEMA company),
-  // it defaults to 'maximo-generic'.
 
   const newTicket: JiraTicket = {
     id: newTicketId,
@@ -251,7 +263,7 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
     provider: ticketData.provider,
     branch: ticketData.branch, 
     attachmentNames: ticketData.attachmentNames || [], 
-    assigneeId: ticketData.assigneeId,
+    assigneeId: ticketData.assigneeId, // Could be pre-assigned by admin during creation
     lastUpdated: new Date().toISOString(),
   };
   

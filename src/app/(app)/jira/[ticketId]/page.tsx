@@ -1,14 +1,20 @@
 
+"use client"; // Make this a client component to use hooks like useAuth
+
+import { useEffect, useState }  from 'react';
 import { getJiraTicket, getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { format, parseISO } from 'date-fns';
+import { useAuth } from '@/context/auth-context';
+import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TicketDetailPageProps {
   params: {
@@ -16,18 +22,76 @@ interface TicketDetailPageProps {
   };
 }
 
-async function getTicketDetails(ticketId: string) {
-  const ticket = await getJiraTicket(ticketId);
-  if (!ticket) {
-    return null;
-  }
-  // Assuming ticket.id or some other property can be used to find related commits
-  const commits = await getGitHubCommits(ticket.id); 
-  return { ticket, commits };
+interface TicketDetailsData {
+  ticket: JiraTicket;
+  commits: GitHubCommit[];
 }
 
-export default async function TicketDetailPage({ params }: TicketDetailPageProps) {
-  const ticketData = await getTicketDetails(params.ticketId);
+async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
+  try {
+    const ticket = await getJiraTicket(ticketId);
+    if (!ticket) {
+      return null;
+    }
+    const commits = await getGitHubCommits(ticket.id);
+    return { ticket, commits };
+  } catch (error) {
+    console.error("Error fetching ticket details:", error);
+    return null;
+  }
+}
+
+
+export default function TicketDetailPage({ params }: TicketDetailPageProps) {
+  const { user, loading: authLoading } = useAuth();
+  const [ticketData, setTicketData] = useState<TicketDetailsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchTicketDetails(params.ticketId)
+      .then(data => {
+        setTicketData(data);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        // Error already logged in fetchTicketDetails
+        setIsLoading(false);
+      });
+  }, [params.ticketId]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-8 w-32 mb-4" /> {/* Back button */}
+        <Card className="shadow-lg rounded-xl">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+              <div className="flex-1">
+                <Skeleton className="h-7 w-3/4 mb-1" /> {/* Title */}
+                <Skeleton className="h-4 w-1/2" /> {/* Description */}
+              </div>
+              <div className="flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
+                <Skeleton className="h-7 w-24" /> {/* Status Badge */}
+                <Skeleton className="h-5 w-20" /> {/* Priority Badge */}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => <div key={i}><Skeleton className="h-4 w-1/3 mb-1" /><Skeleton className="h-5 w-2/3" /></div>)}
+            </div>
+            <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/4 mb-2" /> {/* Description heading */}
+            <Skeleton className="h-16 w-full" /> {/* Description content */}
+            <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Commits heading */}
+            <Skeleton className="h-20 w-full" /> {/* Commits list placeholder */}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!ticketData) {
     return (
@@ -52,7 +116,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
     <div className="space-y-8">
       <div>
         <Button asChild variant="outline" size="sm" className="mb-4">
-          <Link href="/jira" className="flex items-center gap-1">
+          <Link href={user?.role === 'client' ? "/my-tickets" : "/jira"} className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" /> Back to Tickets
           </Link>
         </Button>
@@ -102,7 +166,11 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                  <div>
                     <h3 className="text-sm font-medium text-muted-foreground">GitLab Repository</h3>
                     <p className="text-foreground flex items-center gap-1">
-                        {ticket.gitlabRepository ? <><GitBranch className="h-4 w-4"/>{ticket.gitlabRepository}</> : '-'}
+                        {ticket.gitlabRepository ? 
+                            <Link href={`https://gitlab.com/${ticket.gitlabRepository}`} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                <GitBranch className="h-4 w-4"/>{ticket.gitlabRepository}
+                            </Link> 
+                            : '-'}
                     </p>
                 </div>
                 <div>
@@ -123,10 +191,10 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                         <p className="text-foreground">{ticket.branch}</p>
                     </div>
                 )}
-                 {ticket.assigneeId && ( // Assuming you might fetch assignee details later
+                 {ticket.assigneeId && ( 
                      <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Assigned To</h3>
-                        <p className="text-foreground">{ticket.assigneeId}</p>
+                        <p className="text-foreground">{ticket.assigneeId}</p> {/* Consider fetching user name if available */}
                     </div>
                  )}
             </div>
@@ -143,7 +211,12 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                 <Separator className="my-6" />
                 <h3 className="text-lg font-semibold mb-3 text-foreground">Attachments</h3>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  {ticket.attachmentNames.map((name, index) => <li key={index}>{name}</li>)}
+                  {ticket.attachmentNames.map((name, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                        <HardDriveUpload className="h-4 w-4 text-muted-foreground" /> 
+                        {name}
+                        {/* Add download link if files are actually stored somewhere */}
+                    </li>))}
                 </ul>
               </>
             )}
@@ -165,13 +238,23 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
            </CardFooter>
         </Card>
       </div>
+
+      {user?.role === 'admin' && (
+        <>
+            <Separator className="my-8" />
+            <CommitChangesForm ticketId={ticket.id} currentTicketStatus={ticket.status} />
+        </>
+      )}
     </div>
   );
 }
 
-export async function generateStaticParams() {
-  const tickets = await getJiraTickets(); // Get all tickets for param generation
-  return tickets.map((ticket) => ({
-    ticketId: ticket.id,
-  }));
-}
+// This function is no longer needed here as the page is client-side rendered due to useAuth.
+// If it were a server component wanting to pre-generate paths:
+// export async function generateStaticParams() {
+//   const tickets = await getJiraTickets(); 
+//   return tickets.map((ticket) => ({
+//     ticketId: ticket.id,
+//   }));
+// }
+
