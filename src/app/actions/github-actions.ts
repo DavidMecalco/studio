@@ -1,9 +1,8 @@
-
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { createGitHubCommit as createGitHubCommitService, type GitHubCommit } from "@/services/github";
-import { updateJiraTicket, type JiraTicketStatus } from "@/services/jira";
+import { addCommitToTicketHistory, type JiraTicketStatus, updateJiraTicket } from "@/services/jira";
 
 interface CreateCommitResult {
   success: boolean;
@@ -19,7 +18,6 @@ interface CreateCommitResult {
  * @param authorUsername The username of the commit author.
  * @param fileNames List of files changed (simulated).
  * @param branch The branch to commit to (default 'dev').
- * @param newTicketStatus The new status for the Jira ticket after commit.
  * @returns A promise that resolves to an object indicating success or failure and the created commit.
  */
 export async function createCommitAndPushAction(
@@ -27,8 +25,8 @@ export async function createCommitAndPushAction(
   commitMessage: string,
   authorUsername: string,
   fileNames: string[],
-  branch: string = "dev",
-  newTicketStatus: JiraTicketStatus = "En Progreso"
+  branch: string = "dev"
+  // newTicketStatus is now handled by addCommitToTicketHistory
 ): Promise<CreateCommitResult> {
   if (!ticketId || !commitMessage || !authorUsername) {
     return { success: false, error: "Ticket ID, commit message, and author are required." };
@@ -48,22 +46,26 @@ export async function createCommitAndPushAction(
       return { success: false, error: "Failed to create GitHub commit." };
     }
 
-    // Step 2: Update the Jira ticket status
-    // For assignee, we'll keep the current one or leave as is if not directly changing it here
-    const updatedTicket = await updateJiraTicket(ticketId, newTicketStatus); 
+    // Step 2: Add commit to ticket history (this also updates status if needed)
+    const ticketWithCommitHistory = await addCommitToTicketHistory(
+        ticketId, 
+        newCommit.sha, 
+        authorUsername, 
+        commitMessage, 
+        branch
+    );
 
-    if (!updatedTicket) {
-        // Log this, but maybe the commit was still "successful" in terms of git
-        console.warn(`Commit ${newCommit.sha} created, but failed to update Jira ticket ${ticketId} status.`);
+    if (!ticketWithCommitHistory) {
+        console.warn(`Commit ${newCommit.sha} created, but failed to add commit to Jira ticket ${ticketId} history or update status.`);
         // Depending on requirements, you might want to roll back or flag this.
-        // For now, we'll consider the commit part successful if it reached here.
     }
 
     // Step 3: Revalidate paths
     revalidatePath(`/jira/${ticketId}`);
     revalidatePath("/jira");
     revalidatePath("/dashboard");
-    revalidatePath("/github"); // If commits are displayed on a general GitHub page
+    revalidatePath("/github"); 
+    revalidatePath("/audit"); // Revalidate audit log
 
     return { success: true, commit: newCommit };
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, type ReactNode } from 'react';
@@ -11,10 +10,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { JiraTicket, JiraTicketStatus } from '@/services/jira';
-import type { User } from '@/services/users';
+import type { User as AuthUser } from '@/context/auth-context'; // Renamed to avoid conflict with service User
+import type { User as ServiceUser } from '@/services/users'; // Keep this for the list of assignable users
 import { updateJiraTicketAction } from '@/app/actions/jira-actions';
 import { Briefcase, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
+
 
 const ticketStatusOptions: { value: JiraTicketStatus; label: string }[] = [
   { value: 'Abierto', label: 'Abierto' },
@@ -40,7 +42,7 @@ type TicketManagementFormValues = z.infer<typeof formSchema>;
 
 interface TicketManagementCardProps {
   tickets: JiraTicket[];
-  users: User[];
+  users: ServiceUser[]; // List of users that can be assigned
   defaultIcon?: ReactNode;
 }
 
@@ -48,12 +50,13 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
   const [tickets, setTickets] = useState<JiraTicket[]>(initialTickets);
   const { toast } = useToast();
   const router = useRouter();
+  const { user: currentUser } = useAuth(); // Get the currently logged-in user
 
   const form = useForm<TicketManagementFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       ticketId: "",
-      assigneeId: UNASSIGNED_VALUE, // Use sentinel value
+      assigneeId: UNASSIGNED_VALUE, 
       newStatus: undefined,
     },
   });
@@ -66,14 +69,14 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
       if (ticket) {
         form.reset({
           ticketId: ticket.id,
-          assigneeId: ticket.assigneeId || UNASSIGNED_VALUE, // Use sentinel value
+          assigneeId: ticket.assigneeId || UNASSIGNED_VALUE, 
           newStatus: ticket.status,
         });
       }
     } else {
        form.reset({ 
           ticketId: "",
-          assigneeId: UNASSIGNED_VALUE, // Use sentinel value
+          assigneeId: UNASSIGNED_VALUE, 
           newStatus: undefined,
        });
     }
@@ -85,10 +88,15 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
 
 
   async function onSubmit(values: TicketManagementFormValues) {
+    if (!currentUser) {
+        toast({ title: "Error", description: "Current user not found. Please re-login.", variant: "destructive" });
+        return;
+    }
     const actualAssigneeId = values.assigneeId === UNASSIGNED_VALUE ? "" : values.assigneeId;
     
     const result = await updateJiraTicketAction(
       values.ticketId,
+      currentUser.id, // Pass the ID of the user performing the action
       values.newStatus,
       actualAssigneeId 
     );
@@ -102,7 +110,7 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
       setTickets(prevTickets => prevTickets.map(t => t.id === result.ticket!.id ? result.ticket! : t));
       form.reset({ 
           ticketId: values.ticketId,
-          assigneeId: result.ticket.assigneeId || UNASSIGNED_VALUE, // Use sentinel value
+          assigneeId: result.ticket.assigneeId || UNASSIGNED_VALUE, 
           newStatus: result.ticket.status,
       });
       router.refresh(); 
@@ -167,9 +175,9 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
                         </FormControl>
                         <SelectContent>
                           <SelectItem value={UNASSIGNED_VALUE}>-- Sin Asignar --</SelectItem>
-                          {users.map(user => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
+                          {users.map(userServiceUser => ( // Iterate over ServiceUser[]
+                            <SelectItem key={userServiceUser.id} value={userServiceUser.id}>
+                              {userServiceUser.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

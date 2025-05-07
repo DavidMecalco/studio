@@ -1,0 +1,74 @@
+"use client";
+
+import type { JiraTicketHistoryEntry } from '@/services/jira';
+import { format, parseISO } from 'date-fns';
+import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+
+interface TicketHistoryItemProps {
+  entry: JiraTicketHistoryEntry & { ticketId?: string }; // ticketId for audit log context
+  isLastItem: boolean;
+}
+
+const getIconForAction = (action: string) => {
+  if (action.toLowerCase().includes('created')) return <Layers className="h-4 w-4 text-primary" />;
+  if (action.toLowerCase().includes('status changed')) return <Edit3 className="h-4 w-4 text-yellow-500" />;
+  if (action.toLowerCase().includes('commit added')) return <GitCommit className="h-4 w-4 text-blue-500" />;
+  if (action.toLowerCase().includes('comment added')) return <MessageSquare className="h-4 w-4 text-green-500" />;
+  if (action.toLowerCase().includes('deployment')) return <Layers className="h-4 w-4 text-purple-500" />; // Example for deployment
+  return <Edit3 className="h-4 w-4 text-muted-foreground" />;
+};
+
+
+export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps) {
+  return (
+    <li className="relative pl-8">
+      {!isLastItem && (
+        <div className="absolute left-[10px] top-5 -bottom-3 w-0.5 bg-border"></div>
+      )}
+      <div className="absolute left-[3px] top-[14px] flex h-4 w-4 items-center justify-center rounded-full bg-background ring-4 ring-border">
+        {getIconForAction(entry.action)}
+      </div>
+      <div className="flex flex-col space-y-1 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground">{entry.userId}</span>
+             {(entry as any).ticketId && entry.action !== 'Created' && ( // Show ticket ID if present (from audit log) and not a creation event
+              <Badge variant="outline" className="text-xs">
+                Ticket: <Link href={`/jira/${(entry as any).ticketId}`} className="hover:underline ml-1">{(entry as any).ticketId}</Link>
+              </Badge>
+            )}
+          </div>
+          <time className="text-xs text-muted-foreground">
+            {format(parseISO(entry.timestamp), "MMM d, yyyy 'at' h:mm a")}
+          </time>
+        </div>
+        <p className="text-sm font-semibold text-foreground">{entry.action}</p>
+        {entry.details && <p className="text-sm text-muted-foreground">{entry.details}</p>}
+
+        {entry.fromStatus && entry.toStatus && (
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <Badge variant="secondary">{entry.fromStatus}</Badge>
+            <ArrowRight className="h-3 w-3" />
+            <Badge>{entry.toStatus}</Badge>
+          </p>
+        )}
+        {entry.comment && <p className="text-sm italic text-muted-foreground pl-2 border-l-2 border-border">"{entry.comment}"</p>}
+        {entry.commitSha && (
+          <p className="text-sm text-muted-foreground">
+            Commit: <span className="font-mono text-xs">{entry.commitSha.substring(0, 7)}</span>
+            {/* In a real app, this would be a link to GitHub/GitLab */}
+          </p>
+        )}
+         {entry.deploymentId && (
+          <p className="text-sm text-muted-foreground">
+            Deployment ID: <span className="font-mono text-xs">{entry.deploymentId}</span>
+             {/* Potentially link to deployment details if available */}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}

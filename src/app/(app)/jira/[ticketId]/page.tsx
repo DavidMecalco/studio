@@ -1,14 +1,13 @@
-
-"use client"; // Make this a client component to use hooks like useAuth
+"use client"; 
 
 import { useEffect, useState }  from 'react';
-import { useParams } from 'next/navigation'; // Import useParams
+import { useParams } from 'next/navigation'; 
 import { getJiraTicket, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,13 +15,7 @@ import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// params are no longer passed as props, they are accessed via useParams hook
-// interface TicketDetailPageProps {
-//   params: {
-//     ticketId: string;
-//   };
-// }
+import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
 
 interface TicketDetailsData {
   ticket: JiraTicket;
@@ -46,29 +39,27 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
 
 export default function TicketDetailPage() {
   const { user, loading: authLoading } = useAuth();
-  const params = useParams<{ ticketId: string }>(); // Use useParams hook
-  const ticketId = params.ticketId; // Extract ticketId from params
+  const params = useParams<{ ticketId: string }>(); 
+  const ticketId = params.ticketId; 
 
   const [ticketData, setTicketData] = useState<TicketDetailsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (ticketId) { // Check if ticketId is available
+    if (ticketId) { 
       setIsLoading(true);
-      fetchTicketDetails(ticketId) // Use ticketId from hook
+      fetchTicketDetails(ticketId) 
         .then(data => {
           setTicketData(data);
           setIsLoading(false);
         })
         .catch(() => {
-          // Error already logged in fetchTicketDetails
           setIsLoading(false);
         });
     } else {
-        // Handle case where ticketId might not be available initially
         setIsLoading(false);
     }
-  }, [ticketId]); // Depend on ticketId from hook
+  }, [ticketId]); 
 
   if (authLoading || isLoading) {
     return (
@@ -97,6 +88,9 @@ export default function TicketDetailPage() {
             <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* Commits heading */}
             <Skeleton className="h-20 w-full" /> {/* Commits list placeholder */}
+             <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/3 mb-2" /> {/* History heading */}
+            <Skeleton className="h-24 w-full" /> {/* History list placeholder */}
           </CardContent>
         </Card>
       </div>
@@ -143,7 +137,7 @@ export default function TicketDetailPage() {
               </div>
               <div className="flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
                 <Badge 
-                  variant={ticket.status === 'Resolved' || ticket.status === 'Cerrado' ? 'default' : 'secondary'}
+                  variant={ticket.status === 'Resuelto' || ticket.status === 'Cerrado' ? 'default' : 'secondary'}
                   className={`text-sm px-3 py-1 ${
                     ticket.status === 'Abierto' ? 'bg-blue-100 text-blue-800' :
                     ticket.status === 'En Progreso' ? 'bg-yellow-100 text-yellow-800' :
@@ -204,7 +198,7 @@ export default function TicketDetailPage() {
                  {ticket.assigneeId && ( 
                      <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Assigned To</h3>
-                        <p className="text-foreground">{ticket.assigneeId}</p> {/* Consider fetching user name if available */}
+                        <p className="text-foreground">{ticket.assigneeId}</p> 
                     </div>
                  )}
             </div>
@@ -225,9 +219,18 @@ export default function TicketDetailPage() {
                     <li key={index} className="flex items-center gap-2">
                         <HardDriveUpload className="h-4 w-4 text-muted-foreground" /> 
                         {name}
-                        {/* Add download link if files are actually stored somewhere */}
                     </li>))}
                 </ul>
+                <div className="mt-4 p-4 border rounded-md bg-muted/50">
+                    <h4 className="text-sm font-medium text-foreground flex items-center gap-2 mb-2">
+                        <FileClock className="h-4 w-4" /> Version Comparison (Placeholder)
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                        File version comparison and diff view for .py, .xml, and .rptdesign files will be displayed here.
+                        This feature is under development.
+                    </p>
+                    {/* Placeholder for diff viewer component */}
+                </div>
               </>
             )}
             
@@ -241,6 +244,12 @@ export default function TicketDetailPage() {
             ) : (
                  <p className="text-muted-foreground">No GitHub commits found for this ticket.</p>
             )}
+
+            <Separator className="my-6"/>
+             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
+                <History className="h-5 w-5"/> Historial del Ticket
+            </h3>
+            <TicketHistoryList history={ticket.history} title="" />
            
           </CardContent>
            <CardFooter className="text-xs text-muted-foreground">
@@ -258,13 +267,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
-// This function is no longer needed here as the page is client-side rendered due to useAuth.
-// If it were a server component wanting to pre-generate paths:
-// export async function generateStaticParams() {
-//   const tickets = await getJiraTickets(); 
-//   return tickets.map((ticket) => ({
-//     ticketId: ticket.id,
-//   }));
-// }
-
