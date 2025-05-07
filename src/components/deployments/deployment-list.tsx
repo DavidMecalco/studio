@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 import { Server, User, CalendarDays, FileText, Link as LinkIcon, AlertCircle, CheckCircle2, Loader2, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button'; // Added import
 
 interface DeploymentListProps {
   deploymentLogs: DeploymentLogEntry[];
@@ -114,3 +115,4 @@ export function DeploymentList({ deploymentLogs, users, maxItems }: DeploymentLi
     </div>
   );
 }
+
