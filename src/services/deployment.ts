@@ -73,3 +73,22 @@ export interface CreateDeploymentLogData {
   message?: string;
   ticketIds?: string[];
 }
+
+/**
+ * Asynchronously creates a new deployment log entry.
+ * @param data The data for the new deployment log.
+ * @returns A promise that resolves to the created DeploymentLogEntry object.
+ */
+export async function createDeploymentLog(data: CreateDeploymentLogData): Promise<DeploymentLogEntry> {
+  await new Promise(resolve => setTimeout(resolve, 300)); // Simulate API delay
+
+  const newLogEntry: DeploymentLogEntry = {
+    id: `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    ...data,
+  };
+
+  mockDeploymentLogs.unshift(newLogEntry); // Add to the beginning of the array
+  return JSON.parse(JSON.stringify(newLogEntry));
+}
+
