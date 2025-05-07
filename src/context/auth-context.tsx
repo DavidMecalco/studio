@@ -6,8 +6,9 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface User {
-  id: string;
+  id: string; // Will store the username for mock simplicity
   username: string;
+  role: 'admin' | 'client';
   // email?: string; // Add other user properties as needed
 }
 
@@ -30,7 +31,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for persisted login state (e.g., from localStorage)
     const storedUser = localStorage.getItem('authUser');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Basic validation of stored user structure
+        if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.role) {
+           setUser(parsedUser);
+        } else {
+            localStorage.removeItem('authUser'); // Clear invalid stored user
+        }
+      } catch (e) {
+        console.error("Failed to parse stored user:", e);
+        localStorage.removeItem('authUser');
+      }
     }
     setLoading(false);
   }, []);
@@ -38,7 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, redirectPath: string = '/') => {
     // Simulate API call for login
     await new Promise(resolve => setTimeout(resolve, 500));
-    const mockUser: User = { id: '1', username };
+    
+    const role = username.toLowerCase().startsWith('client') ? 'client' : 'admin';
+    // For mock simplicity, use username as the ID. In a real app, ID would be from backend.
+    const mockUser: User = { id: username, username, role }; 
+    
     setUser(mockUser);
     localStorage.setItem('authUser', JSON.stringify(mockUser));
     router.push(redirectPath);

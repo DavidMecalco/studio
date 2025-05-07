@@ -93,7 +93,8 @@ export default function LoginPage() {
         </CardContent>
       </Card>
        <p className="mt-4 text-center text-sm text-muted-foreground">
-        Hint: Use any username and password `password`.
+        Hint: Use any username and password `password`. <br/>
+        For client view, use a username starting with `client` (e.g., `client1`).
       </p>
     </div>
   );

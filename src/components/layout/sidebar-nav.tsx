@@ -8,10 +8,11 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings } from "lucide-react";
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
 
-const navItems = [
+const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jira", label: "Jira Tickets", icon: Ticket },
   { href: "/github", label: "GitHub Commits", icon: Github },
@@ -19,8 +20,19 @@ const navItems = [
   // { href: "/settings", label: "Settings", icon: Settings }, // Example for future
 ];
 
+const clientNavItems = [
+   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Clients might see a simplified dashboard
+   { href: "/my-tickets", label: "My Tickets", icon: ListChecks },
+];
+
+
 export function SidebarNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const navItems = user?.role === 'client' ? clientNavItems : adminNavItems;
+
+  if (!user) return null; // Or a loading state/skeleton
 
   return (
     <SidebarMenu>

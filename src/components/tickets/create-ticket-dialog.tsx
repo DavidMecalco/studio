@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent, useEffect } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,12 +33,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createJiraTicketAction, type CreateTicketFormValues } from "@/app/actions/jira-actions";
-import type { JiraTicketProvider, JiraTicketBranch } from "@/services/jira";
+import { createJiraTicketAction } from "@/app/actions/jira-actions";
+import type { JiraTicketProvider, JiraTicketBranch, JiraTicketPriority } from "@/services/jira";
 import { Plus, FileUp, Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
 
 const ticketProviders: JiraTicketProvider[] = ['TLA', 'FEMA'];
 const ticketBranches: JiraTicketBranch[] = ['DEV', 'QA', 'PROD'];
+const ticketPriorities: JiraTicketPriority[] = ['Alta', 'Media', 'Baja'];
 
 // Max file size 5MB
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
@@ -53,40 +55,69 @@ const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
 ];
 
-
-const createTicketFormSchema = z.object({
+const createTicketFormSchemaBase = z.object({
   title: z.string().min(5, "El título debe tener al menos 5 caracteres.").max(100, "El título no debe exceder los 100 caracteres."),
-  provider: z.enum(ticketProviders, {
-    required_error: "Seleccione un proveedor.",
-  }),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres.").max(1000, "La descripción no debe exceder los 1000 caracteres."),
-  branch: z.enum(ticketBranches, {
-    required_error: "Seleccione una branch.",
+  priority: z.enum(ticketPriorities, {
+    required_error: "Seleccione una prioridad.",
   }),
+  requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
 });
 
-type FormValues = z.infer<typeof createTicketFormSchema>;
+// Schema for admin users, includes optional provider, branch, and attachments
+const adminCreateTicketFormSchema = createTicketFormSchemaBase.extend({
+  provider: z.enum(ticketProviders).optional(),
+  branch: z.enum(ticketBranches).optional(),
+});
+
+// Schema for client users, provider and branch are not directly input by them
+const clientCreateTicketFormSchema = createTicketFormSchemaBase;
+
+
+type AdminFormValues = z.infer<typeof adminCreateTicketFormSchema>;
+type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
+// Unified form values type for useForm, specific values will be handled by the action
+export type CreateTicketDialogFormValues = Partial<AdminFormValues & ClientFormValues>;
+
 
 export function CreateTicketDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(createTicketFormSchema),
+  const currentFormSchema = user?.role === 'client' ? clientCreateTicketFormSchema : adminCreateTicketFormSchema;
+
+  const form = useForm<CreateTicketDialogFormValues>({
+    resolver: zodResolver(currentFormSchema),
     defaultValues: {
       title: "",
       description: "",
+      priority: undefined,
+      requestingUserId: user?.username || "",
       provider: undefined,
       branch: undefined,
     },
   });
 
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        title: "",
+        description: "",
+        priority: undefined,
+        requestingUserId: user.username,
+        provider: undefined,
+        branch: undefined,
+      });
+    }
+  }, [user, form, isOpen]);
+
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const filesArray = Array.from(event.target.files);
-      // Basic client-side validation
       const validFiles = filesArray.filter(file => {
         if (file.size > MAX_FILE_SIZE_BYTES) {
           toast({
@@ -114,14 +145,25 @@ export function CreateTicketDialog() {
     setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
   };
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: CreateTicketDialogFormValues) {
+    if (!user) {
+        toast({ title: "Error", description: "Usuario no autenticado.", variant: "destructive" });
+        return;
+    }
     setIsSubmitting(true);
 
-    const attachmentNames = selectedFiles.map(file => file.name);
+    const attachmentNames = user.role === 'admin' ? selectedFiles.map(file => file.name) : [];
     
-    const ticketData: CreateTicketFormValues = {
-      ...values,
-      attachmentNames,
+    const ticketData = {
+      title: values.title!,
+      description: values.description!,
+      priority: values.priority!,
+      requestingUserId: values.requestingUserId!, // This should be correctly set from form/user
+      ...(user.role === 'admin' && { // Only include these for admin
+        provider: values.provider,
+        branch: values.branch,
+        attachmentNames,
+      }),
     };
 
     const result = await createJiraTicketAction(ticketData);
@@ -143,6 +185,8 @@ export function CreateTicketDialog() {
     }
     setIsSubmitting(false);
   }
+  
+  if (!user) return null; // Don't render if no user (though layout should prevent this)
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -159,7 +203,7 @@ export function CreateTicketDialog() {
         <DialogHeader>
           <DialogTitle>Crear Nuevo Ticket</DialogTitle>
           <DialogDescription>
-            Complete los detalles a continuación para crear un nuevo ticket de Jira.
+            Complete los detalles a continuación para crear un nuevo ticket.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -177,58 +221,21 @@ export function CreateTicketDialog() {
                 </FormItem>
               )}
             />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="provider"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Proveedor</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione proveedor" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ticketProviders.map(provider => (
-                          <SelectItem key={provider} value={provider}>
-                            {provider}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="branch"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Branch</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione branch" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ticketBranches.map(branch => (
-                          <SelectItem key={branch} value={branch}>
-                            {branch}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             
+            <FormField
+              control={form.control}
+              name="requestingUserId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Usuario Solicitante</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={user.role === 'client'} disabled={user.role === 'client'} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="description"
@@ -246,41 +253,121 @@ export function CreateTicketDialog() {
                 </FormItem>
               )}
             />
+            
+            <FormField
+              control={form.control}
+              name="priority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prioridad</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione prioridad" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {ticketPriorities.map(priority => (
+                        <SelectItem key={priority} value={priority}>
+                          {priority}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <FormItem>
-              <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
-              <FormControl>
-                <div className="flex items-center gap-2">
-                    <Input
-                        id="attachments"
-                        type="file"
-                        multiple
-                        onChange={handleFileChange}
-                        className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                        accept={ALLOWED_MIME_TYPES.join(',')}
-                        disabled={selectedFiles.length >= 5}
-                    />
-                     <FileUp className="h-5 w-5 text-muted-foreground" />
+            {user.role === 'admin' && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="provider"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Proveedor (Admin)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione proveedor" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ticketProviders.map(provider => (
+                              <SelectItem key={provider} value={provider}>
+                                {provider}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="branch"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Branch (Admin)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione branch" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ticketBranches.map(branch => (
+                              <SelectItem key={branch} value={branch}>
+                                {branch}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              </FormControl>
-               {selectedFiles.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-sm font-medium">Archivos seleccionados:</p>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground">
-                    {selectedFiles.map(file => (
-                      <li key={file.name} className="flex justify-between items-center">
-                        <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file.name)} className="text-destructive">X</Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-               {selectedFiles.length >= 5 && (
-                <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
-              )}
-              <FormMessage /> {/* This could be used for general file errors if not handled by toast */}
-            </FormItem>
+              
+                <FormItem>
+                  <FormLabel htmlFor="attachments">Adjuntos (Admin, opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            id="attachments"
+                            type="file"
+                            multiple
+                            onChange={handleFileChange}
+                            className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                            accept={ALLOWED_MIME_TYPES.join(',')}
+                            disabled={selectedFiles.length >= 5}
+                        />
+                         <FileUp className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </FormControl>
+                   {selectedFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm font-medium">Archivos seleccionados:</p>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {selectedFiles.map(file => (
+                          <li key={file.name} className="flex justify-between items-center">
+                            <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file.name)} className="text-destructive">X</Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                   {selectedFiles.length >= 5 && (
+                    <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              </>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { form.reset(); setSelectedFiles([]); setIsOpen(false); }} disabled={isSubmitting}>

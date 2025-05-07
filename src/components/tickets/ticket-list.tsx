@@ -4,16 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowRight, Ticket as TicketIcon } from 'lucide-react'; 
+import { ArrowRight, Ticket as TicketIcon, GitBranch } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 
 interface TicketListProps {
   tickets: JiraTicket[];
   title?: string;
   maxItems?: number;
+  showRequestingUser?: boolean; // To conditionally show this column
 }
 
-export function TicketList({ tickets, title = "Jira Tickets", maxItems }: TicketListProps) {
+export function TicketList({ tickets, title = "Jira Tickets", maxItems, showRequestingUser = true }: TicketListProps) {
   const displayedTickets = maxItems ? tickets.slice(0, maxItems) : tickets;
 
   if (!displayedTickets.length) {
@@ -45,6 +46,9 @@ export function TicketList({ tickets, title = "Jira Tickets", maxItems }: Ticket
               <TableHead>ID</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Priority</TableHead>
+              {showRequestingUser && <TableHead>Requesting User</TableHead>}
+              <TableHead>Repository</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -54,9 +58,40 @@ export function TicketList({ tickets, title = "Jira Tickets", maxItems }: Ticket
                 <TableCell className="font-medium">{ticket.id}</TableCell>
                 <TableCell>{ticket.title}</TableCell>
                 <TableCell>
-                  <Badge variant={ticket.status === 'Resolved' ? 'default' : 'secondary'}>
+                  <Badge 
+                    variant={ticket.status === 'Resuelto' || ticket.status === 'Cerrado' ? 'default' : 'secondary'}
+                    className={
+                        ticket.status === 'Abierto' ? 'bg-blue-100 text-blue-800' :
+                        ticket.status === 'En Progreso' ? 'bg-yellow-100 text-yellow-800' :
+                        ticket.status === 'Pendiente' ? 'bg-orange-100 text-orange-800' :
+                        ticket.status === 'En espera del visto bueno' ? 'bg-purple-100 text-purple-800' :
+                        (ticket.status === 'Resuelto' || ticket.status === 'Cerrado') ? 'bg-green-100 text-green-800' : ''
+                    }
+                  >
                     {ticket.status}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                   <Badge 
+                    variant={ticket.priority === 'Alta' ? 'destructive' : ticket.priority === 'Media' ? 'secondary' : 'outline'}
+                    className={
+                        ticket.priority === 'Alta' ? 'bg-red-100 text-red-800 border-red-300' :
+                        ticket.priority === 'Media' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        'bg-gray-100 text-gray-800 border-gray-300'
+                    }
+                   >
+                    {ticket.priority}
+                   </Badge>
+                </TableCell>
+                {showRequestingUser && <TableCell>{ticket.requestingUserId}</TableCell>}
+                <TableCell>
+                  {ticket.gitlabRepository ? (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <GitBranch className="h-3 w-3" /> {ticket.gitlabRepository}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button asChild variant="ghost" size="sm">

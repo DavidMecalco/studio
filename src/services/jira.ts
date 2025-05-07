@@ -14,6 +14,11 @@ export type JiraTicketProvider = 'TLA' | 'FEMA';
 export type JiraTicketBranch = 'DEV' | 'QA' | 'PROD';
 
 /**
+ * Represents the possible priorities for a Jira ticket.
+ */
+export type JiraTicketPriority = 'Alta' | 'Media' | 'Baja';
+
+/**
  * Represents a Jira ticket.
  */
 export interface JiraTicket {
@@ -53,6 +58,18 @@ export interface JiraTicket {
    * Names of attachments for the ticket.
    */
   attachmentNames?: string[];
+  /**
+   * The priority of the Jira ticket.
+   */
+  priority: JiraTicketPriority;
+  /**
+   * The ID (username for mock) of the user who requested/created the ticket.
+   */
+  requestingUserId: string; // Using username as ID for mock simplicity
+  /**
+   * The GitLab repository associated with the ticket.
+   */
+  gitlabRepository?: string;
 }
 
 // Mock data store
@@ -66,6 +83,9 @@ let mockJiraTickets: JiraTicket[] = [
     lastUpdated: '2024-07-28T10:00:00Z',
     provider: 'TLA',
     branch: 'DEV',
+    priority: 'Media',
+    requestingUserId: 'Alice Wonderland', // Example requesting user
+    gitlabRepository: 'maximo-tla',
   },
   {
     id: 'MAX-456',
@@ -76,6 +96,9 @@ let mockJiraTickets: JiraTicket[] = [
     lastUpdated: '2024-07-27T15:30:00Z',
     provider: 'FEMA',
     branch: 'QA',
+    priority: 'Alta',
+    requestingUserId: 'Bob The Builder',
+    gitlabRepository: 'maximo-fema',
   },
   {
     id: 'MAX-789',
@@ -85,6 +108,9 @@ let mockJiraTickets: JiraTicket[] = [
     lastUpdated: '2024-07-29T09:00:00Z',
     provider: 'TLA',
     branch: 'PROD',
+    priority: 'Alta',
+    requestingUserId: 'Alice Wonderland',
+    gitlabRepository: 'maximo-tla',
   },
   {
     id: 'MAX-101',
@@ -93,6 +119,9 @@ let mockJiraTickets: JiraTicket[] = [
     status: 'Pendiente',
     assigneeId: 'user-1',
     lastUpdated: '2024-07-25T12:00:00Z',
+    priority: 'Baja',
+    requestingUserId: 'client-user1',
+    gitlabRepository: 'maximo-generic',
   },
   {
     id: 'MAX-202',
@@ -101,6 +130,9 @@ let mockJiraTickets: JiraTicket[] = [
     status: 'En espera del visto bueno',
     assigneeId: 'user-3',
     lastUpdated: '2024-07-26T11:00:00Z',
+    priority: 'Media',
+    requestingUserId: 'Charlie Brown',
+    gitlabRepository: 'maximo-tla',
   },
   {
     id: 'MAX-303',
@@ -109,17 +141,26 @@ let mockJiraTickets: JiraTicket[] = [
     status: 'Cerrado',
     assigneeId: 'user-2',
     lastUpdated: '2024-07-20T17:00:00Z',
+    priority: 'Baja',
+    requestingUserId: 'client-user2',
+    gitlabRepository: 'maximo-fema',
   },
 ];
 
 /**
  * Asynchronously retrieves Jira tickets.
+ * Optionally filters by requestingUserId.
+ * @param requestingUserId If provided, filters tickets by this user ID.
  * @returns A promise that resolves to an array of JiraTicket objects.
  */
-export async function getJiraTickets(): Promise<JiraTicket[]> {
+export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 300));
-  return JSON.parse(JSON.stringify(mockJiraTickets)); // Return a deep copy
+  let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); // Return a deep copy
+  if (requestingUserId) {
+    tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
+  }
+  return tickets;
 }
 
 /**
@@ -169,8 +210,11 @@ export async function updateJiraTicket(
 export interface CreateJiraTicketData {
   title: string;
   description: string;
-  provider: JiraTicketProvider;
-  branch: JiraTicketBranch;
+  priority: JiraTicketPriority;
+  requestingUserId: string; // Username of the client/user creating
+  // For admin/dev roles, these might be set:
+  provider?: JiraTicketProvider;
+  branch?: JiraTicketBranch;
   attachmentNames?: string[];
   assigneeId?: string; // Optional: if assigning upon creation
 }
@@ -184,14 +228,27 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 600));
   
+  const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; // Generate a new mock ID like MAS-1234
+
+  let gitlabRepository = 'maximo-generic'; // Default repository
+  // Determine repository based on provider or requestingUserId pattern for mock
+  if (ticketData.provider === 'TLA' || ticketData.requestingUserId.toLowerCase().includes('tla')) {
+    gitlabRepository = 'maximo-tla';
+  } else if (ticketData.provider === 'FEMA' || ticketData.requestingUserId.toLowerCase().includes('fema')) {
+    gitlabRepository = 'maximo-fema';
+  }
+
   const newTicket: JiraTicket = {
-    id: `MAX-${Math.floor(Math.random() * 900) + 1000}`, // Generate a new mock ID
+    id: newTicketId,
     title: ticketData.title,
     description: ticketData.description,
     status: 'Abierto', // Default status for new tickets
-    provider: ticketData.provider,
-    branch: ticketData.branch,
-    attachmentNames: ticketData.attachmentNames || [],
+    priority: ticketData.priority,
+    requestingUserId: ticketData.requestingUserId,
+    gitlabRepository: gitlabRepository,
+    provider: ticketData.provider, // Keep if provided by admin
+    branch: ticketData.branch, // Keep if provided by admin
+    attachmentNames: ticketData.attachmentNames || [], // Keep if provided by admin
     assigneeId: ticketData.assigneeId,
     lastUpdated: new Date().toISOString(),
   };

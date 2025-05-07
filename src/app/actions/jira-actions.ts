@@ -1,6 +1,7 @@
+
 "use server";
 
-import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData } from "@/services/jira";
+import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
 import { updateJiraTicket, createJiraTicket as createJiraTicketService } from "@/services/jira";
 import { revalidatePath } from "next/cache";
 
@@ -32,6 +33,7 @@ export async function updateJiraTicketAction(
       revalidatePath("/dashboard"); // Revalidate dashboard to show updated KPIs
       revalidatePath(`/jira/${ticketId}`); // Revalidate specific ticket page
       revalidatePath("/jira"); // Revalidate jira list page
+      revalidatePath("/my-tickets"); // Revalidate client's ticket list page
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
@@ -49,13 +51,18 @@ interface CreateJiraTicketResult {
   error?: string;
 }
 
-export interface CreateTicketFormValues {
+// This interface should align with CreateTicketDialogFormValues but be specific to what the action expects
+export interface CreateTicketActionFormValues {
   title: string;
-  provider: JiraTicketProvider;
   description: string;
-  branch: JiraTicketBranch;
+  priority: JiraTicketPriority;
+  requestingUserId: string; // Username of the client/user creating
+  // For admin/dev roles, these might be set:
+  provider?: JiraTicketProvider;
+  branch?: JiraTicketBranch;
   attachmentNames?: string[];
 }
+
 
 /**
  * Server action to create a new Jira ticket.
@@ -63,26 +70,29 @@ export interface CreateTicketFormValues {
  * @returns A promise that resolves to an object indicating success or failure.
  */
 export async function createJiraTicketAction(
-  data: CreateTicketFormValues
+  data: CreateTicketActionFormValues
 ): Promise<CreateJiraTicketResult> {
-  if (!data.title || !data.provider || !data.description || !data.branch) {
+  if (!data.title || !data.description || !data.priority || !data.requestingUserId) {
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
 
   try {
+    // The CreateJiraTicketData type in jira.ts service now matches this structure.
     const createData: CreateJiraTicketData = {
       title: data.title,
       description: data.description,
-      provider: data.provider,
-      branch: data.branch,
-      attachmentNames: data.attachmentNames || [],
+      priority: data.priority,
+      requestingUserId: data.requestingUserId,
+      provider: data.provider, // Will be undefined if client role
+      branch: data.branch, // Will be undefined if client role
+      attachmentNames: data.attachmentNames || [], // Will be empty if client role
     };
 
     const newTicket = await createJiraTicketService(createData);
     if (newTicket) {
       revalidatePath("/dashboard");
       revalidatePath("/jira");
-      // No specific ticket page to revalidate yet as it's new, but list pages are important.
+      revalidatePath("/my-tickets");
       return { success: true, ticket: newTicket };
     } else {
       return { success: false, error: "No se pudo crear el ticket. Error de la API." };
