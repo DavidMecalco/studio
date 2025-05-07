@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -7,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, History, UploadCloud } from "lucide-react";
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, History, UploadCloud, LineChart as AnalyticsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
@@ -17,6 +18,7 @@ const adminNavItems = [
   { href: "/github", label: "GitHub Commits", icon: Github },
   { href: "/maximo", label: "Maximo Mgmt", icon: Server },
   { href: "/deployments", label: "Deployments", icon: UploadCloud },
+  { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
   { href: "/audit", label: "Audit Log", icon: History },
   { href: "/admin-profile", label: "Admin Profile", icon: ShieldCheck }, 
   // { href: "/settings", label: "Settings", icon: Settings }, // Example for future
