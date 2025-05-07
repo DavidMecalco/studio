@@ -44,7 +44,6 @@ export async function updateJiraTicketAction(
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
       revalidatePath("/(app)/jira", "page");
       revalidatePath("/(app)/my-tickets", "page");
-      revalidatePath("/(app)/audit", "page"); // Revalidate audit log
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
@@ -101,7 +100,6 @@ export async function createJiraTicketAction(
       revalidatePath("/(app)/dashboard", "page");
       revalidatePath("/(app)/jira", "page");
       revalidatePath("/(app)/my-tickets", "page");
-      revalidatePath("/(app)/audit", "page"); // Revalidate audit log
       return { success: true, ticket: newTicket };
     } else {
       return { success: false, error: "No se pudo crear el ticket. Error de la API." };

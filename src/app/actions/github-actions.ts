@@ -65,7 +65,6 @@ export async function createCommitAndPushAction(
     revalidatePath("/jira");
     revalidatePath("/dashboard");
     revalidatePath("/github"); 
-    revalidatePath("/audit"); // Revalidate audit log
 
     return { success: true, commit: newCommit };
 
