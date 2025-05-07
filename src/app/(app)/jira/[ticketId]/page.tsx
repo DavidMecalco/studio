@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import { useEffect, useState }  from 'react';
@@ -7,7 +8,7 @@ import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,11 +17,64 @@ import { useAuth } from '@/context/auth-context';
 import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
+import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog'; // Import the dialog
 
 interface TicketDetailsData {
   ticket: JiraTicket;
   commits: GitHubCommit[];
 }
+
+// Card for version history of files associated with the ticket
+function VersionHistoryCard({ ticketId, files }: { ticketId: string, files?: string[] }) {
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [selectedFileForHistory, setSelectedFileForHistory] = useState<string | null>(null);
+
+  if (!files || files.length === 0) {
+    return null; // Don't render card if no files
+  }
+
+  const handleShowHistory = (fileName: string) => {
+    setSelectedFileForHistory(fileName);
+    setIsHistoryDialogOpen(true);
+  };
+
+  return (
+    <>
+      <Card className="shadow-md rounded-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileDiff className="h-5 w-5 text-primary" /> Historial de Versiones de Archivos
+          </CardTitle>
+          <CardDescription>
+            Revise y restaure versiones anteriores de los archivos adjuntos o modificados en este ticket.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {files.map(fileName => (
+            <div key={fileName} className="flex justify-between items-center p-3 border rounded-md bg-muted/50">
+              <span className="text-sm font-medium text-foreground flex items-center gap-2">
+                <HardDriveUpload className="h-4 w-4 text-muted-foreground" />
+                {fileName}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => handleShowHistory(fileName)}>
+                <History className="mr-2 h-4 w-4" /> Ver Historial
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      {selectedFileForHistory && (
+        <FileVersionHistoryDialog
+          fileName={selectedFileForHistory}
+          isOpen={isHistoryDialogOpen}
+          onOpenChange={setIsHistoryDialogOpen}
+          ticketId={ticketId}
+        />
+      )}
+    </>
+  );
+}
+
 
 async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
   try {
@@ -91,6 +145,9 @@ export default function TicketDetailPage() {
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* History heading */}
             <Skeleton className="h-24 w-full" /> {/* History list placeholder */}
+             <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/3 mb-2" /> {/* File versions heading */}
+            <Skeleton className="h-20 w-full" /> {/* File versions placeholder */}
           </CardContent>
         </Card>
       </div>
@@ -115,6 +172,7 @@ export default function TicketDetailPage() {
   }
 
   const { ticket, commits } = ticketData;
+  const filesForVersionHistory = ticket.attachmentNames || []; // Could also include files from commits
 
   return (
     <div className="space-y-8">
@@ -229,7 +287,6 @@ export default function TicketDetailPage() {
                         File version comparison and diff view for .py, .xml, and .rptdesign files will be displayed here.
                         This feature is under development.
                     </p>
-                    {/* Placeholder for diff viewer component */}
                 </div>
               </>
             )}
@@ -260,6 +317,8 @@ export default function TicketDetailPage() {
 
       {user?.role === 'admin' && ticketId && ticketData?.ticket &&(
         <>
+            <Separator className="my-8" />
+            <VersionHistoryCard ticketId={ticketId} files={filesForVersionHistory} />
             <Separator className="my-8" />
             <CommitChangesForm ticketId={ticketId} currentTicketStatus={ticketData.ticket.status} />
         </>

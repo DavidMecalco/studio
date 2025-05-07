@@ -28,6 +28,19 @@ export interface GitHubCommit {
   filesChanged?: string[];
 }
 
+/**
+ * Represents a specific version of a file.
+ */
+export interface FileVersion {
+  id: string; // Could be commit SHA or a version number
+  timestamp: string;
+  commitSha: string;
+  author: string;
+  message?: string;
+  fileName: string;
+}
+
+
 // Helper to generate a date within the last month
 const getRandomPastDateISO = () => {
   const now = new Date();
@@ -147,4 +160,37 @@ export async function createGitHubCommit(
     mockCommits.unshift(newCommit); // Add to the beginning of the array
     console.log(`Simulated commit to ${branch} branch:`, newCommit);
     return JSON.parse(JSON.stringify(newCommit));
+}
+
+
+/**
+ * Simulates fetching version history for a file.
+ * In a real scenario, this would query GitLab/GitHub for commits affecting this file.
+ * @param fileName The name of the file.
+ * @returns A promise that resolves to an array of FileVersion objects.
+ */
+export async function getFileVersions(fileName: string): Promise<FileVersion[]> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // Find all commits that mention this file (simplified simulation)
+    const relevantCommits = mockCommits.filter(
+      commit => commit.filesChanged?.includes(fileName) || commit.message.includes(fileName)
+    );
+
+    if (relevantCommits.length === 0) {
+        // If no specific commits, return some generic versions for demo
+        return [
+            { id: 'v3.0', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-abc123', author: 'Admin User', message: `Update ${fileName}`, fileName },
+            { id: 'v2.1', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-def456', author: 'Dev Team', message: `Refactor ${fileName}`, fileName },
+            { id: 'v1.0', timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-ghi789', author: 'Initial Committer', message: `Initial version of ${fileName}`, fileName },
+        ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+
+    return relevantCommits.map(commit => ({
+        id: commit.sha.substring(0, 7), // Use short SHA as version ID
+        timestamp: commit.date,
+        commitSha: commit.sha,
+        author: commit.author,
+        message: commit.message,
+        fileName: fileName,
+    })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }

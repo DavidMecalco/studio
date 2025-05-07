@@ -26,13 +26,15 @@ export interface JiraTicketHistoryEntry {
   id: string;
   timestamp: string;
   userId: string; // User who performed the action
-  action: string; // e.g., "Created", "Status Changed", "Comment Added", "Commit Added"
+  action: string; // e.g., "Created", "Status Changed", "Comment Added", "Commit Added", "File Restored"
   fromStatus?: JiraTicketStatus;
   toStatus?: JiraTicketStatus;
   comment?: string;
   commitSha?: string; // Link to associated commit
   deploymentId?: string; // Link to associated deployment
   details?: string; // General details about the action
+  fileName?: string; // For file-related actions like restoration
+  restoredVersionId?: string; // For file restoration
 }
 
 /**
@@ -108,6 +110,7 @@ let mockJiraTickets: JiraTicket[] = [
     priority: 'Media',
     requestingUserId: 'client-tla1', 
     gitlabRepository: 'maximo-tla',
+    attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
     history: [
       { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
       { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso' },
@@ -125,6 +128,7 @@ let mockJiraTickets: JiraTicket[] = [
     priority: 'Alta',
     requestingUserId: 'client-fema1',
     gitlabRepository: 'maximo-fema',
+    attachmentNames: ['debug_log.txt', 'screenshot_error.png'],
     history: [
       { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
       { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto' },
@@ -141,6 +145,7 @@ let mockJiraTickets: JiraTicket[] = [
     priority: 'Alta',
     requestingUserId: 'client-tla2',
     gitlabRepository: 'maximo-tla',
+    attachmentNames: ['requirements_cicd.docx'],
     history: [
       { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'client-tla2', action: 'Created', details: 'Ticket Creado' },
     ],
@@ -186,6 +191,7 @@ let mockJiraTickets: JiraTicket[] = [
     requestingUserId: 'client-fema1', 
     provider: 'FEMA', 
     gitlabRepository: 'maximo-fema',
+    attachmentNames: ['old_report_design.rptdesign', 'new_report_design.rptdesign'],
     history: [
       { id: 'hist-9', timestamp: '2024-07-20T16:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
       { id: 'hist-10', timestamp: '2024-07-20T17:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Cerrado', details: 'Ticket cerrado.' },
@@ -267,7 +273,8 @@ export async function updateJiraTicket(
     const assigneeChangeDetails = actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado';
     if (historyEntry) {
       historyEntry.details += `; ${assigneeChangeDetails}`;
-      if(comment) historyEntry.comment += `; ${comment}`;
+      if(comment && historyEntry.comment) historyEntry.comment += `; ${comment}`;
+      else if (comment) historyEntry.comment = comment;
     } else {
       historyEntry = {
         id: `hist-${Date.now()}`,
@@ -278,12 +285,22 @@ export async function updateJiraTicket(
         details: assigneeChangeDetails,
       };
     }
+  } else if (comment && !historyEntry) { // If only a comment is provided
+     historyEntry = {
+        id: `hist-comment-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userId: userIdPerformingAction,
+        action: 'Comment Added',
+        comment: comment,
+        details: `Comment added by ${userIdPerformingAction}`
+      };
   }
   
   // Only update if there are changes
-  if (Object.keys(updatedTicketDetails).length > 0) {
+  if (Object.keys(updatedTicketDetails).length > 0 || historyEntry?.action === 'Comment Added') {
     updatedTicketDetails.lastUpdated = new Date().toISOString();
   }
+
 
   const updatedTicket = {
     ...currentTicket,
@@ -458,4 +475,48 @@ export async function getAllTicketHistories(): Promise<JiraTicketHistoryEntry[]>
         });
     });
     return JSON.parse(JSON.stringify(allHistories.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())));
+}
+
+
+/**
+ * Adds a file restoration history entry to a Jira ticket.
+ * @param ticketId The ID of the ticket.
+ * @param userIdPerformingAction User who performed the restoration.
+ * @param fileName Name of the file restored.
+ * @param restoredVersionId ID of the version restored to.
+ * @param commitSha Optional commit SHA of the restored version.
+ * @returns A promise that resolves to the updated JiraTicket object or null.
+ */
+export async function addRestorationToTicketHistory(
+  ticketId: string,
+  userIdPerformingAction: string,
+  fileName: string,
+  restoredVersionId: string,
+  commitSha?: string,
+): Promise<JiraTicket | null> {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
+  if (ticketIndex === -1) return null;
+
+  let details = `Archivo '${fileName}' restaurado a la versión '${restoredVersionId}'`;
+  if (commitSha) {
+    details += ` (commit ${commitSha.substring(0, 7)})`;
+  }
+  details += `.`;
+
+  const historyEntry: JiraTicketHistoryEntry = {
+    id: `hist-restore-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    userId: userIdPerformingAction,
+    action: 'File Restored',
+    fileName: fileName,
+    restoredVersionId: restoredVersionId,
+    commitSha: commitSha,
+    details: details,
+  };
+
+  mockJiraTickets[ticketIndex].history.push(historyEntry);
+  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
+  
+  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
 }

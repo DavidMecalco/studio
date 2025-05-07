@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { JiraTicketHistoryEntry } from '@/services/jira';
 import { format, parseISO } from 'date-fns';
-import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers } from 'lucide-react';
+import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers, RefreshCcw, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
@@ -16,7 +17,8 @@ const getIconForAction = (action: string) => {
   if (action.toLowerCase().includes('status changed')) return <Edit3 className="h-4 w-4 text-yellow-500" />;
   if (action.toLowerCase().includes('commit added')) return <GitCommit className="h-4 w-4 text-blue-500" />;
   if (action.toLowerCase().includes('comment added')) return <MessageSquare className="h-4 w-4 text-green-500" />;
-  if (action.toLowerCase().includes('deployment')) return <Layers className="h-4 w-4 text-purple-500" />; // Example for deployment
+  if (action.toLowerCase().includes('deployment')) return <Layers className="h-4 w-4 text-purple-500" />; 
+  if (action.toLowerCase().includes('file restored')) return <RefreshCcw className="h-4 w-4 text-indigo-500" />;
   return <Edit3 className="h-4 w-4 text-muted-foreground" />;
 };
 
@@ -56,16 +58,21 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
           </div>
         )}
         {entry.comment && <p className="text-sm italic text-muted-foreground pl-2 border-l-2 border-border">"{entry.comment}"</p>}
-        {entry.commitSha && (
+        {entry.commitSha && !entry.action.toLowerCase().includes('file restored') && ( // Don't show separate commit if it's part of restoration log
           <p className="text-sm text-muted-foreground">
             Commit: <span className="font-mono text-xs">{entry.commitSha.substring(0, 7)}</span>
-            {/* In a real app, this would be a link to GitHub/GitLab */}
           </p>
         )}
          {entry.deploymentId && (
           <p className="text-sm text-muted-foreground">
             Deployment ID: <span className="font-mono text-xs">{entry.deploymentId}</span>
-             {/* Potentially link to deployment details if available */}
+          </p>
+        )}
+        {entry.action.toLowerCase().includes('file restored') && entry.fileName && (
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            <span>{entry.fileName} restored to version {entry.restoredVersionId}</span>
+            {entry.commitSha && <span className="font-mono text-xs">(commit: {entry.commitSha.substring(0,7)})</span>}
           </p>
         )}
       </div>
