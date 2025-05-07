@@ -1,7 +1,7 @@
 "use server";
 
 import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
-import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService } from "@/services/jira"; // Renamed to avoid conflict
+import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; // Renamed to avoid conflict
 import { revalidatePath } from "next/cache";
 
 interface UpdateJiraTicketResult {
@@ -107,6 +107,44 @@ export async function createJiraTicketAction(
   } catch (error) {
     console.error("Error creating Jira ticket:", error);
     const errorMessage = error instanceof Error ? error.message : "Un error desconocido del servidor ocurrió durante la creación del ticket.";
+    return { success: false, error: errorMessage };
+  }
+}
+
+
+interface AddCommentResult {
+  success: boolean;
+  ticket?: JiraTicket; // Return updated ticket with new comment in history
+  error?: string;
+}
+
+/**
+ * Server action to add a comment to a Jira ticket.
+ * @param ticketId The ID of the ticket.
+ * @param userIdPerformingAction The ID of the user adding the comment.
+ * @param commentText The text of the comment.
+ * @returns A promise that resolves to an object indicating success or failure.
+ */
+export async function addCommentToTicketAction(
+  ticketId: string,
+  userIdPerformingAction: string,
+  commentText: string
+): Promise<AddCommentResult> {
+  if (!ticketId || !userIdPerformingAction || !commentText) {
+    return { success: false, error: "Ticket ID, user ID, and comment text are required." };
+  }
+
+  try {
+    const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText);
+    if (updatedTicket) {
+      revalidatePath(`/(app)/jira/${ticketId}`, "page");
+      return { success: true, ticket: updatedTicket };
+    } else {
+      return { success: false, error: "Failed to add comment. Ticket not found or API error." };
+    }
+  } catch (error) {
+    console.error("Error adding comment to Jira ticket:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred while adding comment.";
     return { success: false, error: errorMessage };
   }
 }

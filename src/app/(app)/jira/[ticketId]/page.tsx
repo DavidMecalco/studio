@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import { useEffect, useState }  from 'react';
@@ -8,7 +7,7 @@ import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +16,8 @@ import { useAuth } from '@/context/auth-context';
 import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
-import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog'; // Import the dialog
+import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog';
+import { CommentForm } from '@/components/tickets/CommentForm'; // Import the CommentForm
 
 interface TicketDetailsData {
   ticket: JiraTicket;
@@ -115,6 +115,17 @@ export default function TicketDetailPage() {
     }
   }, [ticketId]); 
 
+  // Function to re-fetch ticket data, useful after a comment is added or other action
+  const refreshTicketData = () => {
+    if (ticketId) {
+        // Do not set isLoading to true here to avoid full page skeleton on refresh
+        fetchTicketDetails(ticketId)
+            .then(data => setTicketData(data))
+            .catch(error => console.error("Failed to refresh ticket data:", error));
+    }
+  };
+
+
   if (authLoading || isLoading) {
     return (
       <div className="space-y-8">
@@ -148,6 +159,9 @@ export default function TicketDetailPage() {
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* File versions heading */}
             <Skeleton className="h-20 w-full" /> {/* File versions placeholder */}
+             <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments form heading */}
+            <Skeleton className="h-32 w-full" /> {/* Comments form placeholder */}
           </CardContent>
         </Card>
       </div>
@@ -307,6 +321,12 @@ export default function TicketDetailPage() {
                 <History className="h-5 w-5"/> Historial del Ticket
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
+           
+            <Separator className="my-6"/>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
+                <MessageSquare className="h-5 w-5"/> Comentarios
+            </h3>
+            {ticketId && <CommentForm ticketId={ticketId} />}
            
           </CardContent>
            <CardFooter className="text-xs text-muted-foreground">

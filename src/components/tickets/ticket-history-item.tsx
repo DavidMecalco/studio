@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { JiraTicketHistoryEntry } from '@/services/jira';
@@ -24,6 +23,8 @@ const getIconForAction = (action: string) => {
 
 
 export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps) {
+  const isComment = entry.action.toLowerCase().includes('comment added');
+
   return (
     <li className="relative pl-8">
       {!isLastItem && (
@@ -37,7 +38,7 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
           <div className="flex items-center gap-2">
             <User className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs font-medium text-foreground">{entry.userId}</span>
-             {(entry as any).ticketId && entry.action !== 'Created' && ( // Show ticket ID if present (from audit log) and not a creation event
+             {(entry as any).ticketId && entry.action !== 'Created' && !isComment && ( // Show ticket ID if present (from audit log) and not a creation/comment event
               <Badge variant="outline" className="text-xs">
                 Ticket: <Link href={`/jira/${(entry as any).ticketId}`} className="hover:underline ml-1">{(entry as any).ticketId}</Link>
               </Badge>
@@ -47,8 +48,9 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
             {format(parseISO(entry.timestamp), "MMM d, yyyy 'at' h:mm a")}
           </time>
         </div>
-        <p className="text-sm font-semibold text-foreground">{entry.action}</p>
-        {entry.details && <p className="text-sm text-muted-foreground">{entry.details}</p>}
+        
+        {!isComment && <p className="text-sm font-semibold text-foreground">{entry.action}</p>}
+        {entry.details && !isComment && <p className="text-sm text-muted-foreground">{entry.details}</p>}
 
         {entry.fromStatus && entry.toStatus && (
           <div className="text-sm text-muted-foreground flex items-center gap-1">
@@ -57,7 +59,16 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
             <Badge>{entry.toStatus}</Badge>
           </div>
         )}
-        {entry.comment && <p className="text-sm italic text-muted-foreground pl-2 border-l-2 border-border">"{entry.comment}"</p>}
+        
+        {entry.comment && (
+          <div className={`text-sm pl-2 ${isComment ? 'bg-muted/50 p-3 rounded-md border' : 'italic text-muted-foreground border-l-2 border-border'}`}>
+            {isComment && <p className="text-xs font-medium text-foreground mb-1">Comentario:</p>}
+            <p className={isComment ? 'text-foreground whitespace-pre-wrap' : 'text-muted-foreground whitespace-pre-wrap'}>
+              {entry.comment}
+            </p>
+          </div>
+        )}
+
         {entry.commitSha && !entry.action.toLowerCase().includes('file restored') && ( // Don't show separate commit if it's part of restoration log
           <p className="text-sm text-muted-foreground">
             Commit: <span className="font-mono text-xs">{entry.commitSha.substring(0, 7)}</span>

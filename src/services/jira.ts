@@ -114,6 +114,7 @@ let mockJiraTickets: JiraTicket[] = [
     history: [
       { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
       { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso' },
+      { id: 'hist-comment-1', timestamp: '2024-07-28T10:05:00Z', userId: 'admin', action: 'Comment Added', comment: 'Starting development now. Will update with progress.', details: 'Comment added by admin' },
     ],
   },
   {
@@ -132,6 +133,7 @@ let mockJiraTickets: JiraTicket[] = [
     history: [
       { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
       { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto' },
+      { id: 'hist-comment-2', timestamp: '2024-07-27T15:35:00Z', userId: 'client-fema1', action: 'Comment Added', comment: 'Thanks for fixing this so quickly!', details: 'Comment added by client-fema1' },
     ],
   },
   {
@@ -323,6 +325,7 @@ export async function updateJiraTicket(
  * @param commitSha SHA of the commit.
  * @param userIdPerformingAction User who triggered the commit.
  * @param commitMessage Message of the commit.
+ * @param branch The branch the commit was made to.
  * @returns A promise that resolves to the updated JiraTicket object or null.
  */
 export async function addCommitToTicketHistory(
@@ -518,5 +521,36 @@ export async function addRestorationToTicketHistory(
   mockJiraTickets[ticketIndex].history.push(historyEntry);
   mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
   
+  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
+}
+
+/**
+ * Adds a comment to a Jira ticket's history.
+ * @param ticketId The ID of the ticket.
+ * @param userIdPerformingAction The ID of the user adding the comment.
+ * @param commentText The text of the comment.
+ * @returns A promise that resolves to the updated JiraTicket object or null if not found.
+ */
+export async function addCommentToTicket(
+  ticketId: string,
+  userIdPerformingAction: string,
+  commentText: string
+): Promise<JiraTicket | null> {
+  await new Promise(resolve => setTimeout(resolve, 200)); // Simulate API delay
+  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
+  if (ticketIndex === -1) return null;
+
+  const historyEntry: JiraTicketHistoryEntry = {
+    id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    userId: userIdPerformingAction,
+    action: 'Comment Added',
+    comment: commentText,
+    details: `Comment added by ${userIdPerformingAction}`,
+  };
+
+  mockJiraTickets[ticketIndex].history.push(historyEntry);
+  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
+
   return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
 }
