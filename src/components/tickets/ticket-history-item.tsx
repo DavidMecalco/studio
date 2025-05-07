@@ -49,11 +49,11 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
         {entry.details && <p className="text-sm text-muted-foreground">{entry.details}</p>}
 
         {entry.fromStatus && entry.toStatus && (
-          <p className="text-sm text-muted-foreground flex items-center gap-1">
+          <div className="text-sm text-muted-foreground flex items-center gap-1">
             <Badge variant="secondary">{entry.fromStatus}</Badge>
             <ArrowRight className="h-3 w-3" />
             <Badge>{entry.toStatus}</Badge>
-          </p>
+          </div>
         )}
         {entry.comment && <p className="text-sm italic text-muted-foreground pl-2 border-l-2 border-border">"{entry.comment}"</p>}
         {entry.commitSha && (
