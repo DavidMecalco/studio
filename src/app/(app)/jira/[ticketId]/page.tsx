@@ -2,7 +2,8 @@
 "use client"; // Make this a client component to use hooks like useAuth
 
 import { useEffect, useState }  from 'react';
-import { getJiraTicket, getJiraTickets, type JiraTicket } from '@/services/jira';
+import { useParams } from 'next/navigation'; // Import useParams
+import { getJiraTicket, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,11 +17,12 @@ import { useAuth } from '@/context/auth-context';
 import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
 
-interface TicketDetailPageProps {
-  params: {
-    ticketId: string;
-  };
-}
+// params are no longer passed as props, they are accessed via useParams hook
+// interface TicketDetailPageProps {
+//   params: {
+//     ticketId: string;
+//   };
+// }
 
 interface TicketDetailsData {
   ticket: JiraTicket;
@@ -42,23 +44,31 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
 }
 
 
-export default function TicketDetailPage({ params }: TicketDetailPageProps) {
+export default function TicketDetailPage() {
   const { user, loading: authLoading } = useAuth();
+  const params = useParams<{ ticketId: string }>(); // Use useParams hook
+  const ticketId = params.ticketId; // Extract ticketId from params
+
   const [ticketData, setTicketData] = useState<TicketDetailsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchTicketDetails(params.ticketId)
-      .then(data => {
-        setTicketData(data);
+    if (ticketId) { // Check if ticketId is available
+      setIsLoading(true);
+      fetchTicketDetails(ticketId) // Use ticketId from hook
+        .then(data => {
+          setTicketData(data);
+          setIsLoading(false);
+        })
+        .catch(() => {
+          // Error already logged in fetchTicketDetails
+          setIsLoading(false);
+        });
+    } else {
+        // Handle case where ticketId might not be available initially
         setIsLoading(false);
-      })
-      .catch(() => {
-        // Error already logged in fetchTicketDetails
-        setIsLoading(false);
-      });
-  }, [params.ticketId]);
+    }
+  }, [ticketId]); // Depend on ticketId from hook
 
   if (authLoading || isLoading) {
     return (
@@ -99,7 +109,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
         <h1 className="text-2xl font-semibold mb-2">Ticket Not Found</h1>
         <p className="text-muted-foreground mb-6">
-          The ticket with ID <span className="font-mono">{params.ticketId}</span> could not be found.
+          The ticket with ID <span className="font-mono">{ticketId}</span> could not be found.
         </p>
         <Button asChild>
           <Link href="/jira">
@@ -239,10 +249,10 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
         </Card>
       </div>
 
-      {user?.role === 'admin' && (
+      {user?.role === 'admin' && ticketId && ticketData?.ticket &&(
         <>
             <Separator className="my-8" />
-            <CommitChangesForm ticketId={ticket.id} currentTicketStatus={ticket.status} />
+            <CommitChangesForm ticketId={ticketId} currentTicketStatus={ticketData.ticket.status} />
         </>
       )}
     </div>
