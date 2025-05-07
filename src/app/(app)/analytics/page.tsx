@@ -58,9 +58,11 @@ export default function AnalyticsPage() {
     selectedEnvironment: 'all',
   });
 
+  const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
+
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || user?.role !== 'admin') {
+      if (authLoading || !canViewPage) {
         setIsLoading(false);
         return;
       }
@@ -82,11 +84,15 @@ export default function AnalyticsPage() {
       }
       setIsLoading(false);
     }
-    fetchData();
-  }, [authLoading, user, toast]);
+    if (canViewPage) {
+        fetchData();
+    } else if (!authLoading) {
+        setIsLoading(false);
+    }
+  }, [authLoading, canViewPage, toast]);
 
   const processedData = useMemo((): AnalyticsData | null => {
-    if (isLoading || allTickets.length === 0) return null;
+    if (isLoading || allTickets.length === 0 || !canViewPage) return null;
 
     const dateFrom = filters.dateFrom ? parseISO(filters.dateFrom) : null;
     const dateTo = filters.dateTo ? parseISO(filters.dateTo) : null;
@@ -202,7 +208,7 @@ export default function AnalyticsPage() {
       clients: ['TLA', 'FEMA'],
       environments: ['DEV', 'QA', 'PROD', 'Staging', 'Other']
     };
-  }, [isLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters]);
+  }, [isLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage]);
 
   const handleExport = (format: 'pdf' | 'json') => {
     toast({
@@ -229,12 +235,12 @@ export default function AnalyticsPage() {
     );
   }
   
-  if (user?.role !== 'admin') {
+  if (!canViewPage) {
      return (
         <div className="space-y-8 text-center py-10">
             <AnalyticsIcon className="h-16 w-16 mx-auto text-destructive" />
             <h1 className="text-2xl font-semibold">Access Denied</h1>
-            <p className="text-muted-foreground">This analytics page is for admin users only.</p>
+            <p className="text-muted-foreground">This analytics page is for admin or superuser users only.</p>
         </div>
      );
   }

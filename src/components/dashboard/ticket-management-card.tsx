@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, type ReactNode } from 'react';
@@ -92,6 +93,12 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
         toast({ title: "Error", description: "Current user not found. Please re-login.", variant: "destructive" });
         return;
     }
+    // Superuser and Admin can manage tickets
+    if (currentUser.role !== 'admin' && currentUser.role !== 'superuser') {
+        toast({ title: "Error", description: "You do not have permission to manage tickets.", variant: "destructive" });
+        return;
+    }
+
     const actualAssigneeId = values.assigneeId === UNASSIGNED_VALUE ? "" : values.assigneeId;
     
     const result = await updateJiraTicketAction(
@@ -122,6 +129,12 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
       });
     }
   }
+  
+  // Ensure only Admin or Superuser can interact with this card
+  if (currentUser?.role !== 'admin' && currentUser?.role !== 'superuser') {
+    return null; // Or a message indicating restricted access
+  }
+
 
   return (
     <Card className="shadow-lg rounded-xl">
@@ -223,3 +236,4 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
     </Card>
   );
 }
+

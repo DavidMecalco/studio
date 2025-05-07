@@ -40,35 +40,40 @@ export default function AdminProfilePage() {
     return <p className="text-center text-muted-foreground">User not found. Please log in.</p>;
   }
   
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'superuser') {
     return (
         <div className="space-y-8 text-center py-10">
             <UserCog className="h-16 w-16 mx-auto text-destructive" />
             <h1 className="text-2xl font-semibold">Access Denied</h1>
-            <p className="text-muted-foreground">This profile page is for admin/technician users only.</p>
+            <p className="text-muted-foreground">This profile page is for admin or superuser users only.</p>
         </div>
     );
   }
+
+  const profileRoleName = user.role === 'admin' ? 'Administrator/Technician' : 'Super User';
+  const profileTitle = user.role === 'admin' ? 'Admin Profile' : 'Super User Profile';
+  const profilePageDescription = user.role === 'admin' ? 'administrator/technician' : 'super user';
+
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
         <div className="flex flex-col items-start gap-2 mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                <ShieldCheck className="h-8 w-8 text-primary" /> Admin Profile
+                <ShieldCheck className="h-8 w-8 text-primary" /> {profileTitle}
             </h1>
             <p className="text-muted-foreground">
-                View your administrator/technician account information.
+                View your {profilePageDescription} account information.
             </p>
         </div>
       <Card className="shadow-lg rounded-xl">
         <CardHeader>
           <CardTitle className="text-xl">Account Details</CardTitle>
-          <CardDescription>Information associated with your admin/technician account.</CardDescription>
+          <CardDescription>Information associated with your {profilePageDescription} account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-2">
           <ProfileItem icon={<UserCog className="h-5 w-5 text-muted-foreground" />} label="Username (Nombre)" value={user.username} />
           <Separator />
-          <ProfileItem icon={<ShieldCheck className="h-5 w-5 text-muted-foreground" />} label="Role (Rol en Plataforma)" value={user.role === 'admin' ? 'Administrator/Technician' : user.role} />
+          <ProfileItem icon={<ShieldCheck className="h-5 w-5 text-muted-foreground" />} label="Role (Rol en Plataforma)" value={profileRoleName} />
           <Separator />
           <ProfileItem icon={<Building className="h-5 w-5 text-muted-foreground" />} label="Company (Empresa)" value={user.company || 'N/A'} />
           <Separator />

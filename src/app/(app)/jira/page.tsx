@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Ticket, Users } from 'lucide-react';
+import { Ticket, Users, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 // Potentially add a filter component here for technicians to filter by assignee
@@ -18,9 +18,11 @@ export default function JiraPage() {
   const [isLoading, setIsLoading] = useState(true);
   // const [currentFilter, setCurrentFilter] = useState<'all' | 'my-assigned'>('all'); // Example filter state
 
+  const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
+
   useEffect(() => {
     async function fetchTickets() {
-      if (user) { // Admins (technicians) can see this page
+      if (canViewPage) { // Admins and superusers can see this page
         setIsLoading(true);
         const tickets = await getJiraTickets();
         setAllTickets(tickets);
@@ -29,9 +31,13 @@ export default function JiraPage() {
       }
     }
     if (!authLoading) {
+      if (canViewPage) {
         fetchTickets();
+      } else {
+        setIsLoading(false); // Set loading to false if user cannot view
+      }
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, canViewPage]);
 
   // Example filter logic (can be expanded)
   // useEffect(() => {
@@ -43,13 +49,13 @@ export default function JiraPage() {
   // }, [currentFilter, allTickets, user]);
 
 
-  if (authLoading || isLoading) {
+  if (authLoading || (isLoading && canViewPage)) {
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Ticket className="h-8 w-8 text-primary" /> Jira Tickets (Admin/Technician View)
+              <Ticket className="h-8 w-8 text-primary" /> Jira Tickets ({user?.role === 'admin' ? 'Admin/Technician' : 'Super User'} View)
             </h1>
             <p className="text-muted-foreground">
               Track and manage latest updates and issues from Jira.
@@ -71,12 +77,12 @@ export default function JiraPage() {
     );
   }
   
-  if (user?.role !== 'admin') {
+  if (!canViewPage) {
      return (
         <div className="space-y-8 text-center py-10">
-            <Users className="h-16 w-16 mx-auto text-destructive" />
+            <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
             <h1 className="text-2xl font-semibold">Access Denied</h1>
-            <p className="text-muted-foreground">This page is for admin/technician users only.</p>
+            <p className="text-muted-foreground">This page is for admin or superuser users only.</p>
         </div>
      )
   }
@@ -86,10 +92,10 @@ export default function JiraPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Ticket className="h-8 w-8 text-primary" /> Jira Tickets (Admin/Technician View)
+            <Ticket className="h-8 w-8 text-primary" /> Jira Tickets ({user?.role === 'admin' ? 'Admin/Technician' : 'Super User'} View)
           </h1>
           <p className="text-muted-foreground">
-            Track and manage latest updates and issues from Jira. Technicians can view assigned tickets and manage development.
+            Track and manage latest updates and issues from Jira. {user?.role === 'admin' ? 'Technicians can view assigned tickets and manage development.' : 'Super users can oversee all tickets.'}
           </p>
         </div>
         {/* 
@@ -125,3 +131,4 @@ export default function JiraPage() {
     </div>
   );
 }
+

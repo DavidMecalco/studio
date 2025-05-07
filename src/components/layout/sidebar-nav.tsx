@@ -20,8 +20,11 @@ const adminNavItems = [
   { href: "/deployments", label: "Deployment Logs", icon: Layers },
   { href: "/audit-log", label: "Audit Log", icon: History },
   { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
-  { href: "/admin-profile", label: "Admin Profile", icon: ShieldCheck }, 
+  { href: "/admin-profile", label: "Profile", icon: ShieldCheck }, 
   // { href: "/settings", label: "Settings", icon: Settings }, // Example for future
+  // Future superuser specific items:
+  // { href: "/user-management", label: "User Management", icon: UsersRound },
+  // { href: "/client-setup", label: "Client Setup", icon: Building },
 ];
 
 const clientNavItems = [
@@ -35,9 +38,20 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const navItems = user?.role === 'client' ? clientNavItems : adminNavItems;
-
   if (!user) return null; // Or a loading state/skeleton
+
+  let navItems;
+  if (user.role === 'client') {
+    navItems = clientNavItems;
+  } else if (user.role === 'admin' || user.role === 'superuser') {
+    // Superuser gets admin navigation items. Specific superuser items can be added here later.
+    // For the "Profile" link, adminNavItems already points to /admin-profile.
+    // We will adjust the title on the /admin-profile page itself.
+    navItems = adminNavItems;
+  } else {
+    return null; // Should not happen for authenticated users
+  }
+
 
   return (
     <SidebarMenu>

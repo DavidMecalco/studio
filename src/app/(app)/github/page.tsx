@@ -1,18 +1,74 @@
 
+"use client"; // Make this a client component for auth check
+
+import { useEffect, useState } from 'react';
 import { CommitList } from '@/components/github/commit-list';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Github as GithubIcon } from 'lucide-react'; 
+import { Github as GithubIcon, AlertTriangle } from 'lucide-react'; 
+import { useAuth } from '@/context/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
-async function getPageData() {
-  // For a dedicated GitHub page, you might fetch all relevant commits or commits from specific repos.
-  // Here, we'll simulate fetching commits broadly.
-  const gitHubCommits: GitHubCommit[] = await getGitHubCommits("ALL_PROJECTS"); // Example: fetch for all
-  return { gitHubCommits };
-}
 
-export default async function GitHubPage() {
-  const { gitHubCommits } = await getPageData();
+export default function GitHubPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [gitHubCommits, setGitHubCommits] = useState<GitHubCommit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
+
+  useEffect(() => {
+    async function fetchData() {
+      if (authLoading || !canViewPage) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const commits = await getGitHubCommits("ALL_PROJECTS");
+        setGitHubCommits(commits);
+      } catch (error) {
+        console.error("Error fetching GitHub commits:", error);
+        // Optionally, show a toast or error message
+      }
+      setIsLoading(false);
+    }
+     if (canViewPage) {
+      fetchData();
+    } else if (!authLoading) {
+        setIsLoading(false);
+    }
+  }, [user, authLoading, canViewPage]);
+
+  if (authLoading || (isLoading && canViewPage)) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-7 w-48" />
+        </div>
+        <Skeleton className="h-4 w-3/4" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/3" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!canViewPage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
+        <p className="text-muted-foreground">This page is for admin or superuser users only.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -39,3 +95,4 @@ export default async function GitHubPage() {
     </div>
   );
 }
+

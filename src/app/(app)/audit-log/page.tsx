@@ -38,9 +38,11 @@ export default function AuditLogPage() {
     searchTerm: '',
   });
 
+  const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
+
   useEffect(() => {
     async function fetchData() {
-       if (authLoading || !user || user.role !== 'admin') {
+       if (authLoading || !canViewPage) {
         setIsLoading(false);
         return;
       }
@@ -59,11 +61,15 @@ export default function AuditLogPage() {
       }
       setIsLoading(false);
     }
-    fetchData();
-  }, [user, authLoading]);
+    if (canViewPage) {
+        fetchData();
+    } else if (!authLoading) {
+        setIsLoading(false);
+    }
+  }, [user, authLoading, canViewPage]);
 
   const combinedAndFilteredAuditLog = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading || !canViewPage) return [];
 
     const transformedDeployments: CombinedAuditEntry[] = allDeployments.map(dep => ({
       id: dep.id,
@@ -123,10 +129,10 @@ export default function AuditLogPage() {
     });
 
     return combinedLog.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [isLoading, allHistory, allDeployments, filters]);
+  }, [isLoading, allHistory, allDeployments, filters, canViewPage]);
 
 
-  if (authLoading || (isLoading && combinedAndFilteredAuditLog.length === 0)) {
+  if (authLoading || (isLoading && combinedAndFilteredAuditLog.length === 0 && canViewPage)) {
     return (
         <div className="space-y-8">
              <div className="flex items-center gap-2">
@@ -148,12 +154,12 @@ export default function AuditLogPage() {
     );
   }
   
-  if (!user || user.role !== 'admin') {
+  if (!canViewPage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
         <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
-        <p className="text-muted-foreground">This page is for admin users only.</p>
+        <p className="text-muted-foreground">This page is for admin or superuser users only.</p>
       </div>
     );
   }
@@ -190,3 +196,4 @@ export default function AuditLogPage() {
     </div>
   );
 }
+

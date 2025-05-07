@@ -18,16 +18,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardData {
   jiraTickets: JiraTicket[]; // Tickets for TicketManagementCard / Client view
-  allJiraTickets?: JiraTicket[]; // All tickets for admin KPIs, undefined for client
+  allJiraTickets?: JiraTicket[]; // All tickets for admin/superuser KPIs, undefined for client
   githubCommits: GitHubCommit[];
   users: User[];
-  closedTicketsCount?: number; // For admin KPI
-  pendingTicketsCount?: number; // For admin KPI
-  commitsLastWeekCount?: number; // For admin KPI
+  closedTicketsCount?: number; // For admin/superuser KPI
+  pendingTicketsCount?: number; // For admin/superuser KPI
+  commitsLastWeekCount?: number; // For admin/superuser KPI
   myActiveTicketsCount?: number; // For client KPI
 }
 
-async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'): Promise<DashboardData | null> {
+async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client' | 'superuser'): Promise<DashboardData | null> {
   try {
     const [allJiraTicketsFromService, githubCommits, users] = await Promise.all([
       getJiraTickets(), 
@@ -41,9 +41,9 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
         users,
     };
 
-    if (userRole === 'admin') {
+    if (userRole === 'admin' || userRole === 'superuser') {
       dashboardResult.allJiraTickets = allJiraTicketsFromService;
-      dashboardResult.jiraTickets = allJiraTicketsFromService; // Admin sees all tickets in management card
+      dashboardResult.jiraTickets = allJiraTicketsFromService; // Admin/Superuser sees all tickets in management card
       dashboardResult.closedTicketsCount = allJiraTicketsFromService.filter(
         ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
       ).length;
@@ -102,7 +102,7 @@ export default function DashboardOverviewPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(user?.role === 'client' ? 1 : 3)].map((_, i) => <NavCardSkeleton key={i}/>)}
         </div>
-        {user?.role === 'admin' && <TicketManagementCardSkeleton />}
+        {(user?.role === 'admin' || user?.role === 'superuser') && <TicketManagementCardSkeleton />}
       </div>
     );
   }
@@ -120,6 +120,8 @@ export default function DashboardOverviewPage() {
     myActiveTicketsCount
   } = dashboardData;
 
+  const isAdminOrSuperUser = user?.role === 'admin' || user?.role === 'superuser';
+
 
   return (
     <div className="space-y-8">
@@ -129,14 +131,15 @@ export default function DashboardOverviewPage() {
           <p className="text-muted-foreground">
             {user?.role === 'client' 
               ? "Gestione sus solicitudes y seguimiento de tickets." 
-              : "Su centro de operaciones para la gestión de versiones de Maximo."}
+              : user?.role === 'admin' ? "Su centro de operaciones para la gestión de versiones de Maximo."
+              : "Portal de administración y configuración del sistema Maximo."}
           </p>
         </div>
       </div>
 
       {/* KPIs Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {user?.role === 'admin' && (
+        {isAdminOrSuperUser && (
           <>
             <KpiCard
               title="Tickets Cerrados (Global)"
@@ -195,7 +198,7 @@ export default function DashboardOverviewPage() {
               </CardContent>
             </Card>
         )}
-        {user?.role === 'admin' && (
+        {isAdminOrSuperUser && (
           <>
             <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
               <CardHeader>
@@ -260,8 +263,8 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* Ticket Management Section - Only for Admin */}
-      {user?.role === 'admin' && (
+      {/* Ticket Management Section - Only for Admin/SuperUser */}
+      {isAdminOrSuperUser && (
         <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
       )}
       
@@ -341,3 +344,4 @@ const TicketManagementCardSkeleton = () => (
         </CardContent>
     </Card>
 );
+

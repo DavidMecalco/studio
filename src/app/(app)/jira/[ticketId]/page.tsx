@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import { useEffect, useState }  from 'react';
@@ -177,8 +178,8 @@ export default function TicketDetailPage() {
           The ticket with ID <span className="font-mono">{ticketId}</span> could not be found.
         </p>
         <Button asChild>
-          <Link href="/jira">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go back to Jira Tickets
+          <Link href={user?.role === 'client' ? "/my-tickets" : "/jira"}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Go back to Tickets
           </Link>
         </Button>
       </div>
@@ -187,6 +188,11 @@ export default function TicketDetailPage() {
 
   const { ticket, commits } = ticketData;
   const filesForVersionHistory = ticket.attachmentNames || []; // Could also include files from commits
+
+  // Superuser can view, Admin can view and interact with forms
+  const canManageTicket = user?.role === 'admin';
+  const canViewVersionHistory = user?.role === 'admin' || user?.role === 'superuser';
+
 
   return (
     <div className="space-y-8">
@@ -335,10 +341,15 @@ export default function TicketDetailPage() {
         </Card>
       </div>
 
-      {user?.role === 'admin' && ticketId && ticketData?.ticket &&(
-        <>
+      {canViewVersionHistory && ticketId && filesForVersionHistory.length > 0 && (
+         <>
             <Separator className="my-8" />
             <VersionHistoryCard ticketId={ticketId} files={filesForVersionHistory} />
+         </>
+      )}
+      
+      {canManageTicket && ticketId && ticketData?.ticket &&(
+        <>
             <Separator className="my-8" />
             <CommitChangesForm ticketId={ticketId} currentTicketStatus={ticketData.ticket.status} />
         </>
@@ -346,3 +357,4 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+

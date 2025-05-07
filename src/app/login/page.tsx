@@ -94,8 +94,11 @@ export default function LoginPage() {
       </Card>
        <p className="mt-4 text-center text-sm text-muted-foreground">
         Hint: Use any username and password `password`. <br/>
-        For client view, use a username starting with `client` (e.g., `client1`).
+        For client view, use a username starting with `client` (e.g., `client1`).<br/>
+        For admin view, use a username like `admin`.<br/>
+        For super user view, use username `superuser`.
       </p>
     </div>
   );
 }
+

@@ -64,8 +64,8 @@ const createTicketFormSchemaBase = z.object({
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
 });
 
-// Schema for admin users, includes optional provider, branch, and attachments
-const adminCreateTicketFormSchema = createTicketFormSchemaBase.extend({
+// Schema for admin/superuser users, includes optional provider, branch, and attachments
+const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
   provider: z.enum(ticketProviders).optional(),
   branch: z.enum(ticketBranches).optional(),
 });
@@ -74,10 +74,10 @@ const adminCreateTicketFormSchema = createTicketFormSchemaBase.extend({
 const clientCreateTicketFormSchema = createTicketFormSchemaBase;
 
 
-type AdminFormValues = z.infer<typeof adminCreateTicketFormSchema>;
+type AdminOrSuperUserFormValues = z.infer<typeof adminOrSuperUserCreateTicketFormSchema>;
 type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
 // Unified form values type for useForm, specific values will be handled by the action
-export type CreateTicketDialogFormValues = Partial<AdminFormValues & ClientFormValues>;
+export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & ClientFormValues>;
 
 
 export function CreateTicketDialog() {
@@ -87,7 +87,8 @@ export function CreateTicketDialog() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const currentFormSchema = user?.role === 'client' ? clientCreateTicketFormSchema : adminCreateTicketFormSchema;
+  const isAdminOrSuperUser = user?.role === 'admin' || user?.role === 'superuser';
+  const currentFormSchema = isAdminOrSuperUser ? adminOrSuperUserCreateTicketFormSchema : clientCreateTicketFormSchema;
 
   const form = useForm<CreateTicketDialogFormValues>({
     resolver: zodResolver(currentFormSchema),
@@ -108,7 +109,7 @@ export function CreateTicketDialog() {
         description: "",
         priority: undefined,
         requestingUserId: user.username,
-        provider: undefined, // Provider for admin will be selected; for client, it's derived
+        provider: undefined, 
         branch: undefined,
       });
     }
@@ -152,7 +153,7 @@ export function CreateTicketDialog() {
     }
     setIsSubmitting(true);
 
-    const attachmentNames = user.role === 'admin' ? selectedFiles.map(file => file.name) : [];
+    const attachmentNames = isAdminOrSuperUser ? selectedFiles.map(file => file.name) : [];
     
     let providerForAction: JiraTicketProvider | undefined = undefined;
     if (user.role === 'client') {
@@ -160,7 +161,7 @@ export function CreateTicketDialog() {
         if (user.company === 'TLA' || user.company === 'FEMA') {
             providerForAction = user.company;
         }
-    } else if (user.role === 'admin') {
+    } else if (isAdminOrSuperUser) {
         providerForAction = values.provider;
     }
 
@@ -170,8 +171,8 @@ export function CreateTicketDialog() {
       priority: values.priority!,
       requestingUserId: user.username!,
       provider: providerForAction, 
-      branch: user.role === 'admin' ? values.branch : undefined,
-      attachmentNames: user.role === 'admin' ? attachmentNames : [],
+      branch: isAdminOrSuperUser ? values.branch : undefined,
+      attachmentNames: isAdminOrSuperUser ? attachmentNames : [],
     };
 
     const result = await createJiraTicketAction(ticketDataForAction);
@@ -194,7 +195,7 @@ export function CreateTicketDialog() {
     setIsSubmitting(false);
   }
   
-  if (!user) return null;
+  if (!user) return null; // Don't render button if no user (e.g., on login page)
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -287,7 +288,7 @@ export function CreateTicketDialog() {
               )}
             />
 
-            {user.role === 'admin' && (
+            {isAdminOrSuperUser && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -295,7 +296,7 @@ export function CreateTicketDialog() {
                     name="provider"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Proveedor (Admin)</FormLabel>
+                        <FormLabel>Proveedor</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -319,7 +320,7 @@ export function CreateTicketDialog() {
                     name="branch"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Branch (Admin)</FormLabel>
+                        <FormLabel>Branch</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -341,7 +342,7 @@ export function CreateTicketDialog() {
                 </div>
               
                 <FormItem>
-                  <FormLabel htmlFor="attachments">Adjuntos (Admin, opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
+                  <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
                   <FormControl>
                     <div className="flex items-center gap-2">
                         <Input
@@ -392,3 +393,4 @@ export function CreateTicketDialog() {
     </Dialog>
   );
 }
+

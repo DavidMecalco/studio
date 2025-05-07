@@ -9,8 +9,8 @@ import type { JiraTicketProvider } from '@/services/jira'; // For company type a
 export interface User {
   id: string; // Will store the username for mock simplicity
   username: string;
-  role: 'admin' | 'client';
-  company?: JiraTicketProvider | 'Other Company'; // Aligned with JiraTicketProvider for TLA/FEMA
+  role: 'admin' | 'client' | 'superuser'; // Added 'superuser'
+  company?: JiraTicketProvider | 'Other Company' | 'System Corp'; // Added 'System Corp' for superuser
   phone?: string;
   position?: string;
   // email?: string; // Add other user properties as needed
@@ -55,12 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Simulate API call for login
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    const role = username.toLowerCase().startsWith('client') ? 'client' : 'admin';
+    let role: User['role'];
     let company: User['company'] = 'Other Company';
     let phone = 'N/A';
     let position = 'N/A';
 
-    if (role === 'client') {
+    if (username.toLowerCase() === 'superuser') {
+      role = 'superuser';
+      position = 'System Super User';
+      company = 'System Corp';
+      phone = '555-9999';
+    } else if (username.toLowerCase().startsWith('client')) {
+      role = 'client';
       position = 'Client User';
       if (username.toLowerCase().includes('tla')) {
         company = 'TLA';
@@ -72,7 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Default for other clients
         phone = '555-0303';
       }
-    } else { // admin
+    } else { // admin is the default for non-client, non-superuser
+      role = 'admin';
       position = 'System Administrator';
       company = 'Maximo Corp' as User['company']; // Admin's company
       phone = '555-0000';
@@ -105,3 +112,4 @@ export function useAuth() {
   }
   return context;
 }
+

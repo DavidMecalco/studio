@@ -47,7 +47,9 @@ export function UserNav() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.username}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.role === 'client' ? user.company : 'Administrator'}
+              {user.role === 'client' ? user.company : 
+               user.role === 'admin' ? 'Administrator' : 
+               user.role === 'superuser' ? 'Super User' : ''}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -60,15 +62,16 @@ export function UserNav() {
             </Link>
           </DropdownMenuItem>
         )}
-        {user.role === 'admin' && (
+        {(user.role === 'admin' || user.role === 'superuser') && (
           <DropdownMenuItem asChild className="cursor-pointer">
             <Link href="/admin-profile">
               <ShieldCheck className="mr-2 h-4 w-4" />
-              <span>Admin Profile</span>
+              <span>{user.role === 'superuser' ? 'Super User Profile' : 'Admin Profile'}</span>
             </Link>
           </DropdownMenuItem>
         )}
-        {(user.role === 'client' || user.role === 'admin') && <DropdownMenuSeparator />}
+        {/* Separator only if there was a profile link */}
+        {(user.role === 'client' || user.role === 'admin' || user.role === 'superuser') && <DropdownMenuSeparator />}
         <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
@@ -77,3 +80,4 @@ export function UserNav() {
     </DropdownMenu>
   );
 }
+

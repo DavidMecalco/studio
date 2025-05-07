@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserCog, Briefcase, Phone, Building } from "lucide-react"; 
+import { UserCog, Briefcase, Phone, Building, AlertTriangle } from "lucide-react"; 
 import { Separator } from "@/components/ui/separator";
 
 export default function ProfilePage() {
@@ -42,10 +42,13 @@ export default function ProfilePage() {
   
   if (user.role !== 'client') {
     return (
-        <div className="space-y-8 text-center py-10">
-            <UserCog className="h-16 w-16 mx-auto text-destructive" />
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
+            <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
             <h1 className="text-2xl font-semibold">Access Denied</h1>
             <p className="text-muted-foreground">This profile page is for client users only.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+                If you are an admin or superuser, please use the profile link in the user menu.
+            </p>
         </div>
     );
   }
@@ -96,3 +99,4 @@ function ProfileItem({ icon, label, value }: ProfileItemProps) {
         </div>
     );
 }
+
