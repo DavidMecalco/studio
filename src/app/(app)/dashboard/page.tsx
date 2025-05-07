@@ -17,56 +17,52 @@ import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardData {
-  jiraTickets: JiraTicket[];
+  jiraTickets: JiraTicket[]; // Tickets for TicketManagementCard / Client view
+  allJiraTickets?: JiraTicket[]; // All tickets for admin KPIs, undefined for client
   githubCommits: GitHubCommit[];
   users: User[];
-  closedTicketsCount: number;
-  pendingTicketsCount: number;
-  commitsLastWeekCount: number;
-  myTicketsCount?: number; // For client role
+  closedTicketsCount?: number; // For admin KPI
+  pendingTicketsCount?: number; // For admin KPI
+  commitsLastWeekCount?: number; // For admin KPI
+  myActiveTicketsCount?: number; // For client KPI
 }
 
 async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'): Promise<DashboardData | null> {
   try {
-    const [allJiraTickets, githubCommits, users] = await Promise.all([
-      getJiraTickets(), // Fetch all for admin KPIs, filter later for client if needed
+    const [allJiraTicketsFromService, githubCommits, users] = await Promise.all([
+      getJiraTickets(), 
       getGitHubCommits("ALL_PROJECTS"),
       getUsers(),
     ]);
 
-    let myTicketsCount: number | undefined = undefined;
-    let displayJiraTickets = allJiraTickets; // For admin TicketManagementCard
-
-    if (userRole === 'client' && userId) {
-      const clientTickets = allJiraTickets.filter(ticket => ticket.requestingUserId === userId);
-      myTicketsCount = clientTickets.length;
-       // TicketManagementCard might not be relevant for clients, or show their tickets
-      displayJiraTickets = clientTickets; 
-    }
-
-    const closedTicketsCount = allJiraTickets.filter(
-      ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
-    ).length;
-
-    const pendingTicketsCount = allJiraTickets.filter(
-      ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno'].includes(ticket.status)
-    ).length;
-
-    const oneWeekAgo = subWeeks(new Date(), 1);
-    const commitsLastWeekCount = githubCommits.filter(
-      commit => isAfter(new Date(commit.date), oneWeekAgo)
-    ).length;
-    
-    return { 
-        jiraTickets: displayJiraTickets, // Tickets for TicketManagementCard
-        allJiraTickets, // All tickets for admin KPIs
-        githubCommits, 
-        users, 
-        closedTicketsCount, 
-        pendingTicketsCount, 
-        commitsLastWeekCount,
-        myTicketsCount
+    let dashboardResult: DashboardData = {
+        jiraTickets: [], // Will be populated based on role
+        githubCommits,
+        users,
     };
+
+    if (userRole === 'admin') {
+      dashboardResult.allJiraTickets = allJiraTicketsFromService;
+      dashboardResult.jiraTickets = allJiraTicketsFromService; // Admin sees all tickets in management card
+      dashboardResult.closedTicketsCount = allJiraTicketsFromService.filter(
+        ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
+      ).length;
+      dashboardResult.pendingTicketsCount = allJiraTicketsFromService.filter(
+        ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno'].includes(ticket.status)
+      ).length;
+      const oneWeekAgo = subWeeks(new Date(), 1);
+      dashboardResult.commitsLastWeekCount = githubCommits.filter(
+        commit => isAfter(new Date(commit.date), oneWeekAgo)
+      ).length;
+    } else if (userRole === 'client' && userId) {
+      const clientTickets = allJiraTicketsFromService.filter(ticket => ticket.requestingUserId === userId);
+      dashboardResult.jiraTickets = clientTickets; // Client sees their tickets
+      dashboardResult.myActiveTicketsCount = clientTickets.filter(
+          ticket => ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto'
+      ).length;
+    }
+    
+    return dashboardResult;
   } catch (error) {
     console.error("Failed to fetch dashboard data:", error);
     return null;
@@ -121,7 +117,7 @@ export default function DashboardOverviewPage() {
     closedTicketsCount, 
     pendingTicketsCount, 
     commitsLastWeekCount,
-    myTicketsCount // Will be defined for client role
+    myActiveTicketsCount
   } = dashboardData;
 
 
@@ -144,31 +140,31 @@ export default function DashboardOverviewPage() {
           <>
             <KpiCard
               title="Tickets Cerrados (Global)"
-              value={closedTicketsCount}
+              value={closedTicketsCount ?? 0}
               icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
               description="Total de tickets completados."
               className="shadow-lg rounded-xl"
             />
             <KpiCard
               title="Tickets Pendientes (Global)"
-              value={pendingTicketsCount}
+              value={pendingTicketsCount ?? 0}
               icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
               description="Tickets activos o esperando acción."
               className="shadow-lg rounded-xl"
             />
             <KpiCard
               title="Commits (Última Semana)"
-              value={commitsLastWeekCount}
+              value={commitsLastWeekCount ?? 0}
               icon={<GitMerge className="h-5 w-5 text-blue-500" />}
               description="Actividad reciente en repositorios."
               className="shadow-lg rounded-xl"
             />
           </>
         )}
-        {user?.role === 'client' && typeof myTicketsCount !== 'undefined' && (
+        {user?.role === 'client' && typeof myActiveTicketsCount !== 'undefined' && (
            <KpiCard
             title="Mis Tickets Activos"
-            value={myTicketsCount} // This should ideally be count of *active* client tickets
+            value={myActiveTicketsCount}
             icon={<Ticket className="h-5 w-5 text-accent" />}
             description="Tickets que ha enviado y están activos."
             className="shadow-lg rounded-xl"
@@ -276,8 +272,8 @@ export default function DashboardOverviewPage() {
             <Image
               src="https://picsum.photos/1200/400"
               alt="Abstract technology background"
-              layout="fill"
-              objectFit="cover"
+              fill // Changed from layout="fill" to fill for Next 13+
+              style={{objectFit:"cover"}} // Changed from objectFit="cover"
               priority // Prioritize loading for LCP
               data-ai-hint="technology abstract"
             />
@@ -345,5 +341,3 @@ const TicketManagementCardSkeleton = () => (
         </CardContent>
     </Card>
 );
-
-```
