@@ -22,20 +22,20 @@ export default function JiraPage() {
 
   useEffect(() => {
     async function fetchTickets() {
-      if (canViewPage) { // Admins and superusers can see this page
-        setIsLoading(true);
-        const tickets = await getJiraTickets();
-        setAllTickets(tickets);
-        // setFilteredTickets(tickets); // Initially show all
+      if (authLoading || !canViewPage) {
         setIsLoading(false);
+        return;
       }
+       setIsLoading(true);
+      const tickets = await getJiraTickets();
+      setAllTickets(tickets);
+      // setFilteredTickets(tickets); // Initially show all
+      setIsLoading(false);
     }
-    if (!authLoading) {
-      if (canViewPage) {
-        fetchTickets();
-      } else {
-        setIsLoading(false); // Set loading to false if user cannot view
-      }
+    if (canViewPage) {
+      fetchTickets();
+    } else if (!authLoading) {
+      setIsLoading(false); // User cannot view, stop loading
     }
   }, [user, authLoading, canViewPage]);
 
@@ -77,7 +77,7 @@ export default function JiraPage() {
     );
   }
   
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth loading is complete
      return (
         <div className="space-y-8 text-center py-10">
             <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />

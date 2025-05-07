@@ -189,9 +189,10 @@ export default function TicketDetailPage() {
   const { ticket, commits } = ticketData;
   const filesForVersionHistory = ticket.attachmentNames || []; // Could also include files from commits
 
-  // Superuser can view, Admin can view and interact with forms
-  const canManageTicket = user?.role === 'admin';
+  // Define permissions based on user role
+  const canManageTicketCommits = user?.role === 'admin'; // Only admin (technician) can commit changes
   const canViewVersionHistory = user?.role === 'admin' || user?.role === 'superuser';
+  const canComment = user?.role === 'admin' || user?.role === 'superuser' || user?.id === ticket.requestingUserId; // Admins, SU, and the ticket requester can comment
 
 
   return (
@@ -328,11 +329,15 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
-            <Separator className="my-6"/>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
-                <MessageSquare className="h-5 w-5"/> Comentarios
-            </h3>
-            {ticketId && <CommentForm ticketId={ticketId} />}
+            {canComment && (
+                <>
+                    <Separator className="my-6"/>
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
+                        <MessageSquare className="h-5 w-5"/> Comentarios
+                    </h3>
+                    {ticketId && <CommentForm ticketId={ticketId} />}
+                </>
+            )}
            
           </CardContent>
            <CardFooter className="text-xs text-muted-foreground">
@@ -348,7 +353,7 @@ export default function TicketDetailPage() {
          </>
       )}
       
-      {canManageTicket && ticketId && ticketData?.ticket &&(
+      {canManageTicketCommits && ticketId && ticketData?.ticket && (
         <>
             <Separator className="my-8" />
             <CommitChangesForm ticketId={ticketId} currentTicketStatus={ticketData.ticket.status} />

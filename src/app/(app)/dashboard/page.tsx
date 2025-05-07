@@ -5,13 +5,13 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks } from 'lucide-react';
+import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks, LineChart as AnalyticsIcon, Users, Settings } from 'lucide-react';
 import Image from 'next/image';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { TicketManagementCard } from '@/components/dashboard/ticket-management-card';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
-import { getUsers, type User } from '@/services/users';
+import { getUsers, type User as ServiceUser } from '@/services/users';
 import { subWeeks, isAfter } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +20,7 @@ interface DashboardData {
   jiraTickets: JiraTicket[]; // Tickets for TicketManagementCard / Client view
   allJiraTickets?: JiraTicket[]; // All tickets for admin/superuser KPIs, undefined for client
   githubCommits: GitHubCommit[];
-  users: User[];
+  users: ServiceUser[];
   closedTicketsCount?: number; // For admin/superuser KPI
   pendingTicketsCount?: number; // For admin/superuser KPI
   commitsLastWeekCount?: number; // For admin/superuser KPI
@@ -100,7 +100,7 @@ export default function DashboardOverviewPage() {
           {[...Array(3)].map((_, i) => <KpiCardSkeleton key={i}/>)}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(user?.role === 'client' ? 1 : 3)].map((_, i) => <NavCardSkeleton key={i}/>)}
+            {[...Array(user?.role === 'client' ? 1 : (user?.role === 'superuser' ? 4 : 3))].map((_, i) => <NavCardSkeleton key={i}/>)}
         </div>
         {(user?.role === 'admin' || user?.role === 'superuser') && <TicketManagementCardSkeleton />}
       </div>
@@ -120,7 +120,9 @@ export default function DashboardOverviewPage() {
     myActiveTicketsCount
   } = dashboardData;
 
-  const isAdminOrSuperUser = user?.role === 'admin' || user?.role === 'superuser';
+  const isAdmin = user?.role === 'admin';
+  const isSuperUser = user?.role === 'superuser';
+  const isClient = user?.role === 'client';
 
 
   return (
@@ -129,17 +131,18 @@ export default function DashboardOverviewPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Bienvenido al Portal Maximo</h1>
           <p className="text-muted-foreground">
-            {user?.role === 'client' 
+            {isClient 
               ? "Gestione sus solicitudes y seguimiento de tickets." 
-              : user?.role === 'admin' ? "Su centro de operaciones para la gestión de versiones de Maximo."
-              : "Portal de administración y configuración del sistema Maximo."}
+              : isAdmin ? "Su centro de operaciones para la gestión de versiones de Maximo."
+              : isSuperUser ? "Portal de administración y configuración del sistema Maximo."
+              : "Su panel de control central."}
           </p>
         </div>
       </div>
 
       {/* KPIs Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {isAdminOrSuperUser && (
+        {(isAdmin || isSuperUser) && (
           <>
             <KpiCard
               title="Tickets Cerrados (Global)"
@@ -164,7 +167,7 @@ export default function DashboardOverviewPage() {
             />
           </>
         )}
-        {user?.role === 'client' && typeof myActiveTicketsCount !== 'undefined' && (
+        {isClient && typeof myActiveTicketsCount !== 'undefined' && (
            <KpiCard
             title="Mis Tickets Activos"
             value={myActiveTicketsCount}
@@ -177,7 +180,7 @@ export default function DashboardOverviewPage() {
 
       {/* Navigation Cards Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {user?.role === 'client' && (
+        {isClient && (
             <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center text-xl gap-2">
@@ -198,7 +201,7 @@ export default function DashboardOverviewPage() {
               </CardContent>
             </Card>
         )}
-        {isAdminOrSuperUser && (
+        {(isAdmin || isSuperUser) && (
           <>
             <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
               <CardHeader>
@@ -259,12 +262,56 @@ export default function DashboardOverviewPage() {
                 </Button>
               </CardContent>
             </Card>
+            
+            {isSuperUser && (
+                <>
+                 <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+                    <CardHeader>
+                        <CardTitle className="flex items-center text-xl gap-2">
+                        <AnalyticsIcon className="h-6 w-6 text-accent" />
+                        Analytics
+                        </CardTitle>
+                        <CardDescription>Visualice métricas y rendimiento.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                        Acceda a los dashboards de analítica y reportes del sistema.
+                        </p>
+                        <Button asChild>
+                        <Link href="/analytics">
+                            Ir a Analytics <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+                {/* Placeholder for future User Management card for SuperUser */}
+                {/* <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+                    <CardHeader>
+                        <CardTitle className="flex items-center text-xl gap-2">
+                        <Users className="h-6 w-6 text-accent" />
+                        User Management
+                        </CardTitle>
+                        <CardDescription>Manage client and technician accounts.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                        Create, edit, and manage user accounts and permissions.
+                        </p>
+                        <Button asChild variant="secondary" disabled> 
+                        <Link href="#"> 
+                            Manage Users (Soon) <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                        </Button>
+                    </CardContent>
+                </Card> */}
+                </>
+            )}
           </>
         )}
       </div>
 
       {/* Ticket Management Section - Only for Admin/SuperUser */}
-      {isAdminOrSuperUser && (
+      {(isAdmin || isSuperUser) && (
         <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
       )}
       
@@ -275,9 +322,9 @@ export default function DashboardOverviewPage() {
             <Image
               src="https://picsum.photos/1200/400"
               alt="Abstract technology background"
-              fill // Changed from layout="fill" to fill for Next 13+
-              style={{objectFit:"cover"}} // Changed from objectFit="cover"
-              priority // Prioritize loading for LCP
+              fill 
+              style={{objectFit:"cover"}} 
+              priority 
               data-ai-hint="technology abstract"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-6">

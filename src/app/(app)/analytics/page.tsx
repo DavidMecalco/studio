@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
     selectedEnvironment: 'all',
   });
 
-  const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
+  const canViewPage = user?.role === 'superuser';
 
   useEffect(() => {
     async function fetchData() {
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
     }
     if (canViewPage) {
         fetchData();
-    } else if (!authLoading) {
+    } else if (!authLoading) { // If auth is done and user still cannot view
         setIsLoading(false);
     }
   }, [authLoading, canViewPage, toast]);
@@ -235,17 +235,17 @@ export default function AnalyticsPage() {
     );
   }
   
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth loading is complete
      return (
         <div className="space-y-8 text-center py-10">
             <AnalyticsIcon className="h-16 w-16 mx-auto text-destructive" />
             <h1 className="text-2xl font-semibold">Access Denied</h1>
-            <p className="text-muted-foreground">This analytics page is for admin or superuser users only.</p>
+            <p className="text-muted-foreground">This analytics page is for superuser users only.</p>
         </div>
      );
   }
 
-  if (isLoading || !processedData) {
+  if (isLoading || !processedData) { // This covers initial loading for authorized users
      return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">

@@ -8,24 +8,28 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers } from "lucide-react";
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers, Users } from "lucide-react"; // Added Users for superuser
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
-const adminNavItems = [
+const baseAdminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jira", label: "Jira Tickets", icon: Ticket },
   { href: "/github", label: "GitHub Commits", icon: Github },
   { href: "/maximo", label: "Maximo Mgmt", icon: Server },
   { href: "/deployments", label: "Deployment Logs", icon: Layers },
   { href: "/audit-log", label: "Audit Log", icon: History },
-  { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
-  { href: "/admin-profile", label: "Profile", icon: ShieldCheck }, 
-  // { href: "/settings", label: "Settings", icon: Settings }, // Example for future
-  // Future superuser specific items:
-  // { href: "/user-management", label: "User Management", icon: UsersRound },
-  // { href: "/client-setup", label: "Client Setup", icon: Building },
+  { href: "/admin-profile", label: "Admin Profile", icon: ShieldCheck }, 
 ];
+
+const superUserNavItems = [
+  ...baseAdminNavItems.filter(item => item.href !== "/admin-profile"), // Remove default admin profile
+  { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
+  // Add superuser specific items like User Management if needed in the future
+  // { href: "/user-management", label: "User Management", icon: Users }, 
+  { href: "/admin-profile", label: "SuperUser Profile", icon: ShieldCheck }, // Specific profile link for superuser
+];
+
 
 const clientNavItems = [
    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, 
@@ -43,12 +47,12 @@ export function SidebarNav() {
   let navItems;
   if (user.role === 'client') {
     navItems = clientNavItems;
-  } else if (user.role === 'admin' || user.role === 'superuser') {
-    // Superuser gets admin navigation items. Specific superuser items can be added here later.
-    // For the "Profile" link, adminNavItems already points to /admin-profile.
-    // We will adjust the title on the /admin-profile page itself.
-    navItems = adminNavItems;
-  } else {
+  } else if (user.role === 'admin') {
+    navItems = baseAdminNavItems;
+  } else if (user.role === 'superuser') {
+    navItems = superUserNavItems;
+  }
+   else {
     return null; // Should not happen for authenticated users
   }
 

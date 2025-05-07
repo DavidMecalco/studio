@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ListChecks } from 'lucide-react';
+import { ListChecks, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -14,28 +14,28 @@ export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const canViewPage = user?.role === 'client';
+
   useEffect(() => {
     async function fetchTickets() {
-      if (user && user.role === 'client') {
-        setIsLoading(true);
-        const userTickets = await getJiraTickets(user.id); // Pass username as ID for mock
-        setTickets(userTickets);
+      if (authLoading || !canViewPage) {
         setIsLoading(false);
-      } else if (user && user.role !== 'client') {
-        // Redirect or show an error if a non-client user tries to access
-        // For now, just show no tickets and set loading to false.
-        // Or redirect: router.push('/dashboard'); 
-        setTickets([]);
-        setIsLoading(false);
+        return;
       }
+      setIsLoading(true);
+      const userTickets = await getJiraTickets(user!.id); // User is guaranteed by canViewPage
+      setTickets(userTickets);
+      setIsLoading(false);
     }
 
-    if (!authLoading) {
+    if (canViewPage) {
       fetchTickets();
+    } else if (!authLoading) {
+      setIsLoading(false); // User cannot view, stop loading
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, canViewPage]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || (isLoading && canViewPage)) {
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -63,10 +63,11 @@ export default function MyTicketsPage() {
     );
   }
 
-  if (user?.role !== 'client') {
+  if (!canViewPage && !authLoading) { // Check after auth loading is complete
      return (
-        <div className="space-y-8 text-center">
-            <h1 className="text-2xl font-semibold">Access Denied</h1>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
+            <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+            <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
             <p className="text-muted-foreground">This page is for client users only.</p>
         </div>
      )
@@ -97,3 +98,4 @@ export default function MyTicketsPage() {
     </div>
   );
 }
+
