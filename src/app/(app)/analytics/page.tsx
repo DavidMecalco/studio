@@ -19,7 +19,7 @@ import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deploymen
 import { getUsers, type User as ServiceUser } from '@/services/users';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LineChart as AnalyticsIcon, Download, AlertCircle, CheckCircle2, ClipboardList, GitMerge, Users, ServerIcon, PieChart } from 'lucide-react';
+import { LineChart as AnalyticsIcon, Download, AlertCircle, CheckCircle2, ClipboardList, GitMerge, Users, ServerIcon, PieChart, Ticket } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { subDays, format, parseISO, isWithinInterval } from 'date-fns';
 
@@ -376,3 +376,4 @@ const ChartSkeleton = ({title}: {title: string}) => (
         </CardContent>
     </Card>
 );
+
