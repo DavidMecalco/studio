@@ -16,6 +16,7 @@ import Link from "next/link";
 import { MountainIcon } from "lucide-react"; 
 import CompanyLogo from "./company-logo";
 import { UserNav } from "@/components/auth/user-nav";
+import { CreateTicketDialog } from "@/components/tickets/create-ticket-dialog";
 
 interface AppShellProps {
   children: ReactNode;
@@ -61,6 +62,7 @@ export function AppShell({ children }: AppShellProps) {
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           {children}
         </main>
+        <CreateTicketDialog />
       </SidebarInset>
     </SidebarProvider>
   );

@@ -4,6 +4,16 @@
 export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuelto' | 'Cerrado' | 'En espera del visto bueno';
 
 /**
+ * Represents the possible providers for a Jira ticket.
+ */
+export type JiraTicketProvider = 'TLA' | 'FEMA';
+
+/**
+ * Represents the possible branches for a Jira ticket.
+ */
+export type JiraTicketBranch = 'DEV' | 'QA' | 'PROD';
+
+/**
  * Represents a Jira ticket.
  */
 export interface JiraTicket {
@@ -31,6 +41,18 @@ export interface JiraTicket {
    * The date the ticket was last updated.
    */
   lastUpdated?: string;
+  /**
+   * The provider associated with the ticket (e.g., TLA, FEMA).
+   */
+  provider?: JiraTicketProvider;
+  /**
+   * The branch associated with the ticket (e.g., DEV, QA, PROD).
+   */
+  branch?: JiraTicketBranch;
+  /**
+   * Names of attachments for the ticket.
+   */
+  attachmentNames?: string[];
 }
 
 // Mock data store
@@ -42,6 +64,8 @@ let mockJiraTickets: JiraTicket[] = [
     status: 'En Progreso',
     assigneeId: 'user-1',
     lastUpdated: '2024-07-28T10:00:00Z',
+    provider: 'TLA',
+    branch: 'DEV',
   },
   {
     id: 'MAX-456',
@@ -50,6 +74,8 @@ let mockJiraTickets: JiraTicket[] = [
     status: 'Resuelto',
     assigneeId: 'user-2',
     lastUpdated: '2024-07-27T15:30:00Z',
+    provider: 'FEMA',
+    branch: 'QA',
   },
   {
     id: 'MAX-789',
@@ -57,6 +83,8 @@ let mockJiraTickets: JiraTicket[] = [
     description: 'Configure Jenkins for automated builds and deployments to staging environment.',
     status: 'Abierto',
     lastUpdated: '2024-07-29T09:00:00Z',
+    provider: 'TLA',
+    branch: 'PROD',
   },
   {
     id: 'MAX-101',
@@ -133,4 +161,41 @@ export async function updateJiraTicket(
   };
   mockJiraTickets[ticketIndex] = updatedTicket;
   return JSON.parse(JSON.stringify(updatedTicket));
+}
+
+/**
+ * Data required to create a new Jira Ticket.
+ */
+export interface CreateJiraTicketData {
+  title: string;
+  description: string;
+  provider: JiraTicketProvider;
+  branch: JiraTicketBranch;
+  attachmentNames?: string[];
+  assigneeId?: string; // Optional: if assigning upon creation
+}
+
+/**
+ * Asynchronously creates a new Jira ticket.
+ * @param ticketData The data for the new ticket.
+ * @returns A promise that resolves to the created JiraTicket object.
+ */
+export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket> {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 600));
+  
+  const newTicket: JiraTicket = {
+    id: `MAX-${Math.floor(Math.random() * 900) + 1000}`, // Generate a new mock ID
+    title: ticketData.title,
+    description: ticketData.description,
+    status: 'Abierto', // Default status for new tickets
+    provider: ticketData.provider,
+    branch: ticketData.branch,
+    attachmentNames: ticketData.attachmentNames || [],
+    assigneeId: ticketData.assigneeId,
+    lastUpdated: new Date().toISOString(),
+  };
+  
+  mockJiraTickets.unshift(newTicket); // Add to the beginning of the array
+  return JSON.parse(JSON.stringify(newTicket));
 }
