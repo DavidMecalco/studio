@@ -1,39 +1,94 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Ticket, Github, Server } from 'lucide-react';
+import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase } from 'lucide-react';
 import Image from 'next/image';
+import { KpiCard } from '@/components/dashboard/kpi-card';
+import { TicketManagementCard } from '@/components/dashboard/ticket-management-card';
+import { getJiraTickets, type JiraTicket } from '@/services/jira';
+import { getGitHubCommits, type GitHubCommit } from '@/services/github';
+import { getUsers, type User } from '@/services/users';
+import { subWeeks, isAfter } from 'date-fns';
 
+async function getDashboardData() {
+  const [jiraTickets, githubCommits, users] = await Promise.all([
+    getJiraTickets(),
+    getGitHubCommits("ALL_PROJECTS"), // Fetch all commits for dashboard KPIs
+    getUsers(),
+  ]);
+  return { jiraTickets, githubCommits, users };
+}
 
 export default async function DashboardOverviewPage() {
+  const { jiraTickets, githubCommits, users } = await getDashboardData();
+
+  // Calculate KPIs
+  const closedTicketsCount = jiraTickets.filter(
+    ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
+  ).length;
+
+  const pendingTicketsCount = jiraTickets.filter(
+    ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno'].includes(ticket.status)
+  ).length;
+
+  const oneWeekAgo = subWeeks(new Date(), 1);
+  const commitsLastWeekCount = githubCommits.filter(
+    commit => isAfter(new Date(commit.date), oneWeekAgo)
+  ).length;
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome to Maximo Portal</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Bienvenido al Portal Maximo</h1>
           <p className="text-muted-foreground">
-            Your central hub for managing Maximo versioning activities.
+            Su centro de operaciones para la gestión de versiones de Maximo.
           </p>
         </div>
       </div>
 
+      {/* KPIs Section */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <KpiCard
+          title="Tickets Cerrados"
+          value={closedTicketsCount}
+          icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+          description="Total de tickets completados."
+          className="shadow-lg rounded-xl"
+        />
+        <KpiCard
+          title="Tickets Pendientes"
+          value={pendingTicketsCount}
+          icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
+          description="Tickets activos o esperando acción."
+          className="shadow-lg rounded-xl"
+        />
+        <KpiCard
+          title="Commits (Última Semana)"
+          value={commitsLastWeekCount}
+          icon={<GitMerge className="h-5 w-5 text-blue-500" />}
+          description="Actividad reciente en repositorios."
+          className="shadow-lg rounded-xl"
+        />
+      </div>
+
+      {/* Navigation Cards Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center text-xl gap-2">
               <Ticket className="h-6 w-6 text-accent" />
-              Jira Tickets
+              Tickets de Jira
             </CardTitle>
-            <CardDescription>Track issues and project progress.</CardDescription>
+            <CardDescription>Seguimiento de incidencias y progreso.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              View, manage, and monitor Jira tickets related to Maximo projects.
+              Vea, gestione y monitorice los tickets de Jira relacionados con los proyectos Maximo.
             </p>
             <Button asChild>
               <Link href="/jira">
-                Go to Jira Tickets <ArrowRight className="ml-2 h-4 w-4" />
+                Ir a Tickets de Jira <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
@@ -43,17 +98,17 @@ export default async function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center text-xl gap-2">
               <Github className="h-6 w-6 text-accent" />
-              GitHub Commits
+              Commits de GitHub
             </CardTitle>
-            <CardDescription>Monitor code changes and repository activity.</CardDescription>
+            <CardDescription>Monitorice cambios en el código.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Review recent commits and track development progress in associated GitHub repositories.
+              Revise los commits recientes y siga el progreso del desarrollo.
             </p>
             <Button asChild>
               <Link href="/github">
-                View GitHub Commits <ArrowRight className="ml-2 h-4 w-4" />
+                Ver Commits de GitHub <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
@@ -63,23 +118,27 @@ export default async function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center text-xl gap-2">
               <Server className="h-6 w-6 text-accent" />
-              Maximo Management
+              Gestión de Maximo
             </CardTitle>
-            <CardDescription>Upload configurations and manage files.</CardDescription>
+            <CardDescription>Suba configuraciones y gestione archivos.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Access tools for uploading Maximo configurations and managing related files.
+              Acceda a herramientas para subir configuraciones de Maximo.
             </p>
             <Button asChild>
               <Link href="/maximo">
-                Manage Maximo <ArrowRight className="ml-2 h-4 w-4" />
+                Gestionar Maximo <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
         </Card>
       </div>
 
+      {/* Ticket Management Section */}
+      <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
+
+      {/* Image Card Section - can be kept or removed based on preference */}
       <Card className="bg-card shadow-lg rounded-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="relative h-64 w-full">
@@ -92,7 +151,7 @@ export default async function DashboardOverviewPage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-6">
               <h2 className="text-2xl font-semibold text-white">
-                Stay Ahead with Maximo Version Portal
+                Manténgase al día con el Portal de Versiones Maximo
               </h2>
             </div>
           </div>
