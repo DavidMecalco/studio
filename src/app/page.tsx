@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function AppPageRoot() {
+export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
