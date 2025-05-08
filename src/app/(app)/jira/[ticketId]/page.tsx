@@ -1,14 +1,14 @@
 
 "use client"; 
 
-import { useEffect, useState }  from 'react';
+import { useEffect, useState, type ChangeEvent }  from 'react';
 import { useParams } from 'next/navigation'; 
 import { getJiraTicket, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -18,7 +18,12 @@ import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
 import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog';
-import { CommentForm } from '@/components/tickets/CommentForm'; // Import the CommentForm
+import { CommentForm } from '@/components/tickets/CommentForm';
+import { useToast } from '@/hooks/use-toast';
+import { addAttachmentsToTicketAction } from '@/app/actions/jira-actions';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
 
 interface TicketDetailsData {
   ticket: JiraTicket;
@@ -76,6 +81,159 @@ function VersionHistoryCard({ ticketId, files }: { ticketId: string, files?: str
   );
 }
 
+// Form for adding new attachments
+const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_ATTACHMENT_MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 
+  'application/pdf', 
+  'application/msword', 
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+  'text/plain', 'text/xml', 'application/xml',
+  'application/vnd.ms-excel', 
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip', 'application/x-zip-compressed',
+  // For code files
+  'text/x-python', 'application/python',
+  'text/javascript', 'application/javascript',
+  'application/json',
+];
+
+function AddAttachmentsForm({ ticketId, onAttachmentsAdded }: { ticketId: string, onAttachmentsAdded: () => void }) {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+            const filesArray = Array.from(event.target.files);
+            const validFiles = filesArray.filter(file => {
+                if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+                    toast({
+                        title: "Archivo Demasiado Grande",
+                        description: `El archivo "${file.name}" excede el límite de 5MB.`,
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                // Basic MIME type check; for more robustness, consider server-side validation or more specific client-side checks
+                if (!ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.type) && !file.name.endsWith('.py') && !file.name.endsWith('.xml') && !file.name.endsWith('.rptdesign') && !file.name.endsWith('.sql')) {
+                    toast({
+                        title: "Tipo de Archivo No Permitido",
+                        description: `El tipo de archivo de "${file.name}" (${file.type}) no está permitido.`,
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                return true;
+            }).slice(0, 5 - selectedFiles.length); // Limit to 5 files total
+
+            setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5));
+            if (filesArray.length + selectedFiles.length > 5) {
+                toast({
+                    title: "Límite de Archivos Alcanzado",
+                    description: `Solo se pueden subir hasta 5 archivos. Se ignoraron los adicionales.`,
+                    variant: "warning",
+                })
+            }
+            event.target.value = ""; // Reset file input
+        }
+    };
+
+    const removeFile = (fileName: string) => {
+        setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!user) {
+            toast({ title: "Error", description: "Usuario no autenticado.", variant: "destructive" });
+            return;
+        }
+        if (selectedFiles.length === 0) {
+            toast({ title: "Sin Archivos", description: "Por favor, seleccione al menos un archivo para adjuntar.", variant: "destructive" });
+            return;
+        }
+
+        setIsSubmitting(true);
+        const attachmentNames = selectedFiles.map(file => file.name);
+        const result = await addAttachmentsToTicketAction(ticketId, user.id, attachmentNames);
+
+        if (result.success) {
+            toast({
+                title: "Adjuntos Agregados",
+                description: "Los archivos han sido adjuntados al ticket. (Simulado)",
+            });
+            setSelectedFiles([]);
+            onAttachmentsAdded(); // Callback to refresh ticket data
+        } else {
+            toast({
+                title: "Error al Adjuntar",
+                description: result.error || "No se pudieron adjuntar los archivos.",
+                variant: "destructive",
+            });
+        }
+        setIsSubmitting(false);
+    };
+    
+    return (
+        <Card className="shadow-md rounded-lg mt-6">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    <Paperclip className="h-5 w-5 text-primary" /> Adjuntar Nuevos Archivos
+                </CardTitle>
+                <CardDescription>
+                    Suba archivos relevantes para este ticket (máx. 5 archivos, 5MB c/u).
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <Label htmlFor={`attachments-${ticketId}`}>Seleccionar archivos</Label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <Input
+                                id={`attachments-${ticketId}`}
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                                accept={ALLOWED_ATTACHMENT_MIME_TYPES.join(',')}
+                                disabled={selectedFiles.length >= 5 || isSubmitting}
+                            />
+                            <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        {selectedFiles.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                <p className="text-sm font-medium">Archivos seleccionados:</p>
+                                <ul className="list-none space-y-1">
+                                    {selectedFiles.map(file => (
+                                        <li key={file.name} className="flex justify-between items-center text-sm p-2 border rounded-md bg-muted/50">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(file.name)} className="text-destructive hover:bg-destructive/10 h-6 w-6" disabled={isSubmitting}>
+                                                <XIcon className="h-4 w-4" />
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {selectedFiles.length >= 5 && (
+                            <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
+                        )}
+                    </div>
+                    <Button type="submit" disabled={isSubmitting || selectedFiles.length === 0}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
+                        {isSubmitting ? "Adjuntando..." : "Adjuntar Archivos"}
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
   try {
@@ -100,6 +258,15 @@ export default function TicketDetailPage() {
   const [ticketData, setTicketData] = useState<TicketDetailsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const refreshTicketData = () => {
+    if (ticketId) {
+        // Do not set isLoading to true here to avoid full page skeleton on refresh from actions on page
+        fetchTicketDetails(ticketId)
+            .then(data => setTicketData(data))
+            .catch(error => console.error("Failed to refresh ticket data:", error));
+    }
+  };
+
   useEffect(() => {
     if (ticketId) { 
       setIsLoading(true);
@@ -115,16 +282,6 @@ export default function TicketDetailPage() {
         setIsLoading(false);
     }
   }, [ticketId]); 
-
-  // Function to re-fetch ticket data, useful after a comment is added or other action
-  const refreshTicketData = () => {
-    if (ticketId) {
-        // Do not set isLoading to true here to avoid full page skeleton on refresh
-        fetchTicketDetails(ticketId)
-            .then(data => setTicketData(data))
-            .catch(error => console.error("Failed to refresh ticket data:", error));
-    }
-  };
 
 
   if (authLoading || isLoading) {
@@ -163,6 +320,9 @@ export default function TicketDetailPage() {
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments form heading */}
             <Skeleton className="h-32 w-full" /> {/* Comments form placeholder */}
+             <Skeleton className="h-px w-full" />
+            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Add attachments form heading */}
+            <Skeleton className="h-40 w-full" /> {/* Add attachments form placeholder */}
           </CardContent>
         </Card>
       </div>
@@ -187,12 +347,12 @@ export default function TicketDetailPage() {
   }
 
   const { ticket, commits } = ticketData;
-  const filesForVersionHistory = ticket.attachmentNames || []; // Could also include files from commits
+  const filesForVersionHistory = ticket.attachmentNames || [];
 
-  // Define permissions based on user role
-  const canManageTicketCommits = user?.role === 'admin'; // Only admin (technician) can commit changes
+  const canManageTicketCommits = user?.role === 'admin'; 
   const canViewVersionHistory = user?.role === 'admin' || user?.role === 'superuser';
-  const canComment = user?.role === 'admin' || user?.role === 'superuser' || user?.id === ticket.requestingUserId; // Admins, SU, and the ticket requester can comment
+  // Anyone who can view the ticket and is authenticated can comment or add attachments
+  const canInteractWithTicket = !!user; 
 
 
   return (
@@ -292,7 +452,9 @@ export default function TicketDetailPage() {
             {ticket.attachmentNames && ticket.attachmentNames.length > 0 && (
               <>
                 <Separator className="my-6" />
-                <h3 className="text-lg font-semibold mb-3 text-foreground">Attachments</h3>
+                <h3 className="text-lg font-semibold mb-3 text-foreground flex items-center gap-2">
+                    <Paperclip className="h-5 w-5" /> Attachments
+                </h3>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                   {ticket.attachmentNames.map((name, index) => (
                     <li key={index} className="flex items-center gap-2">
@@ -329,13 +491,20 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
-            {canComment && (
+            {canInteractWithTicket && ticketId && ( // Allow anyone who can view to add attachments & comments
+                <>
+                    <Separator className="my-6"/>
+                    <AddAttachmentsForm ticketId={ticketId} onAttachmentsAdded={refreshTicketData} />
+                </>
+            )}
+
+            {canInteractWithTicket && ( // Allow anyone who can view to add comments
                 <>
                     <Separator className="my-6"/>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
                         <MessageSquare className="h-5 w-5"/> Comentarios
                     </h3>
-                    {ticketId && <CommentForm ticketId={ticketId} />}
+                    {ticketId && <CommentForm ticketId={ticketId} />} 
                 </>
             )}
            

@@ -36,6 +36,7 @@ export interface JiraTicketHistoryEntry {
   details?: string; 
   fileName?: string; 
   restoredVersionId?: string; 
+  attachedFileNames?: string[]; // For attachment history
 }
 
 /**
@@ -535,4 +536,44 @@ export async function addCommentToTicket(
   mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
 
   return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
+}
+
+/**
+ * Adds attachments to a Jira ticket and creates a history entry.
+ * @param ticketId The ID of the ticket.
+ * @param userIdPerformingAction The ID of the user adding the attachments.
+ * @param attachmentNames An array of names for the files being attached.
+ * @returns A promise that resolves to the updated JiraTicket object or null if not found.
+ */
+export async function addAttachmentsToJiraTicket(
+  ticketId: string,
+  userIdPerformingAction: string,
+  attachmentNames: string[]
+): Promise<JiraTicket | null> {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
+  if (ticketIndex === -1) return null;
+
+  const currentTicket = mockJiraTickets[ticketIndex];
+  
+  // Update attachmentNames on the ticket
+  const newAttachmentNames = [...(currentTicket.attachmentNames || []), ...attachmentNames];
+  // Deduplicate names just in case
+  currentTicket.attachmentNames = Array.from(new Set(newAttachmentNames));
+
+  // Create history entry
+  const historyEntry: JiraTicketHistoryEntry = {
+    id: `hist-attach-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    userId: userIdPerformingAction,
+    action: 'Attachments Added',
+    attachedFileNames: attachmentNames, // Store names of files added in this action
+    details: `Archivos adjuntados: ${attachmentNames.join(', ')} por ${userIdPerformingAction}`,
+  };
+
+  currentTicket.history.push(historyEntry);
+  currentTicket.lastUpdated = new Date().toISOString();
+
+  mockJiraTickets[ticketIndex] = currentTicket;
+  return JSON.parse(JSON.stringify(currentTicket));
 }
