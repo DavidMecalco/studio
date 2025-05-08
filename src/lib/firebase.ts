@@ -21,7 +21,7 @@ console.log(`[FIREBASE_INIT] NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${firebaseConfig.p
 
 if (!firebaseConfig.projectId || firebaseConfig.projectId === "undefined" || firebaseConfig.projectId.trim() === "") {
   isFirebaseProperlyConfigured = false;
-  console.error("[FIREBASE_INIT] CRITICAL: Firebase project ID (NEXT_PUBLIC_FIREBASE_PROJECT_ID) is missing or invalid. Firebase will not be initialized.");
+  console.warn("[FIREBASE_INIT] WARNING: Firebase project ID (NEXT_PUBLIC_FIREBASE_PROJECT_ID) is missing or invalid. Firebase real-time features will be disabled. The application will attempt to use local storage fallback for mock data persistence.");
 } else {
   try {
     if (!getApps().length) {
@@ -74,3 +74,4 @@ console.log(`[FIREBASE_INIT] Final Status: isFirebaseProperlyConfigured = ${isFi
 // const auth: Auth | null = app ? getAuth(app) : null; // Uncomment if Firebase Auth is used
 
 export { app, db, isFirebaseProperlyConfigured /*, auth */ };
+
