@@ -1,16 +1,18 @@
 
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, query, where } from 'firebase/firestore';
-import type { User as AuthContextUserType } from '@/context/auth-context'; // Import for type consistency
+import type { User as AuthContextUserType } from '@/context/auth-context'; 
 
 /**
  * Represents a user document in Firestore.
  * The document ID in Firestore will be the user's username.
  */
 export interface UserDoc {
-  id: string; // Corresponds to the document ID / username
+  id: string; 
   username: string;
-  name: string; // Display name for the user
+  name: string; 
+  email: string; // Added email
+  password?: string; // Added password (plain text for mock, should be hashed in real app)
   role: 'admin' | 'client' | 'superuser';
   company?: string;
   phone?: string;
@@ -19,28 +21,28 @@ export interface UserDoc {
 
 // Interface for organizations (companies)
 export interface Organization {
-  id: string; // Unique ID for the organization (e.g., company name normalized)
-  name: string; // Display name of the company
-  githubRepository?: string; // Associated GitHub repository URL or path
+  id: string; 
+  name: string; 
+  githubRepository?: string; 
 }
 
 const usersCollectionRef = collection(db, 'users');
 const organizationsCollectionRef = collection(db, 'organizations');
 
-const MOCK_DATA_SEEDED_FLAG_V3 = 'mock_data_seeded_v3';
+const MOCK_DATA_SEEDED_FLAG_V4 = 'mock_data_seeded_v4'; // Incremented version for new fields
 const LOCAL_STORAGE_USERS_KEY = 'firestore_mock_users';
 const LOCAL_STORAGE_ORGS_KEY = 'firestore_mock_orgs';
 
 const usersToSeed: UserDoc[] = [
-  { id: 'admin', username: 'admin', name: 'Administrator Portal', role: 'admin', company: 'Maximo Corp', phone: '555-0000', position: 'System Administrator' },
-  { id: 'superuser', username: 'superuser', name: 'Super Usuario Portal', role: 'superuser', company: 'System Corp', phone: '555-9999', position: 'System Super User' },
-  { id: 'client-tla1', username: 'client-tla1', name: 'Cliente TLA Primario', role: 'client', company: 'TLA', phone: '555-0101', position: 'Client User' },
-  { id: 'client-fema1', username: 'client-fema1', name: 'Cliente FEMA Primario', role: 'client', company: 'FEMA', phone: '555-0202', position: 'Client User' },
-  { id: 'client-generic1', username: 'client-generic1', name: 'Cliente Genérico Uno', role: 'client', company: 'Other Company', phone: '555-0303', position: 'Client User' },
-  { id: 'client-tla2', username: 'client-tla2', name: 'Cliente TLA Secundario', role: 'client', company: 'TLA', phone: '555-0102', position: 'Client Contact' },
-  { id: 'another-admin', username: 'another-admin', name: 'Técnico Secundario', role: 'admin', company: 'Maximo Corp', phone: '555-0001', position: 'Technician' },
-  { id: 'alice-wonderland', username: 'alice-wonderland', name: 'Alice Wonderland', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
-  { id: 'bob-the-builder', username: 'bob-the-builder', name: 'Bob The Builder', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
+  { id: 'admin', username: 'admin', name: 'Administrator Portal', email: 'admin@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: '555-0000', position: 'System Administrator' },
+  { id: 'superuser', username: 'superuser', name: 'Super Usuario Portal', email: 'superuser@portal.com', password: 'password', role: 'superuser', company: 'System Corp', phone: '555-9999', position: 'System Super User' },
+  { id: 'client-tla1', username: 'client-tla1', name: 'Cliente TLA Primario', email: 'client.tla1@example.com', password: 'password', role: 'client', company: 'TLA', phone: '555-0101', position: 'Client User' },
+  { id: 'client-fema1', username: 'client-fema1', name: 'Cliente FEMA Primario', email: 'client.fema1@example.com', password: 'password', role: 'client', company: 'FEMA', phone: '555-0202', position: 'Client User' },
+  { id: 'client-generic1', username: 'client-generic1', name: 'Cliente Genérico Uno', email: 'client.generic1@example.com', password: 'password', role: 'client', company: 'Other Company', phone: '555-0303', position: 'Client User' },
+  { id: 'client-tla2', username: 'client-tla2', name: 'Cliente TLA Secundario', email: 'client.tla2@example.com', password: 'password', role: 'client', company: 'TLA', phone: '555-0102', position: 'Client Contact' },
+  { id: 'another-admin', username: 'another-admin', name: 'Técnico Secundario', email: 'tech2@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: '555-0001', position: 'Technician' },
+  { id: 'alice-wonderland', username: 'alice-wonderland', name: 'Alice Wonderland', email: 'alice@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
+  { id: 'bob-the-builder', username: 'bob-the-builder', name: 'Bob The Builder', email: 'bob@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
 ];
 
 const orgsToSeed: Organization[] = [
@@ -52,66 +54,58 @@ const orgsToSeed: Organization[] = [
 ];
 
 async function ensureMockDataSeeded(): Promise<void> {
-  if (typeof window === 'undefined') { // Don't run seeding on server
+  if (typeof window === 'undefined') { 
     return;
   }
-  if (localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V3) === 'true') {
+  if (localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V4) === 'true') {
     return;
   }
 
-  console.log("Attempting to seed initial mock data to localStorage and potentially Firestore...");
+  console.log("Attempting to seed initial mock data (v4) to localStorage and potentially Firestore...");
 
-  // Always seed localStorage first if flag is not set
   localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
   localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
-  console.log("Mock data seeded to localStorage.");
+  console.log("Mock data (v4) seeded to localStorage.");
 
   if (navigator.onLine) {
     try {
-      // Attempt to seed Firestore. These operations might fail if offline, even if navigator.onLine is true.
       const adminUserDoc = await getDoc(doc(db, "users", "admin"));
-      if (!adminUserDoc.exists()) {
+      if (!adminUserDoc.exists() || !adminUserDoc.data()?.email) { // Check for email field to ensure new structure
+        console.log("Seeding users to Firestore (v4)...");
         for (const userData of usersToSeed) {
           const { id, ...dataToStore } = userData;
           await setDoc(doc(db, "users", id), dataToStore);
         }
-        console.log("Initial users seeded to Firestore.");
+        console.log("Initial users (v4) seeded to Firestore.");
       } else {
-        console.log("Firestore 'users' collection seems to have data (admin user exists). Skipping Firestore user seed.");
+        console.log("Firestore 'users' collection seems to have data (admin user with email exists). Skipping Firestore user seed.");
       }
 
       const tlaOrgDoc = await getDoc(doc(db, "organizations", "tla"));
       if (!tlaOrgDoc.exists()) {
+         console.log("Seeding organizations to Firestore (v4)...");
         for (const orgData of orgsToSeed) {
           await setDoc(doc(db, "organizations", orgData.id), orgData);
         }
-        console.log("Initial organizations seeded to Firestore.");
+        console.log("Initial organizations (v4) seeded to Firestore.");
       } else {
         console.log("Firestore 'organizations' collection seems to have data (TLA org exists). Skipping Firestore org seed.");
       }
     } catch (error) {
-      console.warn("Error during Firestore seeding (client might be offline or other Firestore issue, despite navigator.onLine suggesting online): ", error);
-      // Errors during Firestore seeding are logged but don't stop the process of setting the flag,
-      // as localStorage is already seeded.
+      console.warn("Error during Firestore seeding (v4) (client might be offline or other Firestore issue): ", error);
     }
   } else {
-    console.log("Client is offline (navigator.onLine is false), skipping Firestore seeding operations. Will rely on localStorage.");
+    console.log("Client is offline (navigator.onLine is false), skipping Firestore seeding operations (v4). Will rely on localStorage.");
   }
   
-  // Set the flag regardless of Firestore success, because localStorage has been seeded.
-  localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
-  console.log("Mock data seeding process complete. Seeding flag set.");
+  localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V4, 'true');
+  console.log("Mock data seeding process (v4) complete. Seeding flag set.");
 }
 
 
-/**
- * Asynchronously retrieves a list of users.
- * Prioritizes localStorage for speed in mock environment after initial seed.
- * @returns A promise that resolves to an array of UserDoc objects.
- */
 export async function getUsers(): Promise<UserDoc[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20)); // Shorter delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
 
   const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
   if (storedUsers) {
@@ -123,35 +117,26 @@ export async function getUsers(): Promise<UserDoc[]> {
     }
   }
 
-  // Fallback or initial load from Firestore (should be rare after first seed)
   console.log("Fetching users from Firestore as localStorage cache was not available or corrupted.");
   try {
     const querySnapshot = await getDocs(usersCollectionRef);
     const users: UserDoc[] = [];
-    querySnapshot.forEach((doc) => {
-      users.push({ id: doc.id, ...doc.data() } as UserDoc);
+    querySnapshot.forEach((docSnap) => { // Changed variable name to avoid conflict
+      users.push({ id: docSnap.id, ...docSnap.data() } as UserDoc);
     });
-    // Re-cache fetched users if localStorage was cleared or initially empty
     if (!storedUsers) {
         localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
     }
     return users;
   } catch (error) {
     console.error("Error fetching users from Firestore: ", error);
-    // If Firestore also fails (e.g. offline and no cache), return empty or pre-defined minimal set
     return []; 
   }
 }
 
-/**
- * Asynchronously retrieves a user by their ID (username).
- * Prioritizes localStorage.
- * @param userId The ID (username) of the user.
- * @returns A promise that resolves to a UserDoc object or undefined if not found.
- */
 export async function getUserById(userId: string): Promise<UserDoc | undefined> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 10)); // Shorter delay
+  await new Promise(resolve => setTimeout(resolve, 10)); 
 
   const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
   if (storedUsers) {
@@ -164,7 +149,6 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
     }
   }
   
-  // Fallback to Firestore
   console.log(`Fetching user ${userId} from Firestore as it was not in localStorage cache.`);
   try {
     if (!userId) return undefined;
@@ -182,45 +166,50 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
 
 /**
  * Creates or updates a user in Firestore and localStorage.
- * @param userData The user data to create or update.
+ * Now includes email and password.
+ * @param userData The user data to create or update, matching AuthContextUserType.
  * @returns A promise that resolves to true if successful, false otherwise.
  */
 export async function createUserInFirestore(userData: AuthContextUserType): Promise<boolean> {
   await ensureMockDataSeeded();
-  if (!userData.username) {
-    console.error("Username is required to create a user.");
+  if (!userData.username || !userData.email || !userData.password) { // Ensure email and password are provided
+    console.error("Username, email, and password are required to create a user.");
     return false;
   }
   try {
     // Firestore update
-    const { id, ...dataToStore } = userData;
-    const userDocRef = doc(db, "users", userData.username);
-    await setDoc(userDocRef, dataToStore, { merge: true });
+    // userData.id will be the username for the document ID in Firestore
+    const userDocRef = doc(db, "users", userData.id); 
+    // Construct the UserDoc object for Firestore and localStorage, ensuring all fields are present
+    const userToStore: UserDoc = {
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        email: userData.email,
+        password: userData.password, // In a real app, hash this before storing
+        role: userData.role,
+        company: userData.company,
+        phone: userData.phone,
+        position: userData.position,
+    };
+    
+    // Firestore uses all fields from userToStore except 'id' as 'id' is the doc key.
+    const { id: firestoreDocId, ...dataForFirestore } = userToStore;
+    await setDoc(userDocRef, dataForFirestore, { merge: true });
 
     // Update localStorage cache
     const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
     let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-    const userIndex = users.findIndex(u => u.id === userData.username);
-    // Ensure all fields of UserDoc are present
-    const userToCache: UserDoc = { 
-        id: userData.username, 
-        username: userData.username, 
-        name: userData.name, 
-        role: userData.role,
-        company: userData.company,
-        phone: userData.phone,
-        position: userData.position
-    };
-
+    const userIndex = users.findIndex(u => u.id === userToStore.id);
 
     if (userIndex > -1) {
-      users[userIndex] = userToCache;
+      users[userIndex] = userToStore;
     } else {
-      users.push(userToCache);
+      users.push(userToStore);
     }
     localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
     
-    console.log(`User ${userData.username} created/updated.`);
+    console.log(`User ${userToStore.username} created/updated with email ${userToStore.email}.`);
     return true;
   } catch (error) {
     console.error("Error creating/updating user: ", error);
@@ -229,14 +218,9 @@ export async function createUserInFirestore(userData: AuthContextUserType): Prom
 }
 
 
-/**
- * Retrieves all organizations.
- * Prioritizes localStorage for speed.
- * @returns A promise that resolves to an array of Organization objects.
- */
 export async function getOrganizations(): Promise<Organization[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20)); // Shorter delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
 
   const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
   if (storedOrgs) {
@@ -252,8 +236,8 @@ export async function getOrganizations(): Promise<Organization[]> {
   try {
     const querySnapshot = await getDocs(organizationsCollectionRef);
     const organizations: Organization[] = [];
-    querySnapshot.forEach((doc) => {
-      organizations.push({ id: doc.id, ...doc.data() } as Organization);
+    querySnapshot.forEach((docSnap) => { // Changed variable name
+      organizations.push({ id: docSnap.id, ...docSnap.data() } as Organization);
     });
     if(!storedOrgs){
         localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations)); 
@@ -265,11 +249,6 @@ export async function getOrganizations(): Promise<Organization[]> {
   }
 }
 
-/**
- * Creates or updates an organization in Firestore and localStorage.
- * @param orgData The organization data.
- * @returns A promise that resolves to true if successful, false otherwise.
- */
 export async function createOrUpdateOrganization(orgData: Organization): Promise<boolean> {
   await ensureMockDataSeeded();
   if (!orgData.id || !orgData.name) {
@@ -277,11 +256,9 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
     return false;
   }
   try {
-    // Firestore update
     const orgDocRef = doc(db, "organizations", orgData.id);
     await setDoc(orgDocRef, orgData, { merge: true });
 
-    // Update localStorage cache
     const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
     let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
     const orgIndex = organizations.findIndex(o => o.id === orgData.id);
@@ -300,12 +277,6 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
   }
 }
 
-/**
- * Retrieves an organization by its ID.
- * Prioritizes localStorage.
- * @param orgId The ID of the organization.
- * @returns A promise that resolves to an Organization object or undefined if not found.
- */
 export async function getOrganizationById(orgId: string): Promise<Organization | undefined> {
   await ensureMockDataSeeded();
   await new Promise(resolve => setTimeout(resolve, 10));
@@ -325,7 +296,7 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
   try {
     if (!orgId) return undefined;
     const orgDocRef = doc(db, "organizations", orgId);
-    const docSnap = await getDoc(orgDocRef);
+    const docSnap = await getDoc(orgDocRef); // Changed variable name
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() } as Organization;
     }

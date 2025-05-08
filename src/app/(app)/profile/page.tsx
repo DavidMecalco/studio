@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserCog, Briefcase, Phone, Building, AlertTriangle } from "lucide-react"; 
+import { UserCog, Briefcase, Phone, Building, AlertTriangle, Mail } from "lucide-react"; 
 import { Separator } from "@/components/ui/separator";
 
 export default function ProfilePage() {
@@ -22,11 +22,11 @@ export default function ProfilePage() {
             <Skeleton className="h-4 w-72" /> {/* Description */}
           </CardHeader>
           <CardContent className="space-y-6 pt-2">
-            {[...Array(4)].map((_, i) => (
+            {[...Array(5)].map((_, i) => ( // Increased to 5 for email
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-32 mb-1" /> {/* Label */}
                 <Skeleton className="h-5 w-3/4" /> {/* Value */}
-                {i < 3 && <Skeleton className="h-px w-full mt-3" />}
+                {i < 4 && <Skeleton className="h-px w-full mt-3" />}
               </div>
             ))}
           </CardContent>
@@ -36,7 +36,6 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    // This case should ideally be handled by the AuthenticatedAppLayout redirecting to login
     return <p className="text-center text-muted-foreground">User not found. Please log in.</p>;
   }
   
@@ -69,9 +68,11 @@ export default function ProfilePage() {
           <CardDescription>Information associated with your client account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-2">
-          <ProfileItem icon={<UserCog className="h-5 w-5 text-muted-foreground" />} label="Username (Nombre)" value={user.username} />
+          <ProfileItem icon={<UserCog className="h-5 w-5 text-muted-foreground" />} label="Username (Nombre de Usuario)" value={user.username} />
           <Separator />
-          <ProfileItem icon={<Building className="h-5 w-5 text-muted-foreground" />} label="Company" value={user.company || 'N/A'} />
+          <ProfileItem icon={<Mail className="h-5 w-5 text-muted-foreground" />} label="Email (Correo Electrónico)" value={user.email} />
+          <Separator />
+          <ProfileItem icon={<Building className="h-5 w-5 text-muted-foreground" />} label="Company (Empresa)" value={user.company || 'N/A'} />
           <Separator />
           <ProfileItem icon={<Briefcase className="h-5 w-5 text-muted-foreground" />} label="Position (Cargo)" value={user.position || 'N/A'} />
           <Separator />
@@ -99,4 +100,3 @@ function ProfileItem({ icon, label, value }: ProfileItemProps) {
         </div>
     );
 }
-

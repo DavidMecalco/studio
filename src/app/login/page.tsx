@@ -9,9 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from '@/context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CompanyLogo from '@/components/layout/company-logo';
+import { Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -26,25 +27,17 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Basic validation
-    if (!username || !password) {
-      setError('Please enter both username and password.');
+    if (!email || !password) {
+      setError('Please enter both email and password.');
       setIsLoading(false);
       return;
     }
 
-    // In a real app, you'd call an API. Here we use the mock login.
-    // For this simple login, we'll just use the username.
-    // Password check is illustrative.
-    if (password === 'password') { // Example password
-      try {
-        await login(username, callbackUrl);
-        // Redirect is handled by the login function in AuthContext
-      } catch (err) {
-        setError('Login failed. Please try again.');
-      }
-    } else {
-      setError('Invalid username or password.');
+    try {
+      await login(email, password, callbackUrl);
+      // Redirect is handled by the login function in AuthContext
+    } catch (err) {
+      setError((err as Error).message || 'Login failed. Please check your credentials.');
     }
     setIsLoading(false);
   };
@@ -57,33 +50,41 @@ export default function LoginPage() {
             <CompanyLogo className="h-12 w-auto" />
           </div>
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+          <CardDescription>Enter your email and password to access your account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="your_username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="pl-10"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+               <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="pl-10"
+                />
+              </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>
@@ -93,12 +94,8 @@ export default function LoginPage() {
         </CardContent>
       </Card>
        <p className="mt-4 text-center text-sm text-muted-foreground">
-        Hint: Use any username and password `password`. <br/>
-        For client view, use a username starting with `client` (e.g., `client1`).<br/>
-        For admin view, use a username like `admin`.<br/>
-        For super user view, use username `superuser`.
+        Hint: Use any seeded email and its corresponding password (e.g., `admin@portal.com` / `password`).
       </p>
     </div>
   );
 }
-

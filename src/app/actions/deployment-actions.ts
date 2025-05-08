@@ -4,9 +4,8 @@
 import { revalidatePath } from "next/cache";
 import { addDeploymentToTicketHistory } from "@/services/jira";
 import type { DeploymentLogEntry, CreateDeploymentLogData as ServiceCreateData } from "@/services/deployment";
-
-// This service function will be created in services/deployment.ts
 import { createDeploymentLog as createDeploymentLogService } from "@/services/deployment";
+import { getUserById } from "@/services/users"; // To get user email for notifications
 
 interface CreateDeploymentResult {
   success: boolean;
@@ -27,14 +26,12 @@ export async function createDeploymentLogAction(
   }
 
   try {
-    // Step 1: Create the deployment log (simulated)
     const newLog = await createDeploymentLogService(data);
 
     if (!newLog) {
       return { success: false, error: "Failed to create deployment log." };
     }
 
-    // Step 2: If ticketIds are provided, add deployment info to their history
     if (newLog.ticketIds && newLog.ticketIds.length > 0) {
       for (const ticketId of newLog.ticketIds) {
         const ticketUpdateResult = await addDeploymentToTicketHistory(
@@ -46,19 +43,34 @@ export async function createDeploymentLogAction(
         );
         if (!ticketUpdateResult) {
           console.warn(`Deployment ${newLog.id} logged, but failed to add history to ticket ${ticketId}.`);
-          // Decide if this should be a partial success or full failure
         }
       }
     }
 
-    // Step 3: Revalidate paths
     revalidatePath("/(app)/deployments", "page");
-    revalidatePath("/(app)/audit-log", "page"); // Audit log might show deployments
+    revalidatePath("/(app)/audit-log", "page"); 
     if (newLog.ticketIds && newLog.ticketIds.length > 0) {
       newLog.ticketIds.forEach(tid => revalidatePath(`/(app)/jira/${tid}`, "page"));
       revalidatePath("/(app)/jira", "page");
     }
     revalidatePath("/(app)/dashboard", "page");
+
+    // Simulate Email Notification
+    const deployingUser = await getUserById(newLog.userId);
+    const notificationRecipients = new Set<string>();
+    if(deployingUser?.email) notificationRecipients.add(deployingUser.email);
+    // Add other relevant parties, e.g., superuser, project leads
+    const superUser = await getUserById('superuser');
+    if(superUser?.email) notificationRecipients.add(superUser.email);
+
+    const filesDeployedString = newLog.filesDeployed.map(f => f.name).join(', ');
+    let notificationMessage = `Deployment Logged: ID ${newLog.id} to ${newLog.environment} by ${deployingUser?.name || newLog.userId}. Status: ${newLog.status}. Files: ${filesDeployedString}.`;
+    if (newLog.message) notificationMessage += ` Message: ${newLog.message}.`;
+    if (newLog.ticketIds && newLog.ticketIds.length > 0) notificationMessage += ` Associated Tickets: ${newLog.ticketIds.join(', ')}.`;
+
+    notificationRecipients.forEach(email => {
+        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+    });
 
     return { success: true, log: newLog };
 
@@ -67,37 +79,4 @@ export async function createDeploymentLogAction(
     const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
     return { success: false, error: errorMessage };
   }
-}
-
-// Mock for createDeploymentLog in services/deployment.ts - to be moved there later
-// This is a placeholder. The actual function should be in services/deployment.ts
-async function createDeploymentLog(data: ServiceCreateData): Promise<DeploymentLogEntry | null> {
-    // This is a mock. In a real app, this would interact with a database.
-    // For now, it's included here to make the action runnable.
-    // It should be moved to src/services/deployment.ts
-    
-    // Find the mockDeploymentLogs array (assuming it's accessible or passed)
-    // This is a simplification for the current file structure.
-    // Ideally, this logic would be within src/services/deployment.ts
-    
-    const mockDeploymentLogs: DeploymentLogEntry[] = []; // This needs to be the actual shared array
-
-    const newLogEntry: DeploymentLogEntry = {
-        id: `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: new Date().toISOString(),
-        userId: data.userId,
-        filesDeployed: data.filesDeployed,
-        environment: data.environment,
-        status: data.status,
-        resultCode: data.resultCode,
-        message: data.message,
-        ticketIds: data.ticketIds,
-    };
-    // This is where you would typically push to your persistent store or in-memory array
-    // For this action, we'll assume it's handled by a service function that updates the shared mock array.
-    // For the purpose of this example, we'll log and return.
-    // A real implementation in services/deployment.ts would update `mockDeploymentLogs`.
-    console.log("Simulating creation of deployment log:", newLogEntry);
-    // In a real service: mockDeploymentLogs.unshift(newLogEntry);
-    return newLogEntry;
 }

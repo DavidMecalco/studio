@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserCog, Briefcase, Phone, ShieldCheck, Building } from "lucide-react"; 
+import { UserCog, Briefcase, Phone, ShieldCheck, Building, Mail } from "lucide-react"; 
 import { Separator } from "@/components/ui/separator";
 
 export default function AdminProfilePage() {
@@ -22,11 +22,11 @@ export default function AdminProfilePage() {
             <Skeleton className="h-4 w-72" /> {/* Description */}
           </CardHeader>
           <CardContent className="space-y-6 pt-2">
-            {[...Array(5)].map((_, i) => ( // Increased to 5 for Role and Company
+            {[...Array(6)].map((_, i) => ( // Increased to 6 for email
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-32 mb-1" /> {/* Label */}
                 <Skeleton className="h-5 w-3/4" /> {/* Value */}
-                {i < 4 && <Skeleton className="h-px w-full mt-3" />}
+                {i < 5 && <Skeleton className="h-px w-full mt-3" />}
               </div>
             ))}
           </CardContent>
@@ -36,7 +36,6 @@ export default function AdminProfilePage() {
   }
 
   if (!user) {
-    // This case should ideally be handled by the AuthenticatedAppLayout redirecting to login
     return <p className="text-center text-muted-foreground">User not found. Please log in.</p>;
   }
   
@@ -71,7 +70,9 @@ export default function AdminProfilePage() {
           <CardDescription>Information associated with your {profilePageDescription} account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-2">
-          <ProfileItem icon={<UserCog className="h-5 w-5 text-muted-foreground" />} label="Username (Nombre)" value={user.username} />
+          <ProfileItem icon={<UserCog className="h-5 w-5 text-muted-foreground" />} label="Username (Nombre de Usuario)" value={user.username} />
+          <Separator />
+          <ProfileItem icon={<Mail className="h-5 w-5 text-muted-foreground" />} label="Email (Correo Electrónico)" value={user.email} />
           <Separator />
           <ProfileItem icon={<ShieldCheck className="h-5 w-5 text-muted-foreground" />} label="Role (Rol en Plataforma)" value={profileRoleName} />
           <Separator />
@@ -103,4 +104,3 @@ function ProfileItem({ icon, label, value }: ProfileItemProps) {
         </div>
     );
 }
-

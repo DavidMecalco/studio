@@ -1,8 +1,10 @@
+
 "use server";
 
 import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
 import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; // Renamed to avoid conflict
 import { revalidatePath } from "next/cache";
+import { getUserById } from "@/services/users"; // To get user email for notifications
 
 interface UpdateJiraTicketResult {
   success: boolean;
@@ -23,7 +25,7 @@ export async function updateJiraTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
   newStatus?: JiraTicketStatus,
-  newAssigneeId?: string, // undefined means don't change, "" means unassign
+  newAssigneeId?: string, 
   comment?: string
 ): Promise<UpdateJiraTicketResult> {
   if (!ticketId) {
@@ -39,11 +41,34 @@ export async function updateJiraTicketAction(
   try {
     const updatedTicket = await updateJiraTicketServiceCall(ticketId, newStatus, newAssigneeId, userIdPerformingAction, comment);
     if (updatedTicket) {
-      // Revalidate specific paths that display this ticket or lists of tickets
       revalidatePath("/(app)/dashboard", "page");
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
       revalidatePath("/(app)/jira", "page");
       revalidatePath("/(app)/my-tickets", "page");
+
+      // Simulate Email Notification
+      const performingUser = await getUserById(userIdPerformingAction);
+      const requester = await getUserById(updatedTicket.requestingUserId);
+      const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
+
+      const notificationRecipients = new Set<string>();
+      if (performingUser?.email) notificationRecipients.add(performingUser.email);
+      if (requester?.email) notificationRecipients.add(requester.email);
+      if (assignee?.email) notificationRecipients.add(assignee.email);
+      // In a real app, also notify superusers/admins based on roles or subscriptions
+      const superUser = await getUserById('superuser'); // Example: notify superuser
+      if(superUser?.email) notificationRecipients.add(superUser.email);
+
+
+      let notificationMessage = `Ticket ${ticketId} updated by ${performingUser?.name || userIdPerformingAction}.`;
+      if (newStatus) notificationMessage += ` New status: ${newStatus}.`;
+      if (newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${newAssigneeId || 'Unassigned'}.`;
+      if (comment) notificationMessage += ` Comment: "${comment}".`;
+      
+      notificationRecipients.forEach(email => {
+          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+      });
+      
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
@@ -66,6 +91,7 @@ export interface CreateTicketActionFormValues {
   description: string;
   priority: JiraTicketPriority;
   requestingUserId: string; 
+  requestingUserEmail?: string; // For notifications
   provider?: JiraTicketProvider; 
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
@@ -100,6 +126,19 @@ export async function createJiraTicketAction(
       revalidatePath("/(app)/dashboard", "page");
       revalidatePath("/(app)/jira", "page");
       revalidatePath("/(app)/my-tickets", "page");
+
+      // Simulate Email Notification
+      const notificationRecipients = new Set<string>();
+      if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
+      // In a real app, notify admins/superusers based on roles or project settings
+      const superUser = await getUserById('superuser'); // Example: notify superuser
+      if (superUser?.email) notificationRecipients.add(superUser.email);
+      
+      const notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
+       notificationRecipients.forEach(email => {
+          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+      });
+
       return { success: true, ticket: newTicket };
     } else {
       return { success: false, error: "No se pudo crear el ticket. Error de la API." };
@@ -114,7 +153,7 @@ export async function createJiraTicketAction(
 
 interface AddCommentResult {
   success: boolean;
-  ticket?: JiraTicket; // Return updated ticket with new comment in history
+  ticket?: JiraTicket; 
   error?: string;
 }
 
@@ -138,6 +177,24 @@ export async function addCommentToTicketAction(
     const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText);
     if (updatedTicket) {
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
+
+      // Simulate Email Notification for comment
+      const performingUser = await getUserById(userIdPerformingAction);
+      const requester = await getUserById(updatedTicket.requestingUserId);
+      const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
+
+      const notificationRecipients = new Set<string>();
+      if (performingUser?.email && performingUser.email !== requester?.email) notificationRecipients.add(performingUser.email); // Don't notify self if requester
+      if (requester?.email) notificationRecipients.add(requester.email);
+      if (assignee?.email && assignee.email !== performingUser?.email) notificationRecipients.add(assignee.email);
+      const superUser = await getUserById('superuser');
+      if(superUser?.email) notificationRecipients.add(superUser.email);
+      
+      const notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
+       notificationRecipients.forEach(email => {
+          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+      });
+
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to add comment. Ticket not found or API error." };

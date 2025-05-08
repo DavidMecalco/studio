@@ -4,23 +4,23 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-// import type { JiraTicketProvider } from '@/services/jira'; // No longer needed here
 
 export interface User {
-  id: string; // Will store the username for mock simplicity
+  id: string; // Unique ID, can be username or a generated UID
   username: string;
-  name: string; // Full name of the user
+  name: string; 
+  email: string; // Added email
+  password?: string; // Added password (for mock purposes, plain text)
   role: 'admin' | 'client' | 'superuser';
-  company?: string; // Changed from JiraTicketProvider to string
+  company?: string; 
   phone?: string;
   position?: string;
-  // email?: string; // Add other user properties as needed
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string, redirectPath?: string) => Promise<void>;
+  login: (email: string, passwordAttempt: string, redirectPath?: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -33,16 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check for persisted login state (e.g., from localStorage)
     const storedUser = localStorage.getItem('authUser');
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser) as User; // Cast to User
-        // Basic validation of stored user structure
-        if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.role && parsedUser.name) { // Added check for name
+        const parsedUser = JSON.parse(storedUser) as User;
+        if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.email && parsedUser.role && parsedUser.name) { // Added email check
            setUser(parsedUser);
         } else {
-            localStorage.removeItem('authUser'); // Clear invalid stored user
+            localStorage.removeItem('authUser');
         }
       } catch (e) {
         console.error("Failed to parse stored user:", e);
@@ -52,66 +50,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (username: string, redirectPath: string = '/') => {
-    // Simulate API call for login
+  const login = async (email: string, passwordAttempt: string, redirectPath: string = '/') => {
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    let mockUserDetails: User | null = null;
-
+    let authenticatedUser: User | null = null;
     const allUsersString = localStorage.getItem('firestore_mock_users'); 
+    
     if (allUsersString) {
         try {
             const allUsers: User[] = JSON.parse(allUsersString);
-            mockUserDetails = allUsers.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+            // Find user by email and "check" password
+            authenticatedUser = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === passwordAttempt) || null;
         } catch (e) {
-            console.error("Error parsing mock users from localStorage", e);
+            console.error("Error parsing mock users from localStorage during login", e);
         }
     }
     
-    if (!mockUserDetails) { 
-        let role: User['role'];
-        let company: User['company'] = 'Other Company';
-        let phone = 'N/A';
-        let position = 'N/A';
-        let name = username; // Default name to username if not found
-
-        if (username.toLowerCase() === 'superuser') {
-          role = 'superuser';
-          position = 'System Super User';
-          company = 'System Corp';
-          phone = '555-9999';
-          name = 'Super Usuario Portal';
-        } else if (username.toLowerCase().startsWith('client')) {
-          role = 'client';
-          position = 'Client User';
-          name = `Cliente ${username.substring(7) || 'Genérico'}`;
-          if (username.toLowerCase().includes('tla')) {
-            company = 'TLA';
-            phone = '555-0101';
-            name = `Cliente TLA ${username.replace(/client-tla/i, '') || 'Principal'}`;
-          } else if (username.toLowerCase().includes('fema')) {
-            company = 'FEMA';
-            phone = '555-0202';
-            name = `Cliente FEMA ${username.replace(/client-fema/i, '') || 'Principal'}`;
-          } else {
-            phone = '555-0303';
-          }
-        } else { 
-          role = 'admin';
-          position = 'System Administrator';
-          company = 'Maximo Corp'; 
-          phone = '555-0000';
-          name = 'Administrator Portal';
-        }
-        mockUserDetails = { id: username, username, name, role, company, phone, position };
+    if (authenticatedUser) {
+      setUser(authenticatedUser);
+      localStorage.setItem('authUser', JSON.stringify(authenticatedUser)); 
+      router.push(redirectPath);
+      // Simulate email notification for login (client-side for mock)
+      console.log(`Simulated Email Notification: User ${authenticatedUser.email} logged in successfully.`);
+    } else {
+      // If user not found via localStorage check, or password mismatch
+      // For this mock, we throw an error. A real app might handle this more gracefully.
+      throw new Error('Invalid email or password.');
     }
-        
-    setUser(mockUserDetails);
-    localStorage.setItem('authUser', JSON.stringify(mockUserDetails)); 
-    router.push(redirectPath);
   };
 
   const logout = () => {
+    if(user) {
+        console.log(`Simulated Email Notification: User ${user.email} logged out.`);
+    }
     setUser(null);
     localStorage.removeItem('authUser');
     router.push('/login');
@@ -131,4 +102,3 @@ export function useAuth() {
   }
   return context;
 }
-

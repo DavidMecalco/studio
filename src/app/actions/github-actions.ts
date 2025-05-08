@@ -1,8 +1,10 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { createGitHubCommit as createGitHubCommitService, type GitHubCommit } from "@/services/github";
 import { addCommitToTicketHistory, type JiraTicketStatus, updateJiraTicket } from "@/services/jira";
+import { getUserById } from "@/services/users"; // To get user email for notifications
 
 interface CreateCommitResult {
   success: boolean;
@@ -33,7 +35,6 @@ export async function createCommitAndPushAction(
   }
 
   try {
-    // Step 1: Create the GitHub commit (simulated)
     const newCommit = await createGitHubCommitService(
       ticketId,
       commitMessage,
@@ -46,7 +47,6 @@ export async function createCommitAndPushAction(
       return { success: false, error: "Failed to create GitHub commit." };
     }
 
-    // Step 2: Add commit to ticket history (this also updates status if needed)
     const ticketWithCommitHistory = await addCommitToTicketHistory(
         ticketId, 
         newCommit.sha, 
@@ -57,14 +57,28 @@ export async function createCommitAndPushAction(
 
     if (!ticketWithCommitHistory) {
         console.warn(`Commit ${newCommit.sha} created, but failed to add commit to Jira ticket ${ticketId} history or update status.`);
-        // Depending on requirements, you might want to roll back or flag this.
     }
 
-    // Step 3: Revalidate paths
     revalidatePath(`/jira/${ticketId}`);
     revalidatePath("/jira");
     revalidatePath("/dashboard");
     revalidatePath("/github"); 
+
+    // Simulate Email Notification
+    const committer = await getUserById(authorUsername);
+    const ticketRequester = ticketWithCommitHistory ? await getUserById(ticketWithCommitHistory.requestingUserId) : null;
+    
+    const notificationRecipients = new Set<string>();
+    if(committer?.email) notificationRecipients.add(committer.email);
+    if(ticketRequester?.email && ticketRequester.email !== committer?.email) notificationRecipients.add(ticketRequester.email);
+    const superUser = await getUserById('superuser');
+    if(superUser?.email) notificationRecipients.add(superUser.email);
+
+    const notificationMessage = `New commit ${newCommit.sha.substring(0,7)} pushed to branch '${branch}' for Ticket ${ticketId} by ${committer?.name || authorUsername}. Message: "${newCommit.message}".`;
+    notificationRecipients.forEach(email => {
+        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+    });
+
 
     return { success: true, commit: newCommit };
 

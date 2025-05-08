@@ -43,17 +43,15 @@ import { getOrganizations, type Organization } from '@/services/users';
 const ticketBranches: JiraTicketBranch[] = ['DEV', 'QA', 'PROD'];
 const ticketPriorities: JiraTicketPriority[] = ['Alta', 'Media', 'Baja'];
 
-// Max file size 5MB
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
-// Allowed file types (MIME types)
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 
   'application/pdf', 
-  'application/msword', // .doc
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'text/plain', // .txt
-  'application/vnd.ms-excel', // .xls
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
+  'application/msword', 
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+  'text/plain', 
+  'application/vnd.ms-excel', 
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
 ];
 
 const createTicketFormSchemaBase = z.object({
@@ -63,25 +61,23 @@ const createTicketFormSchemaBase = z.object({
     required_error: "Seleccione una prioridad.",
   }),
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
+  requestingUserEmail: z.string().email().optional(), // Added for notifications
 });
 
-// Schema for admin/superuser users, includes optional provider, branch, and attachments
 const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
-  provider: z.string().optional(), // Provider/Organization name as string
+  provider: z.string().optional(), 
   branch: z.enum(ticketBranches).optional(),
 });
 
-// Schema for client users, provider and branch are not directly input by them
 const clientCreateTicketFormSchema = createTicketFormSchemaBase;
 
 
 type AdminOrSuperUserFormValues = z.infer<typeof adminOrSuperUserCreateTicketFormSchema>;
 type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
-// Unified form values type for useForm, specific values will be handled by the action
 export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & ClientFormValues>;
 
 interface CreateTicketDialogProps {
-    triggerButton?: ReactNode; // Optional trigger button
+    triggerButton?: ReactNode; 
 }
 
 const NONE_VALUE_SENTINEL = "__NONE_SENTINEL__";
@@ -104,6 +100,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       description: "",
       priority: undefined,
       requestingUserId: user?.username || "",
+      requestingUserEmail: user?.email || "",
       provider: undefined,
       branch: undefined,
     },
@@ -116,11 +113,12 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
         description: "",
         priority: undefined,
         requestingUserId: user.username,
+        requestingUserEmail: user.email, // Set email for notifications
         provider: undefined, 
         branch: undefined,
       });
     }
-    if (isOpen && (user?.role === 'admin' || user?.role === 'superuser')) { // Only fetch for admin/superuser
+    if (isOpen && (user?.role === 'admin' || user?.role === 'superuser')) { 
         getOrganizations().then(setOrganizations).catch(err => {
             console.error("Failed to fetch organizations for ticket dialog", err);
             toast({title: "Error", description: "Could not load organizations.", variant: "destructive"});
@@ -151,7 +149,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
         }
         return true;
       });
-      setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5)); // Limit to 5 files
+      setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5)); 
     }
   };
 
@@ -172,7 +170,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     if (user.role === 'client') {
         providerForAction = user.company;
     } else if (user.role === 'admin' || user.role === 'superuser') {
-        providerForAction = values.provider; // This will be undefined if "Ninguna" was selected thanks to onValueChange
+        providerForAction = values.provider; 
     }
 
     const ticketDataForAction = {
@@ -180,8 +178,9 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       description: values.description!,
       priority: values.priority!,
       requestingUserId: user.username!,
+      requestingUserEmail: user.email, // Pass user's email for notification
       provider: providerForAction, 
-      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined, // This will be undefined if "Ninguna" was selected
+      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined, 
       attachmentNames: (user.role === 'admin' || user.role === 'superuser') ? attachmentNames : [],
     };
 
@@ -207,19 +206,17 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
   
   if (!user) return null; 
 
-  // Default FAB trigger if no custom trigger is provided
   const defaultTrigger = (
      <Button
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl"
         size="icon"
         aria-label="Crear nuevo ticket"
-        onClick={() => setIsOpen(true)} // Ensure dialog opens
+        onClick={() => setIsOpen(true)} 
       >
         <Plus className="h-7 w-7" />
       </Button>
   );
   
-  // Only show dialog trigger for admin/superusers (clients create from My Tickets page)
   const canDisplayTrigger = user.role === 'admin' || user.role === 'superuser';
 
 
@@ -266,6 +263,17 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                 </FormItem>
               )}
             />
+            {/* Hidden field for email, could be displayed if needed */}
+            <FormField
+                control={form.control}
+                name="requestingUserEmail"
+                render={({ field }) => (
+                    <FormItem className="hidden">
+                        <FormControl><Input type="hidden" {...field} /></FormControl>
+                    </FormItem>
+                )}
+            />
+
 
             <FormField
               control={form.control}
@@ -315,7 +323,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="provider" // This is the organization/company name
+                    name="provider" 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Organización (Proveedor)</FormLabel>
@@ -427,5 +435,3 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     </Dialog>
   );
 }
-
-    

@@ -2,9 +2,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addRestorationToTicketHistory } from "@/services/jira";
-// We might need a service function to simulate updating the "current" version of a file if
-// the file manager needs to reflect this. For now, it's mainly a logging action.
+import { addRestorationToTicketHistory, getJiraTicket } from "@/services/jira";
+import { getUserById } from "@/services/users"; // To get user email for notifications
 
 interface RestoreFileVersionResult {
   success: boolean;
@@ -32,15 +31,9 @@ export async function restoreFileVersionAction(
   }
 
   try {
-    // Simulate the actual restoration process
-    // In a real system, this might involve:
-    // 1. Fetching the content of the file at `commitSha` (or `versionIdToRestore`).
-    // 2. Creating a new commit with this old content, or directly checking out.
-    // 3. Pushing the changes.
     console.log(`Simulating restoration of ${fileName} to version ${versionIdToRestore} (commit: ${commitSha || 'N/A'}) by ${userIdPerformingAction}`);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
 
-    // If a ticketId is provided, log this action in the ticket's history
     if (ticketId) {
       const ticketUpdateResult = await addRestorationToTicketHistory(
         ticketId,
@@ -51,17 +44,41 @@ export async function restoreFileVersionAction(
       );
       if (!ticketUpdateResult) {
         console.warn(`File ${fileName} restored, but failed to add history to ticket ${ticketId}.`);
-        // Decide if this should be a partial success or full failure
       }
     }
 
-    // Revalidate paths that might display file versions or ticket history
     if (ticketId) {
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
-      revalidatePath("/(app)/jira", "page"); // If the file was from a ticket
+      revalidatePath("/(app)/jira", "page"); 
     }
-    revalidatePath("/(app)/maximo", "page"); // For File Manager
-    revalidatePath("/(app)/dashboard", "page"); // General revalidation
+    revalidatePath("/(app)/maximo", "page"); 
+    revalidatePath("/(app)/dashboard", "page"); 
+
+    // Simulate Email Notification
+    const performingUser = await getUserById(userIdPerformingAction);
+    const notificationRecipients = new Set<string>();
+    if(performingUser?.email) notificationRecipients.add(performingUser.email);
+    
+    let ticketRequesterEmail: string | undefined;
+    if (ticketId) {
+        const ticket = await getJiraTicket(ticketId);
+        if (ticket) {
+            const requester = await getUserById(ticket.requestingUserId);
+            if(requester?.email) ticketRequesterEmail = requester.email;
+        }
+    }
+    if(ticketRequesterEmail && ticketRequesterEmail !== performingUser?.email) notificationRecipients.add(ticketRequesterEmail);
+    
+    const superUser = await getUserById('superuser');
+    if(superUser?.email) notificationRecipients.add(superUser.email);
+
+    let notificationMessage = `File '${fileName}' restored to version '${versionIdToRestore}' by ${performingUser?.name || userIdPerformingAction}.`;
+    if (commitSha) notificationMessage += ` (Commit: ${commitSha.substring(0,7)})`;
+    if (ticketId) notificationMessage += ` Related to Ticket: ${ticketId}.`;
+
+    notificationRecipients.forEach(email => {
+        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+    });
 
     return { success: true };
 

@@ -1,14 +1,13 @@
 
 "use client";
 
-import { useEffect, useState } from 'react'; // Removed ReactNode import
+import { useEffect, useState } from 'react'; 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label'; // Label is implicitly used by FormLabel
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +15,7 @@ import { getUsers, type UserDoc, getOrganizations, type Organization } from '@/s
 import { createOrUpdateUserAction } from '@/app/actions/user-actions'; 
 import type { User as AuthUserType } from '@/context/auth-context'; 
 import { useAuth } from '@/context/auth-context';
-import { Users as UsersIcon, AlertTriangle, Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
+import { Users as UsersIcon, AlertTriangle, Loader2, Edit, Trash2, PlusCircle, Mail, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -42,11 +41,18 @@ const userFormSchema = z.object({
   id: z.string().optional(), 
   username: z.string().min(3, "Username must be at least 3 characters.").max(50),
   name: z.string().min(1, "Name is required.").max(100),
+  email: z.string().email("Invalid email address.").min(1, "Email is required."),
+  password: z.string().min(6, "Password must be at least 6 characters.").max(50)
+    .refine(val => !val || val.length >=6, { message: "Password is required if creating user or changing it."}).optional(), // Optional for edit if not changing
   role: z.enum(['client', 'admin', 'superuser'], { required_error: "Role is required." }),
   company: z.string().optional(), 
   phone: z.string().optional(),
   position: z.string().optional(),
+}).refine(data => !!data.id || !!data.password, { // If creating (no id), password is required
+    message: "Password is required for new users.",
+    path: ["password"],
 });
+
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
@@ -55,9 +61,9 @@ const NO_COMPANY_SENTINEL = "__NO_COMPANY_SELECTED__";
 export default function UserManagementPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serviceUsers, setServiceUsers] = useState<UserDoc[]>([]); // Renamed users to serviceUsers
+  const [serviceUsers, setServiceUsers] = useState<UserDoc[]>([]); 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [editingUser, setEditingUser] = useState<UserDoc | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -67,6 +73,8 @@ export default function UserManagementPage() {
     defaultValues: {
       username: "",
       name: "",
+      email: "",
+      password: "", // Will be empty for edit unless changed
       role: undefined,
       company: "",
       phone: "",
@@ -78,13 +86,13 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage || !currentUser) { // Ensure currentUser is available
+      if (authLoading || !canViewPage || !currentUser) { 
         setIsPageLoading(false);
         return;
       }
       setIsPageLoading(true);
       try {
-        const [fetchedUsers, fetchedOrganizations] = await Promise.all([getUsers(), getOrganizations()]); // Uses efficient local storage first
+        const [fetchedUsers, fetchedOrganizations] = await Promise.all([getUsers(), getOrganizations()]); 
         setServiceUsers(fetchedUsers);
         setOrganizations(fetchedOrganizations);
       } catch (error) {
@@ -93,7 +101,7 @@ export default function UserManagementPage() {
       }
       setIsPageLoading(false);
     }
-    if (canViewPage && !authLoading && currentUser) { // Trigger fetch when auth is done and currentUser is present
+    if (canViewPage && !authLoading && currentUser) { 
       fetchData();
     } else if (!authLoading) {
       setIsPageLoading(false);
@@ -103,12 +111,26 @@ export default function UserManagementPage() {
   const handleCreateOrUpdateUser = async (values: UserFormValues) => {
     setIsSubmitting(true);
     
+    // For existing users, if password field is empty, don't update it.
+    // For new users, password is required by schema.
+    const passwordToUse = values.id && !values.password 
+        ? editingUser?.password // Keep existing password if not changed during edit
+        : values.password;
+
+    if (!passwordToUse) {
+        toast({ title: "Password Error", description: "Password is required for new users or if changing it.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
+
     const payloadForAction: AuthUserType = {
       id: values.id || values.username, 
       username: values.username,
       name: values.name, 
+      email: values.email,
+      password: passwordToUse, // Plain text for mock
       role: values.role,
-      company: values.company === NO_COMPANY_SENTINEL ? undefined : values.company, // Handle sentinel
+      company: values.company === NO_COMPANY_SENTINEL ? undefined : values.company, 
       phone: values.phone,
       position: values.position,
     };
@@ -120,6 +142,9 @@ export default function UserManagementPage() {
         title: editingUser ? "User Updated" : "User Created",
         description: `User ${values.username} has been successfully ${editingUser ? 'updated' : 'created'}.`,
       });
+      // Simulate email notification for user creation/update
+      console.log(`Simulated Email Notification: User account for ${payloadForAction.email} ${editingUser ? 'updated' : 'created'} by ${currentUser?.email}.`);
+      
       setServiceUsers(await getUsers()); 
       setIsFormOpen(false);
       setEditingUser(null);
@@ -127,7 +152,7 @@ export default function UserManagementPage() {
     } else {
       toast({
         title: "Operation Failed",
-        description: result.error || `Could not ${editingUser ? 'update' : 'create'} user. Username might already exist or server error.`,
+        description: result.error || `Could not ${editingUser ? 'update' : 'create'} user. Username or Email might already exist or server error.`,
         variant: "destructive",
       });
     }
@@ -140,8 +165,10 @@ export default function UserManagementPage() {
       id: userToEdit.id, 
       username: userToEdit.username,
       name: userToEdit.name,
+      email: userToEdit.email,
+      password: "", // Keep password field blank for edit, user must re-enter to change
       role: userToEdit.role,
-      company: userToEdit.company || "", // "" will map to NO_COMPANY_SENTINEL if no company
+      company: userToEdit.company || NO_COMPANY_SENTINEL, 
       phone: userToEdit.phone || "",
       position: userToEdit.position || "",
     });
@@ -154,24 +181,29 @@ export default function UserManagementPage() {
       id: undefined,
       username: "",
       name: "",
+      email: "",
+      password: "",
       role: undefined,
-      company: "", // Default to empty string, which will map to NO_COMPANY_SENTINEL
+      company: NO_COMPANY_SENTINEL, 
       phone: "",
       position: "",
     });
     setIsFormOpen(true);
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: string, userEmail?: string) => {
     toast({
       title: "Deletion Simulated",
       description: `User ${userId} would be deleted. (Actual deletion not implemented in mock service)`,
       variant: "default",
     });
+    if (userEmail) {
+        console.log(`Simulated Email Notification: User account ${userEmail} deleted by ${currentUser?.email}.`);
+    }
   };
 
 
-  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
+  if (authLoading || (isPageLoading && canViewPage)) { 
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-1/3" /> <Skeleton className="h-4 w-2/3" />
@@ -181,7 +213,7 @@ export default function UserManagementPage() {
     );
   }
 
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) { 
     return (
       <div className="space-y-8 text-center py-10">
         <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
@@ -242,6 +274,40 @@ export default function UserManagementPage() {
                     )}
                   />
                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <FormControl>
+                            <Input type="email" placeholder="user@example.com" {...field} disabled={isSubmitting} className="pl-10" />
+                            </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{editingUser ? 'New Password (leave blank to keep current)' : 'Password'}</FormLabel>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} className="pl-10" />
+                            </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -249,7 +315,7 @@ export default function UserManagementPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="client">Client</SelectItem>
@@ -271,7 +337,7 @@ export default function UserManagementPage() {
                             onValueChange={(selectedValue) => {
                                 field.onChange(selectedValue === NO_COMPANY_SENTINEL ? "" : selectedValue);
                             }} 
-                            value={field.value === "" ? NO_COMPANY_SENTINEL : field.value || NO_COMPANY_SENTINEL} 
+                            value={field.value || NO_COMPANY_SENTINEL} 
                             disabled={isSubmitting}
                           >
                             <FormControl><SelectTrigger><SelectValue placeholder="Select an organization" /></SelectTrigger></FormControl>
@@ -341,6 +407,7 @@ export default function UserManagementPage() {
                         <TableRow>
                         <TableHead>Username</TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead>Actions</TableHead>
@@ -351,6 +418,7 @@ export default function UserManagementPage() {
                         <TableRow key={userEntry.id}>
                             <TableCell className="font-medium">{userEntry.username}</TableCell>
                             <TableCell>{userEntry.name}</TableCell>
+                            <TableCell>{userEntry.email}</TableCell>
                             <TableCell><span className="capitalize">{userEntry.role}</span></TableCell>
                             <TableCell>{userEntry.company || 'N/A'}</TableCell>
                             <TableCell className="space-x-1">
@@ -373,7 +441,7 @@ export default function UserManagementPage() {
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction
-                                    onClick={() => handleDeleteUser(userEntry.id)}
+                                    onClick={() => handleDeleteUser(userEntry.id, userEntry.email)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
                                     Delete User
@@ -392,4 +460,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
