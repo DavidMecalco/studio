@@ -108,7 +108,7 @@ function initializeMockJiraTickets() {
         id: 'MAX-789',
         title: 'Setup new CI/CD pipeline',
         description: 'Configure Jenkins for automated builds and deployments to staging environment.',
-        status: 'Abierto',
+        status: 'Abierto', // Unassigned example
         lastUpdated: '2024-07-29T09:00:00Z',
         provider: 'TLA',
         branch: 'PROD',
@@ -246,19 +246,22 @@ export async function updateJiraTicket(
       action: action,
       fromStatus: currentTicket.status,
       toStatus: newStatus,
-      comment: comment,
+      comment: comment, // Comment is now directly added here
       details: details
     };
   }
   
-  const actualNewAssigneeId = newAssigneeId === "" ? undefined : newAssigneeId;
+  const actualNewAssigneeId = newAssigneeId === "" ? undefined : newAssigneeId; // Treat empty string as unassigning
   if (newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { 
     updatedTicketDetails.assigneeId = actualNewAssigneeId;
     const assigneeChangeDetails = actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado';
     if (historyEntry) {
       historyEntry.details += `; ${assigneeChangeDetails}`;
-      if(comment && historyEntry.comment) historyEntry.comment += `; ${comment}`;
-      else if (comment) historyEntry.comment = comment;
+      if(comment && historyEntry.comment && !historyEntry.action.includes('Reabierto')) { // Don't duplicate reopen comment
+         historyEntry.comment += `; ${comment}`; // Append if comment was for status AND assignee change
+      } else if (comment && !historyEntry.action.includes('Reabierto')) {
+         historyEntry.comment = comment;
+      }
     } else {
       historyEntry = {
         id: `hist-${Date.now()}`,
@@ -280,7 +283,7 @@ export async function updateJiraTicket(
       };
   }
   
-  if (Object.keys(updatedTicketDetails).length > 0 || historyEntry?.action === 'Comment Added' || historyEntry?.action === 'Ticket Reabierto') {
+  if (Object.keys(updatedTicketDetails).length > 0 || (historyEntry && (historyEntry.action === 'Comment Added' || historyEntry.action === 'Ticket Reabierto' || historyEntry.action === 'Assignee Changed' ))) {
     updatedTicketDetails.lastUpdated = new Date().toISOString();
   }
 
@@ -362,7 +365,7 @@ export interface CreateJiraTicketData {
   provider?: JiraTicketProvider; 
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
-  assigneeId?: string; 
+  assigneeId?: string; // Made optional, as client tickets are unassigned
 }
 
 /**
@@ -407,7 +410,7 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
     provider: ticketData.provider,
     branch: ticketData.branch, 
     attachmentNames: ticketData.attachmentNames || [], 
-    assigneeId: ticketData.assigneeId, 
+    assigneeId: ticketData.assigneeId, // Will be undefined for client-created tickets
     lastUpdated: new Date().toISOString(),
     history: [initialHistoryEntry],
   };
@@ -577,3 +580,4 @@ export async function addAttachmentsToJiraTicket(
   mockJiraTickets[ticketIndex] = currentTicket;
   return JSON.parse(JSON.stringify(currentTicket));
 }
+

@@ -61,20 +61,27 @@ const createTicketFormSchemaBase = z.object({
     required_error: "Seleccione una prioridad.",
   }),
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
-  requestingUserEmail: z.string().email().optional(), // Added for notifications
+  requestingUserEmail: z.string().email().optional(), 
 });
 
+// Admin/SuperUser can select provider and branch
 const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
   provider: z.string().optional(), 
   branch: z.enum(ticketBranches).optional(),
 });
 
-const clientCreateTicketFormSchema = createTicketFormSchemaBase;
+// Client can also select branch (environment)
+const clientCreateTicketFormSchema = createTicketFormSchemaBase.extend({
+  provider: z.string().optional(), // Will be auto-filled from user.company for client
+  branch: z.enum(ticketBranches, { required_error: "Seleccione un ambiente/branch."}),
+});
 
 
 type AdminOrSuperUserFormValues = z.infer<typeof adminOrSuperUserCreateTicketFormSchema>;
 type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
+// This type now correctly covers both scenarios.
 export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & ClientFormValues>;
+
 
 interface CreateTicketDialogProps {
     triggerButton?: ReactNode; 
@@ -91,6 +98,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
   const { user } = useAuth();
 
   const isAdminOrSuperUser = user?.role === 'admin' || user?.role === 'superuser';
+  const isClient = user?.role === 'client';
   const currentFormSchema = isAdminOrSuperUser ? adminOrSuperUserCreateTicketFormSchema : clientCreateTicketFormSchema;
 
   const form = useForm<CreateTicketDialogFormValues>({
@@ -101,7 +109,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       priority: undefined,
       requestingUserId: user?.username || "",
       requestingUserEmail: user?.email || "",
-      provider: undefined, 
+      provider: isAdminOrSuperUser ? undefined : user?.company || undefined, // Auto-fill for client
       branch: undefined,
     },
   });
@@ -113,8 +121,8 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
         description: "",
         priority: undefined,
         requestingUserId: user.username,
-        requestingUserEmail: user.email, // Set email for notifications
-        provider: isAdminOrSuperUser ? undefined : user.company, // Pre-fill provider for client
+        requestingUserEmail: user.email,
+        provider: isAdminOrSuperUser ? undefined : user.company || undefined,
         branch: undefined,
       });
     }
@@ -167,11 +175,19 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     const attachmentNames = selectedFiles.map(file => file.name);
     
     let providerForAction: JiraTicketProvider | undefined = undefined;
-    if (user.role === 'client') {
-        providerForAction = user.company; // Client's company is their provider
+    if (isClient) {
+        providerForAction = user.company; 
     } else if (isAdminOrSuperUser) {
         providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider; 
     }
+
+    let branchForAction: JiraTicketBranch | undefined = undefined;
+    if (isAdminOrSuperUser) {
+        branchForAction = values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch;
+    } else if (isClient) {
+        branchForAction = values.branch; // Client must select a branch/environment
+    }
+
 
     const ticketDataForAction = {
       title: values.title!,
@@ -180,8 +196,9 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       requestingUserId: user.username!,
       requestingUserEmail: user.email,
       provider: providerForAction, 
-      branch: isAdminOrSuperUser ? (values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch) : undefined, 
+      branch: branchForAction, 
       attachmentNames: attachmentNames,
+      // assigneeId will be undefined by default, allowing SuperUser to assign it.
     };
 
     const result = await createJiraTicketAction(ticketDataForAction);
@@ -218,15 +235,15 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        {triggerButton ? ( // If a trigger is explicitly passed (e.g. from AppShell FAB or MyTicketsPage button), use it
+        {triggerButton ? ( 
             <DialogTrigger asChild>
                 {triggerButton}
             </DialogTrigger>
-        ) : isAdminOrSuperUser ? ( // Otherwise, if no trigger is passed AND user is admin/superuser, render the default FAB
+        ) : isAdminOrSuperUser ? ( 
             <DialogTrigger asChild>
                 {defaultFabTrigger}
             </DialogTrigger>
-        ) : null /* Clients or other roles without a passed trigger don't get a default trigger from here */
+        ) : null 
         }
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
@@ -355,7 +372,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                     name="branch"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Branch</FormLabel>
+                        <FormLabel>Branch/Ambiente</FormLabel>
                         <Select 
                             onValueChange={(selectedValue) => {
                                 field.onChange(selectedValue === NONE_VALUE_SENTINEL ? undefined : selectedValue);
@@ -364,7 +381,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Seleccione branch" />
+                              <SelectValue placeholder="Seleccione branch/ambiente" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -382,6 +399,33 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                   />
                 </div>
               </>
+            )}
+
+            {isClient && (
+                 <FormField
+                    control={form.control}
+                    name="branch" // Clients select branch (environment)
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ambiente</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione el ambiente afectado" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ticketBranches.map(branch => (
+                              <SelectItem key={branch} value={branch}>
+                                {branch}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
             )}
               
             {/* Attachment field for all roles that can create tickets */}

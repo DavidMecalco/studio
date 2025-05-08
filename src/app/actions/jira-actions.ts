@@ -105,7 +105,7 @@ export interface CreateTicketActionFormValues {
   requestingUserId: string; 
   requestingUserEmail?: string; 
   provider?: JiraTicketProvider; 
-  branch?: JiraTicketBranch;
+  branch?: JiraTicketBranch; // This will now be populated by clients too
   attachmentNames?: string[];
 }
 
@@ -121,6 +121,12 @@ export async function createJiraTicketAction(
   if (!data.title || !data.description || !data.priority || !data.requestingUserId) {
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
+  // Client specific validation: branch is required
+  const requestingUser = await getUserById(data.requestingUserId); // Await the promise
+  if (requestingUser?.role === 'client' && !data.branch) {
+    return { success: false, error: "El ambiente/branch es obligatorio para los clientes." };
+  }
+
 
   try {
     const createData: CreateJiraTicketData = {
@@ -130,14 +136,16 @@ export async function createJiraTicketAction(
       requestingUserId: data.requestingUserId,
       provider: data.provider, 
       branch: data.branch, 
-      attachmentNames: data.attachmentNames || [], 
+      attachmentNames: data.attachmentNames || [],
+      // assigneeId is intentionally omitted here, so it defaults to unassigned.
+      // The superuser will assign it later.
     };
 
     const newTicket = await createJiraTicketService(createData);
     if (newTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath("/(app)/jira", "page");
-      revalidatePath("/(app)/my-tickets", "page");
+      revalidatePath("/(app)/jira", "page"); // For superuser/admin to see new ticket
+      revalidatePath("/(app)/my-tickets", "page"); // For client to see their new ticket
 
       // Simulate Email Notification
       if (isFirebaseProperlyConfigured) {
@@ -147,7 +155,11 @@ export async function createJiraTicketAction(
         const superUser = await getUserById('superuser'); 
         if (superUser?.email) notificationRecipients.add(superUser.email);
         
-        const notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
+        let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
+        if (newTicket.branch) {
+          notificationMessage += ` Environment/Branch: ${newTicket.branch}.`;
+        }
+        notificationMessage += ` Ticket is currently unassigned.`
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
@@ -294,3 +306,4 @@ export async function addAttachmentsToTicketAction(
     return { success: false, error: errorMessage };
   }
 }
+

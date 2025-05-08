@@ -24,7 +24,7 @@ export default function JiraPage() {
     dateTo: '', 
     status: 'all',
     priority: 'all',
-    assigneeId: 'all',
+    assigneeId: 'all', // Default to all, allowing to see unassigned ones
     requestingClient: 'all',
     searchTerm: '',
   });
@@ -80,7 +80,7 @@ export default function JiraPage() {
       if (filters.assigneeId !== 'all') {
         if (filters.assigneeId === UNASSIGNED_ASSIGNEE_FILTER_VALUE) {
           // An unassigned ticket has assigneeId as undefined.
-          if (ticket.assigneeId !== undefined) return false;
+          if (ticket.assigneeId !== undefined && ticket.assigneeId !== null && ticket.assigneeId !== '') return false;
         } else {
           // A specific assignee is selected.
           if (ticket.assigneeId !== filters.assigneeId) return false;
@@ -95,10 +95,10 @@ export default function JiraPage() {
           ticket.id,
           ticket.title,
           ticket.description,
-          ticket.assigneeId,
+          ticket.assigneeId || '', // Handle undefined assigneeId
           ticket.requestingUserId,
-          ticket.provider,
-          ticket.branch
+          ticket.provider || '', // Handle undefined provider
+          ticket.branch || '' // Handle undefined branch
         ].join(' ').toLowerCase();
         if (!searchableContent.includes(term)) return false;
       }
@@ -150,7 +150,7 @@ export default function JiraPage() {
             <Ticket className="h-8 w-8 text-primary" /> Jira Tickets ({user?.role === 'admin' ? 'Admin/Technician' : 'Super User'} View)
           </h1>
           <p className="text-muted-foreground">
-            Track and manage latest updates and issues from Jira. {user?.role === 'admin' ? 'Technicians can view assigned tickets and manage development.' : 'Super users can oversee all tickets.'}
+            Track and manage latest updates and issues from Jira. {user?.role === 'admin' ? 'Technicians can view assigned tickets and manage development.' : 'Super users can oversee all tickets, including unassigned ones, and assign them to technicians.'}
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ export default function JiraPage() {
             All Jira Tickets 
           </CardTitle>
           <CardDescription>
-            Browse and manage all available Jira tickets. Click 'View' to see details and manage development.
+            Browse and manage all available Jira tickets. Click 'View' to see details and manage development. Superusers can assign unassigned tickets.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -176,10 +176,11 @@ export default function JiraPage() {
             tickets={filteredTickets} 
             title="" 
             showRequestingUser={true} 
-            showAssignee={true}
+            showAssignee={true} // Ensure assignee (or lack thereof) is shown
             />
         </CardContent>
       </Card>
     </div>
   );
 }
+
