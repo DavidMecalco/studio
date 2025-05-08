@@ -518,20 +518,30 @@ export async function addRestorationToTicketHistory(
 }
 
 /**
- * Adds a comment to a Jira ticket's history.
+ * Adds a comment to a Jira ticket's history, potentially with attachments.
  * @param ticketId The ID of the ticket.
  * @param userIdPerformingAction The ID of the user adding the comment.
  * @param commentText The text of the comment.
+ * @param attachmentNames Optional array of names for files attached with this comment.
  * @returns A promise that resolves to the updated JiraTicket object or null if not found.
  */
 export async function addCommentToTicket(
   ticketId: string,
   userIdPerformingAction: string,
-  commentText: string
+  commentText: string,
+  attachmentNames?: string[] // Added attachmentNames
 ): Promise<JiraTicket | null> {
   await new Promise(resolve => setTimeout(resolve, 20)); 
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
+
+  const currentTicket = mockJiraTickets[ticketIndex];
+
+  // Update main ticket attachment list if new attachments are part of the comment
+  if (attachmentNames && attachmentNames.length > 0) {
+    const newTicketAttachmentNames = [...(currentTicket.attachmentNames || []), ...attachmentNames];
+    currentTicket.attachmentNames = Array.from(new Set(newTicketAttachmentNames));
+  }
 
   const historyEntry: JiraTicketHistoryEntry = {
     id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -540,12 +550,14 @@ export async function addCommentToTicket(
     action: 'Comment Added',
     comment: commentText,
     details: `Comentario agregado por ${userIdPerformingAction}`,
+    attachedFileNames: attachmentNames, // Store names of files attached with this comment
   };
 
-  mockJiraTickets[ticketIndex].history.push(historyEntry);
-  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
+  currentTicket.history.push(historyEntry);
+  currentTicket.lastUpdated = new Date().toISOString();
 
-  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
+  mockJiraTickets[ticketIndex] = currentTicket; // Ensure the updated ticket is saved back
+  return JSON.parse(JSON.stringify(currentTicket));
 }
 
 /**

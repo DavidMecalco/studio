@@ -2,7 +2,7 @@
 "use server";
 
 import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
-import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService, addAttachmentsToJiraTicket as addAttachmentsToJiraTicketService } from "@/services/jira"; 
+import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; 
 import { revalidatePath } from "next/cache";
 import { getUserById } from "@/services/users"; 
 import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
@@ -198,19 +198,21 @@ interface AddCommentResult {
  * @param ticketId The ID of the ticket.
  * @param userIdPerformingAction The ID of the user adding the comment.
  * @param commentText The text of the comment.
+ * @param attachmentNames Optional array of names for files attached with this comment.
  * @returns A promise that resolves to an object indicating success or failure.
  */
 export async function addCommentToTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
-  commentText: string
+  commentText: string,
+  attachmentNames?: string[] // Added attachmentNames parameter
 ): Promise<AddCommentResult> {
   if (!ticketId || !userIdPerformingAction || !commentText) {
     return { success: false, error: "Ticket ID, user ID, and comment text are required." };
   }
 
   try {
-    const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText);
+    const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText, attachmentNames);
     if (updatedTicket) {
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
 
@@ -227,7 +229,11 @@ export async function addCommentToTicketAction(
         const superUser = await getUserById('superuser');
         if(superUser?.email) notificationRecipients.add(superUser.email);
         
-        const notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
+        let notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
+        if (attachmentNames && attachmentNames.length > 0) {
+            notificationMessage += ` Attachments: ${attachmentNames.join(', ')}.`;
+        }
+
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
@@ -246,70 +252,7 @@ export async function addCommentToTicketAction(
   }
 }
 
-interface AddAttachmentsResult {
-  success: boolean;
-  ticket?: JiraTicket;
-  error?: string;
-}
+// Attachment-specific action removed as per previous request.
+// Functionality can be merged into addCommentToTicketAction or a dedicated form if complex upload is needed.
+// For now, comments can carry attachment names.
 
-/**
- * Server action to add attachments to a Jira ticket.
- * @param ticketId The ID of the ticket.
- * @param userIdPerformingAction The ID of the user adding the attachments.
- * @param attachmentNames An array of names for the files being attached.
- * @returns A promise that resolves to an object indicating success or failure.
- */
-export async function addAttachmentsToTicketAction(
-  ticketId: string,
-  userIdPerformingAction: string,
-  attachmentNames: string[]
-): Promise<AddAttachmentsResult> {
-  if (!ticketId || !userIdPerformingAction || !attachmentNames || attachmentNames.length === 0) {
-    return { success: false, error: "Ticket ID, user ID, and at least one attachment name are required." };
-  }
-
-  try {
-    const updatedTicket = await addAttachmentsToJiraTicketService(ticketId, userIdPerformingAction, attachmentNames);
-    if (updatedTicket) {
-      revalidatePath(`/(app)/jira/${ticketId}`, "page");
-
-      // Simulate Email Notification for attachments
-      if (isFirebaseProperlyConfigured) {
-        const performingUser = await getUserById(userIdPerformingAction);
-        const requester = await getUserById(updatedTicket.requestingUserId);
-        const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
-
-        const notificationRecipients = new Set<string>();
-        // Notify performing user, requester, assignee, and superuser
-        if (performingUser?.email) notificationRecipients.add(performingUser.email);
-        if (requester?.email) notificationRecipients.add(requester.email);
-        if (assignee?.email) notificationRecipients.add(assignee.email);
-        const superUser = await getUserById('superuser');
-        if (superUser?.email) notificationRecipients.add(superUser.email);
-        
-        // Remove performing user from recipients if they are also requester/assignee/superuser to avoid duplicate notifications
-        if (requester?.email === performingUser?.email) notificationRecipients.delete(requester.email);
-        if (assignee?.email === performingUser?.email) notificationRecipients.delete(assignee.email);
-        if (superUser?.email === performingUser?.email) notificationRecipients.delete(superUser.email);
-
-
-        const filesString = attachmentNames.join(', ');
-        const notificationMessage = `New attachments added to Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: ${filesString}`;
-        
-        notificationRecipients.forEach(email => {
-            console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-        });
-      } else {
-        console.log("Skipped Jira attachment email notification as Firebase is not properly configured.");
-      }
-
-      return { success: true, ticket: updatedTicket };
-    } else {
-      return { success: false, error: "Failed to add attachments. Ticket not found or API error." };
-    }
-  } catch (error) {
-    console.error("Error adding attachments to Jira ticket:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred while adding attachments.";
-    return { success: false, error: errorMessage };
-  }
-}
