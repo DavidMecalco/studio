@@ -506,3 +506,4 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     </Dialog>
   );
 }
+

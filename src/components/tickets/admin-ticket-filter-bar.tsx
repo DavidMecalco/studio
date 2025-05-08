@@ -142,3 +142,4 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
     </Card>
   );
 }
+

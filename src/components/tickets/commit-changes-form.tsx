@@ -227,3 +227,4 @@ export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = 
     </Card>
   );
 }
+

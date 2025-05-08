@@ -249,3 +249,4 @@ export async function addCommentToTicketAction(
     return { success: false, error: errorMessage };
   }
 }
+

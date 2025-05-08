@@ -123,3 +123,4 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
     </li>
   );
 }
+

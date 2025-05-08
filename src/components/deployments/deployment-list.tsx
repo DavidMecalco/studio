@@ -97,7 +97,7 @@ export function DeploymentList({ deploymentLogs, users, maxItems }: DeploymentLi
                 {log.ticketIds && log.ticketIds.length > 0 ? (
                   log.ticketIds.map(ticketId => (
                     <Button key={ticketId} variant="link" size="sm" asChild className="p-0 h-auto text-xs">
-                      <Link href={`/jira/${ticketId}`} className="flex items-center gap-0.5">
+                      <Link href={`/tickets/${ticketId}`} className="flex items-center gap-0.5"> {/* Updated path */}
                         <LinkIcon className="h-3 w-3"/>{ticketId}
                       </Link>
                     </Button>

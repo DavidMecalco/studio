@@ -114,3 +114,4 @@ export function MyTicketsFilterBar({ filters, onFiltersChange }: MyTicketsFilter
     </Card>
   );
 }
+

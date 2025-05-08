@@ -51,6 +51,7 @@ export interface TicketHistoryEntry {
   fileName?: string;
   restoredVersionId?: string;
   attachedFileNames?: string[];
+  ticketId?: string; // Added ticketId to link history directly to a ticket
 }
 
 /**
@@ -719,3 +720,4 @@ export async function addAttachmentsToTicket(
   console.error("Cannot add attachments: No persistent storage available.");
   return null;
 }
+

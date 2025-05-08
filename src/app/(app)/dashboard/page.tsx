@@ -400,3 +400,4 @@ const ChartSkeleton = () => (
         </CardContent>
     </Card>
 );
+

@@ -31,3 +31,4 @@ export function TicketHistoryList({ history, title = "Historial del Ticket" }: T
     </div>
   );
 }
+

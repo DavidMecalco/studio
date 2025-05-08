@@ -381,3 +381,4 @@ const ChartSkeleton = ({title}: {title: string}) => (
         </CardContent>
     </Card>
 );
+

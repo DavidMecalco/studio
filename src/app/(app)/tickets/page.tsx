@@ -184,3 +184,4 @@ export default function TicketsPage() { // Renamed from JiraPage
     </div>
   );
 }
+

@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"; // Added for file input
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
-import { addCommentToTicketAction } from "@/app/actions/jira-actions";
+import { addCommentToTicketAction } from "@/app/actions/ticket-actions"; // Updated import
 import { Loader2, MessageSquare, Paperclip, Code2, X } from "lucide-react";
 
 const commentFormSchema = z.object({
@@ -211,3 +211,4 @@ export function CommentForm({ ticketId }: CommentFormProps) {
     </Form>
   );
 }
+
