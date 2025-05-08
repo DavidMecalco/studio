@@ -75,12 +75,13 @@ export interface Ticket {
 }
 
 let ticketsCollectionRef: CollectionReference<DocumentData> | null = null;
+const SERVICE_NAME = 'TicketService';
+
 if (db) { // Only initialize if db is available
   ticketsCollectionRef = collection(db, 'tickets');
+   console.log(`[SERVICE_INIT ${SERVICE_NAME}] Collection ref initialized (tickets: ${!!ticketsCollectionRef}) because db is available.`);
 } else {
-  if(isFirebaseProperlyConfigured) {
-     console.warn("TicketService: Firestore db instance is null. ticketsCollectionRef will not be initialized. Operations will rely on localStorage (client-side) or fail (server-side).");
-  }
+   console.warn(`[SERVICE_INIT ${SERVICE_NAME}] Firestore db instance is null. ticketsCollectionRef not initialized. isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}`);
 }
 
 const MOCK_TICKETS_SEEDED_FLAG_V6 = 'mock_tickets_seeded_v6';
@@ -144,7 +145,7 @@ const ticketsToSeed: Ticket[] = [
 async function ensureTicketsMockDataSeeded(): Promise<void> {
   if (typeof window === 'undefined') {
     if (!isFirebaseProperlyConfigured) {
-        console.warn("Ticket mock data seeding (server-side): Firebase not properly configured. Cannot seed to Firestore.");
+        console.warn(`[${SERVICE_NAME}] Mock data seeding (server-side): Firebase not properly configured. Cannot seed to Firestore.`);
     }
     return;
   }
@@ -154,17 +155,20 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
     try {
         const firstTicket = await getDoc(doc(ticketsCollectionRef, ticketsToSeed[0].id));
-        if (firstTicket.exists()) return; // Already seeded in Firestore
+        if (firstTicket.exists()) {
+            // console.log(`[${SERVICE_NAME}] Mock data (v6) already confirmed in Firestore. Skipping further seeding checks.`);
+            return;
+        }
     } catch (e) {
-        console.warn("Error checking Firestore seed status for tickets (client might be offline). Will proceed with localStorage check and potential re-seed.", e);
+        console.warn(`[${SERVICE_NAME}] Error checking Firestore seed status (client might be offline or other Firestore issue). Will proceed with localStorage check and potential re-seed to Firestore if online. Error:`, e);
     }
   }
 
   if (!isSeededInLocalStorage) {
-    console.log("Attempting to seed Tickets mock data (v6) to localStorage...");
+    console.log(`[${SERVICE_NAME}] Attempting to seed Tickets mock data (v6) to localStorage...`);
     localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(ticketsToSeed));
     localStorage.setItem(MOCK_TICKETS_SEEDED_FLAG_V6, 'true');
-    console.log("Tickets mock data (v6) seeded to localStorage. Seeding flag set.");
+    console.log(`[${SERVICE_NAME}] Tickets mock data (v6) seeded to localStorage. Seeding flag set.`);
   }
   
 
@@ -173,17 +177,17 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
       const firstTicketSnap = await getDoc(doc(ticketsCollectionRef, ticketsToSeed[0].id));
       if (!firstTicketSnap.exists()) {
         const batch = writeBatch(db);
-        console.log("Preparing to seed Tickets to Firestore (v6)...");
+        console.log(`[${SERVICE_NAME}] Preparing to seed Tickets to Firestore (v6)...`);
         for (const ticketData of ticketsToSeed) {
           batch.set(doc(ticketsCollectionRef, ticketData.id), ticketData);
         }
         await batch.commit();
-        console.log("Initial Tickets (v6) committed to Firestore.");
+        console.log(`[${SERVICE_NAME}] Initial Tickets (v6) committed to Firestore.`);
       } else {
-        console.log("Firestore already contains key Tickets mock data (v6). Skipping Firestore Tickets seed.");
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key Tickets mock data (v6). Skipping Firestore Tickets seed.`);
       }
     } catch (error) {
-      console.warn("Error during Firestore Tickets seeding (v6): ", error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore Tickets seeding (v6): `, error);
     }
   } else if (typeof window !== 'undefined'){
     let reason = "";
@@ -191,7 +195,7 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
     else if (!db) reason += "Firestore db instance is null. ";
     else if (!ticketsCollectionRef) reason += "ticketsCollectionRef is null. ";
     else if (!navigator.onLine) reason += "Client is offline. ";
-    console.log(`Skipping Firestore Tickets seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore Tickets seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 
@@ -201,7 +205,7 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
 
   if (isFirebaseProperlyConfigured && db && ticketsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
-      console.log(`Fetching Tickets from Firestore${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
+      // console.log(`[${SERVICE_NAME}] Fetching Tickets from Firestore${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
       let q;
       if (requestingUserId) {
         q = query(ticketsCollectionRef, where("requestingUserId", "==", requestingUserId), orderBy("lastUpdated", "desc"));
@@ -213,7 +217,7 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
       querySnapshot.forEach((docSnap) => {
         tickets.push(docSnap.data() as Ticket);
       });
-      if (typeof window !== 'undefined') { // Update cache on client
+      if (typeof window !== 'undefined') { 
         localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(
             requestingUserId ? 
             (JSON.parse(localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY) || '[]') as Ticket[]).filter(t => t.requestingUserId !== requestingUserId).concat(tickets)
@@ -222,29 +226,28 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
       }
       return tickets;
     } catch (error) {
-      console.error(`Error fetching Tickets from Firestore (user: ${requestingUserId || 'all'}). Falling back to localStorage (client-side).`, error);
+      console.error(`[${SERVICE_NAME}] Error fetching Tickets from Firestore (user: ${requestingUserId || 'all'}). Falling back to localStorage (client-side). Error:`, error);
     }
   }
 
-  // Fallback for client-side or if Firestore failed
   if (typeof window !== 'undefined') {
     const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
     if (storedTickets) {
       try {
-        console.warn(`Fetching Tickets from localStorage (Firestore unavailable or offline)${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
+        console.warn(`[${SERVICE_NAME}] Fetching Tickets from localStorage (Firestore unavailable or offline)${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
         let tickets: Ticket[] = JSON.parse(storedTickets);
         if (requestingUserId) {
           tickets = tickets.filter(ticket => ticket.requestingUserId === requestingUserId);
         }
         return tickets.sort((a, b) => new Date(b.lastUpdated || b.history[0]?.timestamp || 0).getTime() - new Date(a.lastUpdated || a.history[0]?.timestamp || 0).getTime());
       } catch (e) {
-        console.error("Error parsing Tickets from localStorage.", e);
+        console.error(`[${SERVICE_NAME}] Error parsing Tickets from localStorage. Error:`, e);
       }
     }
-    console.warn(`No Tickets found in localStorage cache for user ${requestingUserId || 'all'}.`);
+    console.warn(`[${SERVICE_NAME}] No Tickets found in localStorage cache for user ${requestingUserId || 'all'}.`);
     return [];
   }
-  console.warn(`No Tickets found. (Server-side context and Firestore is unavailable/not configured for user ${requestingUserId || 'all'}).`);
+  console.warn(`[${SERVICE_NAME}] No Tickets found. (Server-side context and Firestore is unavailable/not configured for user ${requestingUserId || 'all'}).`);
   return [];
 }
 
@@ -259,7 +262,7 @@ export async function getTicketById(ticketId: string): Promise<Ticket | null> {
       const docSnap = await getDoc(ticketDocRef);
       if (docSnap.exists()) {
         const ticketData = docSnap.data() as Ticket;
-        if (typeof window !== 'undefined') { // Update client-side cache
+        if (typeof window !== 'undefined') { 
             const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
             let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
             const ticketIndex = tickets.findIndex(t => t.id === ticketId);
@@ -269,11 +272,10 @@ export async function getTicketById(ticketId: string): Promise<Ticket | null> {
         return ticketData;
       }
     } catch (error) {
-      console.error(`Error fetching Ticket ${ticketId} from Firestore. Falling back to localStorage (client-side).`, error);
+      console.error(`[${SERVICE_NAME}] Error fetching Ticket ${ticketId} from Firestore. Falling back to localStorage (client-side). Error:`, error);
     }
   }
 
-  // Fallback for client-side or if Firestore failed
   if (typeof window !== 'undefined') {
     const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
     if (storedTickets) {
@@ -281,17 +283,17 @@ export async function getTicketById(ticketId: string): Promise<Ticket | null> {
         const tickets: Ticket[] = JSON.parse(storedTickets);
         const ticket = tickets.find((t) => t.id === ticketId);
         if (ticket) {
-            console.warn(`Fetching Ticket ${ticketId} from localStorage (Firestore unavailable or offline).`);
+            console.warn(`[${SERVICE_NAME}] Fetching Ticket ${ticketId} from localStorage (Firestore unavailable or offline).`);
             return ticket;
         }
       } catch (e) {
-        console.error("Error parsing Tickets from localStorage for getTicketById", e);
+        console.error(`[${SERVICE_NAME}] Error parsing Tickets from localStorage for getTicketById. Error:`, e);
       }
     }
-     console.warn(`Ticket ${ticketId} not found in localStorage cache.`);
+    //  console.warn(`[${SERVICE_NAME}] Ticket ${ticketId} not found in localStorage cache.`);
     return null;
   }
-  console.warn(`Ticket ${ticketId} not found. (Server-side context and Firestore is unavailable/not configured).`);
+  console.warn(`[${SERVICE_NAME}] Ticket ${ticketId} not found. (Server-side context and Firestore is unavailable/not configured).`);
   return null;
 }
 
@@ -303,37 +305,35 @@ interface TicketUpdatePayload {
     comment?: string;
 }
 
-// This function is primarily called by server actions.
-// It should only attempt Firestore operations. LocalStorage updates happen if this call is also made on client (e.g. after revalidation).
 export async function updateTicket(
   ticketId: string,
   userIdPerformingAction: string,
   updates: TicketUpdatePayload
 ): Promise<Ticket | null> {
   
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error(
+      `[${SERVICE_NAME}] (updateTicket): Cannot update ticket ${ticketId}. `+
+      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
+      `Firebase not properly configured, or db/collection instance is null.`
+    );
+    return null;
+  }
+  
   let currentTicket: Ticket | null = null;
-  // For server actions, always try to fetch the latest from Firestore if configured.
-  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-      try {
-        const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-        const docSnap = await getDoc(ticketDocRef);
-        if (docSnap.exists()) {
-            currentTicket = docSnap.data() as Ticket;
-        }
-      } catch (e) {
-          console.error(`Error fetching ticket ${ticketId} from Firestore before update:`, e);
-          // If it fails, we can't reliably perform the update based on previous state from Firestore.
-          // For server action, this is a hard stop if Firestore is the target.
-          return null; 
-      }
-  } else if (typeof window !== 'undefined'){ // Client-side fallback for fetching current state if Firestore not primary
-      const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-      if(storedTickets) currentTicket = (JSON.parse(storedTickets) as Ticket[]).find(t => t.id === ticketId) || null;
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+    const docSnap = await getDoc(ticketDocRef);
+    if (docSnap.exists()) {
+        currentTicket = docSnap.data() as Ticket;
+    }
+  } catch (e) {
+      console.error(`[${SERVICE_NAME}] (updateTicket): Error fetching ticket ${ticketId} from Firestore before update:`, e);
+      return null; 
   }
 
-
   if (!currentTicket) {
-    console.error(`TicketService (updateTicket): Cannot update Ticket ${ticketId}: Ticket not found.`);
+    console.error(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} not found in Firestore.`);
     return null;
   }
 
@@ -341,7 +341,6 @@ export async function updateTicket(
   const historyEntriesToAdd: TicketHistoryEntry[] = [];
   const timestamp = new Date().toISOString();
 
-  // Logic to build updates and history... (same as before)
    if (updates.newStatus !== undefined && updates.newStatus !== currentTicket.status) {
     updatedTicketFields.status = updates.newStatus;
     const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && updates.newStatus === 'Reabierto';
@@ -360,7 +359,7 @@ export async function updateTicket(
     });
   }
 
-  const actualNewAssigneeId = updates.newAssigneeId === "" ? undefined : updates.newAssigneeId; // Handle empty string as unassign
+  const actualNewAssigneeId = updates.newAssigneeId === "" ? undefined : updates.newAssigneeId; 
   if (updates.newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) {
     updatedTicketFields.assigneeId = actualNewAssigneeId;
     historyEntriesToAdd.push({
@@ -391,7 +390,7 @@ export async function updateTicket(
   }
 
   const isReopenAction = historyEntriesToAdd.some(h => h.action === 'Ticket Reabierto');
-  if (updates.comment && !isReopenAction) { // Add general comment if not a reopen comment
+  if (updates.comment && !isReopenAction) { 
      historyEntriesToAdd.push({
         id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
         timestamp, userId: userIdPerformingAction, action: 'Comment Added',
@@ -402,7 +401,7 @@ export async function updateTicket(
 
 
   if (Object.keys(updatedTicketFields).length === 0 && historyEntriesToAdd.length === 0) {
-    console.log(`TicketService (updateTicket): No effective changes for ticket ${ticketId}.`);
+    console.log(`[${SERVICE_NAME}] (updateTicket): No effective changes for ticket ${ticketId}.`);
     return currentTicket; 
   }
   updatedTicketFields.lastUpdated = timestamp;
@@ -415,34 +414,23 @@ export async function updateTicket(
   };
 
 
-  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-    try {
-      const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-      await setDoc(ticketDocRef, updatedTicketData);
-      console.log(`TicketService (updateTicket): Ticket ${ticketId} updated in Firestore.`);
-      
-      // If on client, update localStorage cache
-      if (typeof window !== 'undefined') {
-          const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-          let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-          const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-          if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-          localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-          console.log("Local ticket cache updated after Firestore update (updateTicket).");
-      }
-      return updatedTicketData;
-    } catch (error) {
-      console.error(`TicketService (updateTicket): Error updating Ticket ${ticketId} in Firestore: `, error);
-      // For server actions, if Firestore fails, it's an error.
-      // For client-side calls, we could add a localStorage write here too as a fallback,
-      // but server actions are the primary concern for writes.
-      return null; 
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+    await setDoc(ticketDocRef, updatedTicketData);
+    console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in Firestore.`);
+    
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        console.log(`[${SERVICE_NAME}] (updateTicket): Local ticket cache updated after Firestore update.`);
     }
-  } else { // Firebase not configured, or collection ref missing. This is an issue for server actions.
-    console.error(`TicketService (updateTicket): Cannot update ticket ${ticketId}. Firebase not configured, db instance null, or ticketsCollectionRef null.`);
-    // If this was a client-side only call AND localStorage was the primary (e.g. offline-first demo), we could write to LS here.
-    // But since actions are server-first, this indicates a setup problem for writes.
-    return null;
+    return updatedTicketData;
+  } catch (error) {
+    console.error(`[${SERVICE_NAME}] (updateTicket): Error updating Ticket ${ticketId} in Firestore: `, error);
+    return null; 
   }
 }
 
@@ -459,19 +447,25 @@ export interface CreateTicketData {
   assigneeId?: string;
 }
 
-// This function is primarily called by server actions.
 export async function createTicket(ticketData: CreateTicketData): Promise<Ticket | null> {
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error(
+      `[${SERVICE_NAME}] (createTicket): Cannot create ticket. `+
+      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
+      `Firebase not properly configured, or db/collection instance is null.`
+    );
+    return null;
+  }
+  
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`;
   let githubRepository: string | undefined;
   
-  // For server actions, getOrganizations will try Firestore.
   const organizations = await getOrganizations(); 
   if (ticketData.provider) {
     const organization = organizations.find(org => org.name === ticketData.provider);
     if (organization && organization.githubRepository) {
       githubRepository = organization.githubRepository;
     } else {
-      // Fallback repo name generation if org not found or has no repo linked
       githubRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9-]/gi, '')}`;
     }
   }
@@ -494,28 +488,22 @@ export async function createTicket(ticketData: CreateTicketData): Promise<Ticket
     history: [initialHistoryEntry],
   };
 
-  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-    try {
-      const ticketDocRef = doc(ticketsCollectionRef, newTicketId);
-      await setDoc(ticketDocRef, newTicket);
-      console.log(`TicketService (createTicket): Ticket ${newTicketId} created in Firestore.`);
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, newTicketId);
+    await setDoc(ticketDocRef, newTicket);
+    console.log(`[${SERVICE_NAME}] (createTicket): Ticket ${newTicketId} created in Firestore.`);
 
-      // If on client, update localStorage cache
-      if (typeof window !== 'undefined') {
-          const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-          let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-          tickets.unshift(newTicket);
-          localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-          console.log("Local ticket cache updated after Firestore create (createTicket).");
-      }
-      return newTicket;
-    } catch (error) {
-      console.error(`TicketService (createTicket): Error creating Ticket ${newTicketId} in Firestore: `, error);
-      return null; 
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        tickets.unshift(newTicket);
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        console.log(`[${SERVICE_NAME}] (createTicket): Local ticket cache updated after Firestore create.`);
     }
-  } else {
-     console.error(`TicketService (createTicket): Cannot create ticket ${newTicketId}. Firebase not configured, db instance null, or ticketsCollectionRef null.`);
-    return null;
+    return newTicket;
+  } catch (error) {
+    console.error(`[${SERVICE_NAME}] (createTicket): Error creating Ticket ${newTicketId} in Firestore: `, error);
+    return null; 
   }
 }
 
@@ -524,7 +512,7 @@ export async function addCommitToTicketHistory(
   ticketId: string, commitSha: string, userIdPerformingAction: string,
   commitMessage: string, branch: string
 ): Promise<Ticket | null> {
-    const currentTicket = await getTicketById(ticketId); // This will try Firestore then localStorage (on client)
+    const currentTicket = await getTicketById(ticketId); 
     let newStatus: TicketStatus | undefined = undefined;
     if (currentTicket && ['Abierto', 'Pendiente', 'Reabierto'].includes(currentTicket.status)) {
         newStatus = 'En Progreso';
@@ -532,9 +520,8 @@ export async function addCommitToTicketHistory(
     
     const historyComment = `Commit ${commitSha.substring(0,7)} a rama '${branch}': ${commitMessage}`;
     
-    // updateTicket is now primarily Firestore-focused for server actions
     return updateTicket(ticketId, userIdPerformingAction, {
-        comment: historyComment, // This will be added as a 'Comment Added' history entry
+        comment: historyComment, 
         newStatus: newStatus
     });
 }
@@ -545,17 +532,16 @@ export async function addDeploymentToTicketHistory(
 ): Promise<Ticket | null> {
    const historyComment = `Despliegue ${deploymentId} a ${environment} registrado. Resultado: ${result}.`;
    return updateTicket(ticketId, userIdPerformingAction, {
-        comment: historyComment // This will be added as a 'Comment Added' history entry
+        comment: historyComment 
    });
 }
 
 export async function getAllTicketHistories(): Promise<TicketHistoryEntry[]> {
-  // This function reads all tickets, so it uses the standard getTickets flow (Firestore then localStorage on client)
   await ensureTicketsMockDataSeeded();
   const tickets = await getTickets(); 
   const allHistories: TicketHistoryEntry[] = [];
   tickets.forEach(ticket => {
-      (ticket.history || []).forEach(entry => { // Ensure history array exists
+      (ticket.history || []).forEach(entry => { 
           allHistories.push({ ...entry, ticketId: ticket.id } as TicketHistoryEntry & {ticketId: string});
       });
   });
@@ -566,6 +552,15 @@ export async function addRestorationToTicketHistory(
   ticketId: string, userIdPerformingAction: string, fileName: string,
   restoredVersionId: string, commitSha?: string,
 ): Promise<Ticket | null> {
+    if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+      console.error(
+        `[${SERVICE_NAME}] (addRestorationToTicketHistory): Cannot add restoration history for ticket ${ticketId}. `+
+        `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
+        `Firebase not properly configured, or db/collection instance is null.`
+      );
+      return null;
+    }
+
     let details = `Archivo '${fileName}' restaurado a la versión '${restoredVersionId}'`;
     if (commitSha) details += ` (commit ${commitSha.substring(0, 7)})`;
     details += `.`;
@@ -584,7 +579,7 @@ export async function addRestorationToTicketHistory(
 
     const currentTicket = await getTicketById(ticketId);
     if (!currentTicket) {
-        console.error(`Ticket ${ticketId} not found for adding restoration history.`);
+        console.error(`[${SERVICE_NAME}] (addRestorationToTicketHistory): Ticket ${ticketId} not found.`);
         return null;
     }
     const updatedTicketData = {
@@ -593,24 +588,19 @@ export async function addRestorationToTicketHistory(
         lastUpdated: new Date().toISOString(),
     };
 
-    if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-        try {
-            await setDoc(doc(ticketsCollectionRef, ticketId), updatedTicketData);
-            console.log(`File restoration history added to ticket ${ticketId} in Firestore.`);
-            if (typeof window !== 'undefined') {
-                const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-                let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-                const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-                if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-                localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-            }
-            return updatedTicketData;
-        } catch (error) {
-            console.error(`Error adding file restoration history to ticket ${ticketId} in Firestore:`, error);
-            return null;
+    try {
+        await setDoc(doc(ticketsCollectionRef, ticketId), updatedTicketData);
+        console.log(`[${SERVICE_NAME}] (addRestorationToTicketHistory): File restoration history added to ticket ${ticketId} in Firestore.`);
+        if (typeof window !== 'undefined') {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
         }
-    } else {
-        console.error(`Cannot add file restoration history to ticket ${ticketId}. Firebase not configured, db instance null, or ticketsCollectionRef null.`);
+        return updatedTicketData;
+    } catch (error) {
+        console.error(`[${SERVICE_NAME}] (addRestorationToTicketHistory): Error adding file restoration history to ticket ${ticketId} in Firestore:`, error);
         return null;
     }
 }
@@ -619,10 +609,18 @@ export async function addCommentToTicket(
   ticketId: string, userIdPerformingAction: string, commentText: string,
   attachmentNames?: string[]
 ): Promise<Ticket | null> {
+    if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+      console.error(
+        `[${SERVICE_NAME}] (addCommentToTicket): Cannot add comment for ticket ${ticketId}. `+
+        `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
+        `Firebase not properly configured, or db/collection instance is null.`
+      );
+      return null;
+    }
     
-    const currentTicket = await getTicketById(ticketId); // Fetch current ticket state
+    const currentTicket = await getTicketById(ticketId); 
     if (!currentTicket) {
-      console.error(`Ticket ${ticketId} not found for adding comment.`);
+      console.error(`[${SERVICE_NAME}] (addCommentToTicket): Ticket ${ticketId} not found.`);
       return null;
     }
 
@@ -649,26 +647,20 @@ export async function addCommentToTicket(
         lastUpdated: timestamp,
     };
     
-    if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-        try {
-            const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-            await setDoc(ticketDocRef, updatedTicketData); // Update the whole ticket doc
-            console.log(`Comment added to ticket ${ticketId} and history updated in Firestore.`);
-            // Update client-side cache
-            if (typeof window !== 'undefined') {
-                const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-                let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-                const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-                if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-                localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-            }
-            return updatedTicketData;
-        } catch (error) {
-            console.error(`Error adding comment to ticket ${ticketId} in Firestore:`, error);
-            return null;
+    try {
+        const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+        await setDoc(ticketDocRef, updatedTicketData); 
+        console.log(`[${SERVICE_NAME}] (addCommentToTicket): Comment added to ticket ${ticketId} and history updated in Firestore.`);
+        if (typeof window !== 'undefined') {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
         }
-    } else {
-        console.error(`Cannot add comment to ticket ${ticketId}. Firebase not configured, db instance null, or ticketsCollectionRef null.`);
+        return updatedTicketData;
+    } catch (error) {
+        console.error(`[${SERVICE_NAME}] (addCommentToTicket): Error adding comment to ticket ${ticketId} in Firestore:`, error);
         return null;
     }
 }
@@ -679,7 +671,15 @@ export async function addAttachmentsToTicket(
   userIdPerformingAction: string,
   attachmentNames: string[]
 ): Promise<Ticket | null> {
-  
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error(
+        `[${SERVICE_NAME}] (addAttachmentsToTicket): Cannot add attachments for ticket ${ticketId}. `+
+        `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
+        `Firebase not properly configured, or db/collection instance is null.`
+    );
+    return null;
+  }
+
   const currentTicket = await getTicketById(ticketId);
   if (!currentTicket) return null;
 
@@ -704,24 +704,20 @@ export async function addAttachmentsToTicket(
       lastUpdated: new Date().toISOString(),
   };
 
-  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
-    try {
-      const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-      await setDoc(ticketDocRef, updatedTicketData);
-      console.log(`Attachments added to ticket ${ticketId} and history updated in Firestore.`);
-      if (typeof window !== 'undefined') {
-          const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-          let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-          const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-          if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-          localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-      }
-      return updatedTicketData;
-    } catch (error) {
-      console.error("Error adding attachments to Ticket in Firestore:", error);
-       return null;
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+    await setDoc(ticketDocRef, updatedTicketData);
+    console.log(`[${SERVICE_NAME}] (addAttachmentsToTicket): Attachments added to ticket ${ticketId} and history updated in Firestore.`);
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
     }
+    return updatedTicketData;
+  } catch (error) {
+    console.error(`[${SERVICE_NAME}] (addAttachmentsToTicket): Error adding attachments to Ticket in Firestore:`, error);
+     return null;
   }
-  console.error("Cannot add attachments: Firebase not properly configured or db/collectionRef null.");
-  return null;
 }

@@ -19,12 +19,13 @@ export interface DeploymentLogEntry {
 }
 
 let deploymentLogsCollectionRef: CollectionReference<DocumentData> | null = null;
-if (db) { // Only initialize if db is available
+const SERVICE_NAME = 'DeploymentService';
+
+if (db) { 
   deploymentLogsCollectionRef = collection(db, 'deployment_logs');
+  console.log(`[SERVICE_INIT ${SERVICE_NAME}] Collection ref initialized (deployment_logs: ${!!deploymentLogsCollectionRef}) because db is available.`);
 } else {
-  if(isFirebaseProperlyConfigured) {
-      console.warn("DeploymentService: Firestore db instance is null. deploymentLogsCollectionRef will not be initialized. Operations will rely on localStorage (client-side) or fail (server-side).");
-  }
+  console.warn(`[SERVICE_INIT ${SERVICE_NAME}] Firestore db instance is null. deploymentLogsCollectionRef not initialized. isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}`);
 }
 
 const MOCK_DEPLOYMENT_SEEDED_FLAG_V5 = 'mock_deployment_seeded_v5';
@@ -60,7 +61,7 @@ const deploymentsToSeed: DeploymentLogEntry[] = [
 async function ensureDeploymentMockDataSeeded(): Promise<void> {
   if (typeof window === 'undefined') {
     if (!isFirebaseProperlyConfigured) {
-         console.warn("Deployment mock data seeding (server-side): Firebase not properly configured. Cannot seed to Firestore.");
+         console.warn(`[${SERVICE_NAME}] Mock data seeding (server-side): Firebase not properly configured. Cannot seed to Firestore.`);
     }
     return;
   }
@@ -70,17 +71,20 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && deploymentLogsCollectionRef) {
       try {
         const firstLog = await getDoc(doc(deploymentLogsCollectionRef, deploymentsToSeed[0].id));
-        if (firstLog.exists()) return; // Already seeded in Firestore
+        if (firstLog.exists()) {
+            // console.log(`[${SERVICE_NAME}] Mock data (v5) already confirmed in Firestore. Skipping further seeding checks.`);
+            return;
+        }
     } catch (e) {
-        console.warn("Error checking Firestore seed status for deployments. Will proceed with localStorage check and potential re-seed.", e);
+        console.warn(`[${SERVICE_NAME}] Error checking Firestore seed status for deployments. Will proceed with localStorage check and potential re-seed. Error:`, e);
     }
   }
 
   if (!isSeededInLocalStorage) {
-    console.log("Attempting to seed Deployment mock data (v5) to localStorage...");
+    console.log(`[${SERVICE_NAME}] Attempting to seed Deployment mock data (v5) to localStorage...`);
     localStorage.setItem(LOCAL_STORAGE_DEPLOYMENTS_KEY, JSON.stringify(deploymentsToSeed));
     localStorage.setItem(MOCK_DEPLOYMENT_SEEDED_FLAG_V5, 'true');
-    console.log("Deployment mock data (v5) seeded to localStorage. Seeding flag set.");
+    console.log(`[${SERVICE_NAME}] Deployment mock data (v5) seeded to localStorage. Seeding flag set.`);
   }
   
 
@@ -89,17 +93,17 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
       const firstLogSnap = await getDoc(doc(deploymentLogsCollectionRef, deploymentsToSeed[0].id));
       if (!firstLogSnap.exists()) {
         const batch = writeBatch(db);
-        console.log("Preparing to seed Deployment logs to Firestore (v5)...");
+        console.log(`[${SERVICE_NAME}] Preparing to seed Deployment logs to Firestore (v5)...`);
         for (const logData of deploymentsToSeed) {
           batch.set(doc(deploymentLogsCollectionRef, logData.id), logData);
         }
         await batch.commit();
-        console.log("Initial Deployment logs (v5) committed to Firestore.");
+        console.log(`[${SERVICE_NAME}] Initial Deployment logs (v5) committed to Firestore.`);
       } else {
-        console.log("Firestore already contains key Deployment mock data (v5). Skipping Firestore Deployment seed.");
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key Deployment mock data (v5). Skipping Firestore Deployment seed.`);
       }
     } catch (error) {
-      console.warn("Error during Firestore Deployment seeding (v5): ", error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore Deployment seeding (v5): `, error);
     }
   } else if (typeof window !== 'undefined'){
     let reason = "";
@@ -107,7 +111,7 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
     else if (!db) reason += "Firestore db instance is null. ";
     else if (!deploymentLogsCollectionRef) reason += "deploymentLogsCollectionRef is null. ";
     else if (!navigator.onLine) reason += "Client is offline. ";
-    console.log(`Skipping Firestore Deployment seeding (v5). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore Deployment seeding (v5). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 
@@ -117,7 +121,7 @@ export async function getDeploymentLogs(): Promise<DeploymentLogEntry[]> {
 
   if (isFirebaseProperlyConfigured && db && deploymentLogsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
-      console.log("Fetching deployment logs from Firestore.");
+      // console.log(`[${SERVICE_NAME}] Fetching deployment logs from Firestore.`);
       const q = query(deploymentLogsCollectionRef, orderBy("timestamp", "desc"));
       const querySnapshot = await getDocs(q);
       const logs: DeploymentLogEntry[] = [];
@@ -129,25 +133,24 @@ export async function getDeploymentLogs(): Promise<DeploymentLogEntry[]> {
       }
       return logs;
     } catch (error) {
-      console.error("Error fetching deployment logs from Firestore. Falling back to localStorage (client-side).", error);
+      console.error(`[${SERVICE_NAME}] Error fetching deployment logs from Firestore. Falling back to localStorage (client-side). Error:`, error);
     }
   }
 
-  // Fallback for client-side or if Firestore failed
   if (typeof window !== 'undefined') {
     const storedLogs = localStorage.getItem(LOCAL_STORAGE_DEPLOYMENTS_KEY);
     if (storedLogs) {
       try {
-        console.warn("Fetching deployment logs from localStorage (Firestore unavailable or offline).");
+        console.warn(`[${SERVICE_NAME}] Fetching deployment logs from localStorage (Firestore unavailable or offline).`);
         return JSON.parse(storedLogs).sort((a: DeploymentLogEntry, b: DeploymentLogEntry) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       } catch (e) {
-        console.error("Error parsing deployment logs from localStorage.", e);
+        console.error(`[${SERVICE_NAME}] Error parsing deployment logs from localStorage. Error:`, e);
       }
     }
-    console.warn("No deployment logs found in localStorage cache.");
+    console.warn(`[${SERVICE_NAME}] No deployment logs found in localStorage cache.`);
     return [];
   }
-  console.warn("No deployment logs found. (Server-side context and Firestore is unavailable/not configured).");
+  console.warn(`[${SERVICE_NAME}] No deployment logs found. (Server-side context and Firestore is unavailable/not configured).`);
   return [];
 }
 
@@ -161,7 +164,7 @@ export async function getDeploymentLogById(deploymentId: string): Promise<Deploy
       const docSnap = await getDoc(logDocRef);
       if (docSnap.exists()) {
         const logData = docSnap.data() as DeploymentLogEntry;
-        if (typeof window !== 'undefined') { // Update client-side cache
+        if (typeof window !== 'undefined') { 
             const storedLogs = localStorage.getItem(LOCAL_STORAGE_DEPLOYMENTS_KEY);
             let logs: DeploymentLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
             const logIndex = logs.findIndex(l => l.id === deploymentId);
@@ -171,11 +174,10 @@ export async function getDeploymentLogById(deploymentId: string): Promise<Deploy
         return logData;
       }
     } catch (error) {
-      console.error(`Error fetching deployment log ${deploymentId} from Firestore. Falling back to localStorage (client-side).`, error);
+      console.error(`[${SERVICE_NAME}] Error fetching deployment log ${deploymentId} from Firestore. Falling back to localStorage (client-side). Error:`, error);
     }
   }
 
-  // Fallback for client-side or if Firestore failed
   if (typeof window !== 'undefined') {
     const storedLogs = localStorage.getItem(LOCAL_STORAGE_DEPLOYMENTS_KEY);
     if (storedLogs) {
@@ -183,17 +185,17 @@ export async function getDeploymentLogById(deploymentId: string): Promise<Deploy
         const logs: DeploymentLogEntry[] = JSON.parse(storedLogs);
         const log = logs.find(d => d.id === deploymentId);
         if (log) {
-            console.warn(`Fetching deployment log ${deploymentId} from localStorage (Firestore unavailable or offline).`);
+            console.warn(`[${SERVICE_NAME}] Fetching deployment log ${deploymentId} from localStorage (Firestore unavailable or offline).`);
             return log;
         }
       } catch (e) {
-        console.error("Error parsing deployment logs from localStorage for getDeploymentLogById", e);
+        console.error(`[${SERVICE_NAME}] Error parsing deployment logs from localStorage for getDeploymentLogById. Error:`, e);
       }
     }
-    console.warn(`Deployment log ${deploymentId} not found in localStorage cache.`);
+    // console.warn(`[${SERVICE_NAME}] Deployment log ${deploymentId} not found in localStorage cache.`);
     return null;
   }
-  console.warn(`Deployment log ${deploymentId} not found. (Server-side context and Firestore is unavailable/not configured).`);
+  console.warn(`[${SERVICE_NAME}] Deployment log ${deploymentId} not found. (Server-side context and Firestore is unavailable/not configured).`);
   return null;
 }
 
@@ -208,10 +210,13 @@ export interface CreateDeploymentLogData {
   ticketIds?: string[];
 }
 
-// This function is primarily called by server actions.
 export async function createDeploymentLog(data: CreateDeploymentLogData): Promise<DeploymentLogEntry | null> {
   if (!isFirebaseProperlyConfigured || !db || !deploymentLogsCollectionRef) {
-    console.error("DeploymentService (createDeploymentLog): Cannot create deployment log. Firebase not properly configured, db instance null, or deploymentLogsCollectionRef null.");
+    console.error(
+        `[${SERVICE_NAME}] (createDeploymentLog): Cannot create deployment log. ` +
+        `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, deploymentLogsCollectionRef: ${!!deploymentLogsCollectionRef}. ` +
+        `Firebase not properly configured, or db/collection instance is null.`
+    );
     return null;
   }
 
@@ -225,19 +230,18 @@ export async function createDeploymentLog(data: CreateDeploymentLogData): Promis
 
     const logDocRef = doc(deploymentLogsCollectionRef, newLogId);
     await setDoc(logDocRef, newLogEntry);
-    console.log(`Deployment log ${newLogId} created in Firestore.`);
+    console.log(`[${SERVICE_NAME}] (createDeploymentLog): Deployment log ${newLogId} created in Firestore.`);
 
-    // If on client (e.g. direct call, not server action), update local cache
     if (typeof window !== 'undefined') {
         const storedLogs = localStorage.getItem(LOCAL_STORAGE_DEPLOYMENTS_KEY);
         let logs: DeploymentLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
         logs.unshift(newLogEntry);
         localStorage.setItem(LOCAL_STORAGE_DEPLOYMENTS_KEY, JSON.stringify(logs));
-        console.log("Local deployment log cache updated after Firestore create (createDeploymentLog).");
+        console.log(`[${SERVICE_NAME}] (createDeploymentLog): Local deployment log cache updated after Firestore create.`);
     }
     return newLogEntry;
   } catch (error) {
-    console.error("Error creating deployment log in Firestore: ", error);
+    console.error(`[${SERVICE_NAME}] (createDeploymentLog): Error creating deployment log in Firestore: `, error);
     return null;
   }
 }
