@@ -12,6 +12,19 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Check if the project ID is configured, as this is a common cause for "projects//" errors.
+if (!firebaseConfig.projectId) {
+  const errorMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly.";
+  console.error(errorMessage);
+  // In a client-side environment, throwing an error here might be too disruptive.
+  // For a server-side context or build process, an error throw is appropriate.
+  // Since this runs in both contexts in Next.js, logging an error is a safer default.
+  // If this is critical for app functionality, an error should be thrown.
+  // For now, we'll log and allow initialization to proceed, which will likely fail later with the Firebase error.
+  // A more robust solution in a real app might involve conditional logic or a dedicated config validation step.
+}
+
+
 // Initialize Firebase
 let app: FirebaseApp;
 let db: Firestore;
@@ -19,21 +32,23 @@ let db: Firestore;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
-  enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
-    .then(() => {
-      console.log("Firestore offline persistence enabled.");
-    })
-    .catch((err) => {
-      if (err.code === 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one tab at a time.
-        console.warn('Firestore offline persistence failed (failed-precondition). This can happen if multiple tabs are open or due to other browser restrictions. The app will continue to function but may rely more on network connectivity for Firestore data.');
-      } else if (err.code === 'unimplemented') {
-        // The current browser does not support all of the features required to enable persistence
-        console.warn('Firestore offline persistence failed (unimplemented). The browser may not support IndexedDB for offline persistence.');
-      } else {
-        console.error('Firestore offline persistence failed: ', err);
-      }
-    });
+  if (typeof window !== 'undefined') { // IndexedDB persistence only works in the browser
+    enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+      .then(() => {
+        console.log("Firestore offline persistence enabled.");
+      })
+      .catch((err) => {
+        if (err.code === 'failed-precondition') {
+          // Multiple tabs open, persistence can only be enabled in one tab at a time.
+          console.warn('Firestore offline persistence failed (failed-precondition). This can happen if multiple tabs are open or due to other browser restrictions. The app will continue to function but may rely more on network connectivity for Firestore data.');
+        } else if (err.code === 'unimplemented') {
+          // The current browser does not support all of the features required to enable persistence
+          console.warn('Firestore offline persistence failed (unimplemented). The browser may not support IndexedDB for offline persistence.');
+        } else {
+          console.error('Firestore offline persistence failed: ', err);
+        }
+      });
+  }
 } else {
   app = getApp();
   db = getFirestore(app); // Ensure db is initialized for existing app instance
@@ -42,3 +57,4 @@ if (!getApps().length) {
 // const auth: Auth = getAuth(app); // Uncomment if Firebase Auth is used
 
 export { app, db /*, auth */ };
+
