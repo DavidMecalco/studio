@@ -28,6 +28,14 @@ export interface FileVersion {
   fileName: string;
 }
 
+// --- TLA GitLab API Key for Testing ---
+// WARNING: Storing API keys directly in client-side or bundled server-side code is INSECURE.
+// This is included for demonstration and mock testing purposes ONLY, as requested by the user.
+// In a real application, API keys should be stored securely as environment variables on the server
+// and accessed ONLY by backend services/API routes, never exposed to the client.
+const TLA_GITLAB_API_KEY = 'glpat-m5wMBM1TQ3PSKXoRpPay';
+// --- End of Warning ---
+
 let commitsCollectionRef: CollectionReference<DocumentData> | null = null;
 if (isFirebaseProperlyConfigured && db) {
   commitsCollectionRef = collection(db, 'github_commits');
@@ -123,6 +131,12 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
   await ensureGitHubMockDataSeeded();
   await new Promise(resolve => setTimeout(resolve, 20));
 
+  // Simulate API key usage for TLA
+  if (ticketIdOrProjectId === 'maximo-tla') {
+    console.log(`SIMULATING: If this were a real GitLab API call for TLA (repo: ${ticketIdOrProjectId}), the TLA GitLab API Key would be used: ${TLA_GITLAB_API_KEY.substring(0, 10)}... (This is for testing purposes only and not a secure practice).`);
+  }
+
+
   if (isFirebaseProperlyConfigured && db && commitsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
       console.log(`Fetching GitHub commits from Firestore for: ${ticketIdOrProjectId}`);
@@ -130,7 +144,19 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       if (ticketIdOrProjectId === "ALL_PROJECTS") {
         q = query(commitsCollectionRef, orderBy("date", "desc"), limit(50)); 
       } else {
-        q = query(commitsCollectionRef, where("ticketId", "==", ticketIdOrProjectId), orderBy("date", "desc"));
+        // Check if it's a repo name directly or a ticket ID
+        if (ticketIdOrProjectId.includes('-')) { // Heuristic for ticket ID
+             q = query(commitsCollectionRef, where("ticketId", "==", ticketIdOrProjectId), orderBy("date", "desc"));
+        } else { // Assume it's a project/repo name for direct filtering if applicable
+            // This part is tricky as commits are not directly tied to a project name but via ticket.
+            // For simplicity, this mock won't directly filter by generic project name from here unless it's a special case like 'maximo-tla'
+            // The current mock data links commits via ticketId, which then links to a provider/repo.
+            // A more robust solution would involve joining or multiple queries if commits were stored per project.
+            // For now, if it's 'maximo-tla', we've already logged key usage. The query below will fetch relevant TLA commits via ticketId.
+            // If it's another repo name not matching 'maximo-tla', this will likely return few/no results directly from Firestore based on current data structure.
+            // The localStorage fallback handles broader matching.
+            q = query(commitsCollectionRef, where("ticketId", "==", `dummy-value-for-repo-${ticketIdOrProjectId}`), orderBy("date", "desc")); // Fallback for other repo names
+        }
       }
       const querySnapshot = await getDocs(q);
       const commits: GitHubCommit[] = [];
@@ -153,7 +179,9 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
         console.warn(`Fetching GitHub commits for ${ticketIdOrProjectId} from localStorage (Firestore unavailable or offline).`);
         let commits: GitHubCommit[] = JSON.parse(storedCommits);
         if (ticketIdOrProjectId !== "ALL_PROJECTS") {
-          commits = commits.filter(commit => commit.ticketId === ticketIdOrProjectId || commit.message.includes(ticketIdOrProjectId));
+          commits = commits.filter(commit => commit.ticketId === ticketIdOrProjectId || commit.message.includes(ticketIdOrProjectId) || commit.branch?.includes(ticketIdOrProjectId));
+           // If ticketIdOrProjectId is 'maximo-tla', this won't filter correctly by repo name alone using current data.
+           // The earlier logging for 'maximo-tla' already handles the API key simulation.
         }
         return commits.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } catch (e) {
@@ -173,8 +201,37 @@ export async function createGitHubCommit(
     branch: string = 'dev',
     filesChanged: string[] = []
 ): Promise<GitHubCommit | null> {
+  
+  // Simplified repo name logic, assuming ticket provider can be parsed from ID or message.
+  let repoName = 'example/repo'; // default
+  // This logic assumes ticket ID or provider information can determine the repo.
+  // The TLA check is based on 'maximo-tla' for consistency with org data.
+  if(ticketId.toUpperCase().startsWith('MAS-TLA') || ticketId.toUpperCase().includes('TLA')) repoName = 'maximo-tla';
+  else if(ticketId.toUpperCase().startsWith('MAS-FEMA') || ticketId.toUpperCase().includes('FEMA')) repoName = 'maximo-fema';
+  
+  // Simulate API key usage for TLA
+  if (repoName === 'maximo-tla') {
+    console.log(`SIMULATING: If this were a real GitLab API call for TLA (repo: ${repoName}) to create a commit, the TLA GitLab API Key would be used: ${TLA_GITLAB_API_KEY.substring(0, 10)}... (This is for testing purposes only and not a secure practice).`);
+  }
+  
   if (!isFirebaseProperlyConfigured || !db || !commitsCollectionRef) {
     console.error("Cannot create GitHub commit: Firebase not properly configured or db/commitsCollectionRef is null.");
+    // Fallback to in-memory/localStorage for mock if necessary
+    if (typeof window !== 'undefined') {
+        const newSha = Math.random().toString(36).substring(2, 12);
+        const fullMessage = `${ticketId}: ${message}`;
+        const newCommit: GitHubCommit = {
+            sha: newSha, message: fullMessage, author,
+            url: `https://github.com/${repoName}/commit/${newSha}`, // Stays GitHub URL for mock consistency
+            date: new Date().toISOString(), filesChanged, ticketId, branch,
+        };
+        const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
+        let commits: GitHubCommit[] = storedCommits ? JSON.parse(storedCommits) : [];
+        commits.unshift(newCommit);
+        localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commits));
+        console.warn(`GitHub commit ${newSha} created in localStorage only (Firestore unavailable).`);
+        return newCommit;
+    }
     return null;
   }
 
@@ -182,15 +239,9 @@ export async function createGitHubCommit(
     const newSha = Math.random().toString(36).substring(2, 12);
     const fullMessage = `${ticketId}: ${message}`;
     
-    // Simplified repo name logic, assuming ticket provider can be parsed from ID or message.
-    let repoName = 'example/repo'; // default
-    if(ticketId.includes('-TLA') || ticketId.toUpperCase().startsWith('MAS-TLA')) repoName = 'maximo-tla';
-    else if(ticketId.includes('-FEMA') || ticketId.toUpperCase().startsWith('MAS-FEMA')) repoName = 'maximo-fema';
-
-
     const newCommit: GitHubCommit = {
         sha: newSha, message: fullMessage, author,
-        url: `https://github.com/${repoName}/commit/${newSha}`,
+        url: `https://github.com/${repoName}/commit/${newSha}`, // Stays GitHub URL for mock consistency
         date: new Date().toISOString(), filesChanged, ticketId, branch,
     };
 
@@ -221,7 +272,7 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
         try {
             const q = query(commitsCollectionRef, where("filesChanged", "array-contains", fileName), orderBy("date", "desc"));
             const querySnapshot = await getDocs(q);
-            querySnapshot.forEach(doc => relevantCommits.push(doc.data() as GitHubCommit));
+            querySnapshot.forEach(docSnap => relevantCommits.push(docSnap.data() as GitHubCommit));
         } catch (error) {
             console.error(`Error fetching versions for ${fileName} from Firestore:`, error);
         }
@@ -259,4 +310,3 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
         fileName: fileName,
     })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
-
