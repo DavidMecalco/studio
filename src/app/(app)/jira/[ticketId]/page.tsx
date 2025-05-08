@@ -34,55 +34,55 @@ interface TicketDetailsData {
 }
 
 // Card for version history of files associated with the ticket
-function VersionHistoryCard({ ticketId, files }: { ticketId: string, files?: string[] }) {
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const [selectedFileForHistory, setSelectedFileForHistory] = useState<string | null>(null);
+// function VersionHistoryCard({ ticketId, files }: { ticketId: string, files?: string[] }) {
+//   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+//   const [selectedFileForHistory, setSelectedFileForHistory] = useState<string | null>(null);
 
-  if (!files || files.length === 0) {
-    return null; // Don't render card if no files
-  }
+//   if (!files || files.length === 0) {
+//     return null; // Don't render card if no files
+//   }
 
-  const handleShowHistory = (fileName: string) => {
-    setSelectedFileForHistory(fileName);
-    setIsHistoryDialogOpen(true);
-  };
+//   const handleShowHistory = (fileName: string) => {
+//     setSelectedFileForHistory(fileName);
+//     setIsHistoryDialogOpen(true);
+//   };
 
-  return (
-    <>
-      <Card className="shadow-md rounded-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileDiff className="h-5 w-5 text-primary" /> Historial de Versiones de Archivos
-          </CardTitle>
-          <CardDescription>
-            Revise y restaure versiones anteriores de los archivos adjuntos o modificados en este ticket.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {files.map(fileName => (
-            <div key={fileName} className="flex justify-between items-center p-3 border rounded-md bg-muted/50">
-              <span className="text-sm font-medium text-foreground flex items-center gap-2">
-                <HardDriveUpload className="h-4 w-4 text-muted-foreground" />
-                {fileName}
-              </span>
-              <Button variant="outline" size="sm" onClick={() => handleShowHistory(fileName)}>
-                <History className="mr-2 h-4 w-4" /> Ver Historial
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-      {selectedFileForHistory && (
-        <FileVersionHistoryDialog
-          fileName={selectedFileForHistory}
-          isOpen={isHistoryDialogOpen}
-          onOpenChange={setIsHistoryDialogOpen}
-          ticketId={ticketId}
-        />
-      )}
-    </>
-  );
-}
+//   return (
+//     <>
+//       <Card className="shadow-md rounded-lg">
+//         <CardHeader>
+//           <CardTitle className="flex items-center gap-2 text-lg">
+//             <FileDiff className="h-5 w-5 text-primary" /> Historial de Versiones de Archivos
+//           </CardTitle>
+//           <CardDescription>
+//             Revise y restaure versiones anteriores de los archivos adjuntos o modificados en este ticket.
+//           </CardDescription>
+//         </CardHeader>
+//         <CardContent className="space-y-3">
+//           {files.map(fileName => (
+//             <div key={fileName} className="flex justify-between items-center p-3 border rounded-md bg-muted/50">
+//               <span className="text-sm font-medium text-foreground flex items-center gap-2">
+//                 <HardDriveUpload className="h-4 w-4 text-muted-foreground" />
+//                 {fileName}
+//               </span>
+//               <Button variant="outline" size="sm" onClick={() => handleShowHistory(fileName)}>
+//                 <History className="mr-2 h-4 w-4" /> Ver Historial
+//               </Button>
+//             </div>
+//           ))}
+//         </CardContent>
+//       </Card>
+//       {selectedFileForHistory && (
+//         <FileVersionHistoryDialog
+//           fileName={selectedFileForHistory}
+//           isOpen={isHistoryDialogOpen}
+//           onOpenChange={setIsHistoryDialogOpen}
+//           ticketId={ticketId}
+//         />
+//       )}
+//     </>
+//   );
+// }
 
 // Form for adding new attachments - REMOVED
 // const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -326,15 +326,12 @@ export default function TicketDetailPage() {
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* History heading */}
             <Skeleton className="h-24 w-full" /> {/* History list placeholder */}
-             <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/3 mb-2" /> {/* File versions heading */}
-            <Skeleton className="h-20 w-full" /> {/* File versions placeholder */}
+             {/* <Skeleton className="h-px w-full" /> // Removed skeleton for VersionHistoryCard */}
+            {/* <Skeleton className="h-6 w-1/3 mb-2" /> // Removed skeleton for VersionHistoryCard */}
+            {/* <Skeleton className="h-20 w-full" /> // Removed skeleton for VersionHistoryCard */}
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments form heading */}
             <Skeleton className="h-32 w-full" /> {/* Comments form placeholder */}
-             {/* <Skeleton className="h-px w-full" /> // Removed skeleton for AddAttachmentsForm */}
-            {/* <Skeleton className="h-6 w-1/3 mb-2" /> // Removed skeleton for AddAttachmentsForm */}
-            {/* <Skeleton className="h-40 w-full" /> // Removed skeleton for AddAttachmentsForm */}
           </CardContent>
         </Card>
       </div>
@@ -511,12 +508,6 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
-            {/* {canInteractWithTicket && ticketId && (  // AddAttachmentsForm removed
-                <>
-                    <Separator className="my-6"/>
-                    <AddAttachmentsForm ticketId={ticketId} onAttachmentsAdded={refreshTicketData} />
-                </>
-            )} */}
 
             {canInteractWithTicket && ( 
                 <>
@@ -534,13 +525,6 @@ export default function TicketDetailPage() {
            </CardFooter>
         </Card>
       </div>
-
-      {canViewVersionHistory && ticketId && filesForVersionHistory.length > 0 && (
-         <>
-            <Separator className="my-8" />
-            <VersionHistoryCard ticketId={ticketId} files={filesForVersionHistory} />
-         </>
-      )}
       
       {canManageTicketCommits && ticketId && ticketData?.ticket && (
         <>
