@@ -50,6 +50,8 @@ const userFormSchema = z.object({
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
+const NO_COMPANY_SENTINEL = "__NO_COMPANY_SELECTED__";
+
 export default function UserManagementPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -106,7 +108,7 @@ export default function UserManagementPage() {
       username: values.username,
       name: values.name, 
       role: values.role,
-      company: values.company,
+      company: values.company === NO_COMPANY_SENTINEL ? undefined : values.company, // Handle sentinel
       phone: values.phone,
       position: values.position,
     };
@@ -139,7 +141,7 @@ export default function UserManagementPage() {
       username: userToEdit.username,
       name: userToEdit.name,
       role: userToEdit.role,
-      company: userToEdit.company || "",
+      company: userToEdit.company || "", // "" will map to NO_COMPANY_SENTINEL if no company
       phone: userToEdit.phone || "",
       position: userToEdit.position || "",
     });
@@ -153,7 +155,7 @@ export default function UserManagementPage() {
       username: "",
       name: "",
       role: undefined,
-      company: "",
+      company: "", // Default to empty string, which will map to NO_COMPANY_SENTINEL
       phone: "",
       position: "",
     });
@@ -265,10 +267,16 @@ export default function UserManagementPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Company / Organization</FormLabel>
-                         <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
+                         <Select 
+                            onValueChange={(selectedValue) => {
+                                field.onChange(selectedValue === NO_COMPANY_SENTINEL ? "" : selectedValue);
+                            }} 
+                            value={field.value === "" ? NO_COMPANY_SENTINEL : field.value || NO_COMPANY_SENTINEL} 
+                            disabled={isSubmitting}
+                          >
                             <FormControl><SelectTrigger><SelectValue placeholder="Select an organization" /></SelectTrigger></FormControl>
                             <SelectContent>
-                                <SelectItem value="">-- No Specific Organization --</SelectItem>
+                                <SelectItem value={NO_COMPANY_SENTINEL}>-- No Specific Organization --</SelectItem>
                                 {organizations.map(org => (
                                     <SelectItem key={org.id} value={org.name}>{org.name}</SelectItem>
                                 ))}
@@ -384,3 +392,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
