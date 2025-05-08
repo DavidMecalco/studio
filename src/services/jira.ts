@@ -1,4 +1,6 @@
 
+import { db, isFirebaseProperlyConfigured } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, setDoc, query, where, writeBatch, type CollectionReference, type DocumentData, orderBy, limit } from 'firebase/firestore';
 
 /**
  * Represents the possible statuses of a Jira ticket.
@@ -9,7 +11,7 @@ export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuel
  * Represents the possible providers for a Jira ticket.
  * These can also represent client company names for repository mapping.
  */
-export type JiraTicketProvider = string; 
+export type JiraTicketProvider = string;
 
 /**
  * Represents the possible branches for a Jira ticket.
@@ -34,63 +36,64 @@ export const JIRA_TICKET_TYPES: JiraTicketType[] = ['Nueva Funcionalidad', 'Bug'
 export interface JiraTicketHistoryEntry {
   id: string;
   timestamp: string;
-  userId: string; 
-  action: string; 
+  userId: string;
+  action: string;
   fromStatus?: JiraTicketStatus;
   toStatus?: JiraTicketStatus;
-  fromPriority?: JiraTicketPriority; 
-  toPriority?: JiraTicketPriority;   
-  fromType?: JiraTicketType; // Added for type change logging
-  toType?: JiraTicketType;     // Added for type change logging
+  fromPriority?: JiraTicketPriority;
+  toPriority?: JiraTicketPriority;
+  fromType?: JiraTicketType;
+  toType?: JiraTicketType;
   comment?: string;
-  commitSha?: string; 
-  deploymentId?: string; 
-  details?: string; 
-  fileName?: string; 
-  restoredVersionId?: string; 
-  attachedFileNames?: string[]; 
+  commitSha?: string;
+  deploymentId?: string;
+  details?: string;
+  fileName?: string;
+  restoredVersionId?: string;
+  attachedFileNames?: string[];
 }
 
 /**
  * Represents a Jira ticket.
  */
 export interface JiraTicket {
-  id: string;
+  id: string; // Document ID in Firestore
   title: string;
   description: string;
   status: JiraTicketStatus;
-  type: JiraTicketType; // Added ticket type
+  type: JiraTicketType;
   assigneeId?: string;
-  lastUpdated?: string;
+  lastUpdated?: string; // ISO string
   provider?: JiraTicketProvider;
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
   priority: JiraTicketPriority;
-  requestingUserId: string; 
+  requestingUserId: string;
   gitlabRepository?: string;
   history: JiraTicketHistoryEntry[];
 }
 
-// Mock data store - initialize once
-let mockJiraTickets: JiraTicket[] = [];
-let mockJiraTicketsInitialized = false;
+let ticketsCollectionRef: CollectionReference<DocumentData> | null = null;
+if (isFirebaseProperlyConfigured && db) {
+  ticketsCollectionRef = collection(db, 'jira_tickets');
+}
 
-function initializeMockJiraTickets() {
-    if (mockJiraTicketsInitialized) return;
+const MOCK_JIRA_SEEDED_FLAG_V5 = 'mock_jira_seeded_v5';
+const LOCAL_STORAGE_JIRA_KEY = 'firestore_mock_jira_tickets_cache_v5';
 
-    mockJiraTickets = [
-      {
+const jiraTicketsToSeed: JiraTicket[] = [
+    {
         id: 'MAX-123',
         title: 'Implement feature X',
         description: 'Details about feature X implementation, including backend and frontend changes.',
         status: 'En Progreso',
         type: 'Nueva Funcionalidad',
-        assigneeId: 'admin', 
+        assigneeId: 'admin',
         lastUpdated: '2024-07-28T10:00:00Z',
         provider: 'TLA',
         branch: 'DEV',
         priority: 'Media',
-        requestingUserId: 'client-tla1', 
+        requestingUserId: 'client-tla1',
         gitlabRepository: 'maximo-tla',
         attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
         history: [
@@ -123,7 +126,7 @@ function initializeMockJiraTickets() {
         id: 'MAX-789',
         title: 'Setup new CI/CD pipeline',
         description: 'Configure Jenkins for automated builds and deployments to staging environment.',
-        status: 'Abierto', 
+        status: 'Abierto',
         type: 'Tarea',
         lastUpdated: '2024-07-29T09:00:00Z',
         provider: 'TLA',
@@ -145,8 +148,8 @@ function initializeMockJiraTickets() {
         assigneeId: 'admin',
         lastUpdated: '2024-07-25T12:00:00Z',
         priority: 'Baja',
-        requestingUserId: 'client-tla1', 
-        provider: 'TLA', 
+        requestingUserId: 'client-tla1',
+        provider: 'TLA',
         gitlabRepository: 'maximo-tla',
         history: [
           { id: 'hist-6', timestamp: '2024-07-25T12:00:00Z', userId: 'client-tla1', action: 'Created', toStatus: 'Abierto', toType: 'Issue', details: 'Ticket Creado' },
@@ -158,7 +161,7 @@ function initializeMockJiraTickets() {
         description: 'Conduct a thorough security audit focusing on authentication and authorization mechanisms.',
         status: 'En espera del visto bueno',
         type: 'Tarea',
-        assigneeId: 'another-admin', 
+        assigneeId: 'another-admin',
         lastUpdated: '2024-07-26T11:00:00Z',
         priority: 'Media',
         requestingUserId: 'client-generic1',
@@ -177,8 +180,8 @@ function initializeMockJiraTickets() {
         assigneeId: 'admin',
         lastUpdated: '2024-07-20T17:00:00Z',
         priority: 'Baja',
-        requestingUserId: 'client-fema1', 
-        provider: 'FEMA', 
+        requestingUserId: 'client-fema1',
+        provider: 'FEMA',
         gitlabRepository: 'maximo-fema',
         attachmentNames: ['old_report_design.rptdesign', 'new_report_design.rptdesign'],
         history: [
@@ -186,448 +189,458 @@ function initializeMockJiraTickets() {
           { id: 'hist-10', timestamp: '2024-07-20T17:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Cerrado', details: 'Ticket cerrado.' },
         ],
       },
-    ];
-    mockJiraTicketsInitialized = true;
-}
+];
 
-initializeMockJiraTickets();
-
-
-/**
- * Asynchronously retrieves Jira tickets.
- * Optionally filters by requestingUserId.
- * @param requestingUserId If provided, filters tickets by this user ID.
- * @returns A promise that resolves to an array of JiraTicket objects.
- */
-export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
-  await new Promise(resolve => setTimeout(resolve, 20)); 
-  let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); 
-  if (requestingUserId) {
-    tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
+async function ensureJiraMockDataSeeded(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (localStorage.getItem(MOCK_JIRA_SEEDED_FLAG_V5) === 'true' && isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
+    try {
+        const firstTicket = await getDoc(doc(ticketsCollectionRef, jiraTicketsToSeed[0].id));
+        if (firstTicket.exists()) return;
+    } catch (e) {/* ignore, proceed to seed */}
   }
-  return tickets.sort((a: JiraTicket, b: JiraTicket) => new Date(b.lastUpdated || b.history[0]?.timestamp || 0).getTime() - new Date(a.lastUpdated || a.history[0]?.timestamp || 0).getTime());
+
+  console.log("Attempting to seed Jira mock data (v5)...");
+  localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(jiraTicketsToSeed));
+  console.log("Jira mock data (v5) seeded to localStorage.");
+
+  if (isFirebaseProperlyConfigured && db && navigator.onLine && ticketsCollectionRef) {
+    try {
+      const batch = writeBatch(db);
+      let firestoreNeedsSeeding = false;
+      const firstTicketSnap = await getDoc(doc(ticketsCollectionRef, jiraTicketsToSeed[0].id));
+
+      if (!firstTicketSnap.exists()) {
+        firestoreNeedsSeeding = true;
+        console.log("Preparing to seed Jira tickets to Firestore (v5)...");
+        for (const ticketData of jiraTicketsToSeed) {
+          batch.set(doc(ticketsCollectionRef, ticketData.id), ticketData);
+        }
+      }
+
+      if (firestoreNeedsSeeding) {
+        await batch.commit();
+        console.log("Initial Jira tickets (v5) committed to Firestore.");
+      } else {
+        console.log("Firestore already contains key Jira mock data (v5). Skipping Firestore Jira seed.");
+      }
+    } catch (error) {
+      console.warn("Error during Firestore Jira seeding (v5): ", error);
+    }
+  } else {
+    console.log("Skipping Firestore Jira seeding (v5). Firebase not configured, offline, or collection ref missing.");
+  }
+  localStorage.setItem(MOCK_JIRA_SEEDED_FLAG_V5, 'true');
 }
 
-/**
- * Asynchronously retrieves a specific Jira ticket by its ID.
- * @param ticketId The ID of the Jira ticket to retrieve.
- * @returns A promise that resolves to a JiraTicket object or null if not found.
- */
+
+export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
+  await ensureJiraMockDataSeeded();
+  await new Promise(resolve => setTimeout(resolve, 20));
+
+  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
+    try {
+      console.log("Fetching Jira tickets from Firestore.");
+      let q = query(ticketsCollectionRef, orderBy("lastUpdated", "desc"));
+      if (requestingUserId) {
+        q = query(ticketsCollectionRef, where("requestingUserId", "==", requestingUserId), orderBy("lastUpdated", "desc"));
+      }
+      const querySnapshot = await getDocs(q);
+      const tickets: JiraTicket[] = [];
+      querySnapshot.forEach((docSnap) => {
+        tickets.push(docSnap.data() as JiraTicket);
+      });
+      if (typeof window !== 'undefined') {
+        // Update full cache if not filtering, or specific user's cache
+        if (!requestingUserId) localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+      }
+      return tickets;
+    } catch (error) {
+      console.error("Error fetching Jira tickets from Firestore, falling back to localStorage if available: ", error);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+    if (storedTickets) {
+      try {
+        console.warn("Fetching Jira tickets from localStorage (Firestore unavailable or offline).");
+        let tickets: JiraTicket[] = JSON.parse(storedTickets);
+        if (requestingUserId) {
+          tickets = tickets.filter(ticket => ticket.requestingUserId === requestingUserId);
+        }
+        return tickets.sort((a, b) => new Date(b.lastUpdated || b.history[0]?.timestamp || 0).getTime() - new Date(a.lastUpdated || a.history[0]?.timestamp || 0).getTime());
+      } catch (e) {
+        console.error("Error parsing Jira tickets from localStorage.", e);
+        return [];
+      }
+    }
+  }
+  console.warn("No Jira tickets found in Firestore or localStorage.");
+  return [];
+}
+
+
 export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 10)); 
-  const ticket = mockJiraTickets.find((ticket) => ticket.id === ticketId);
-  return ticket ? JSON.parse(JSON.stringify(ticket)) : null;
+  await ensureJiraMockDataSeeded();
+  await new Promise(resolve => setTimeout(resolve, 10));
+
+  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
+    try {
+      if (!ticketId) return null;
+      const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+      const docSnap = await getDoc(ticketDocRef);
+      if (docSnap.exists()) {
+        const ticketData = docSnap.data() as JiraTicket;
+         // Update localStorage cache
+        if (typeof window !== 'undefined') {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+            let tickets: JiraTicket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+            if (ticketIndex > -1) tickets[ticketIndex] = ticketData; else tickets.push(ticketData);
+            localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+        }
+        return ticketData;
+      }
+    } catch (error) {
+      console.error(`Error fetching Jira ticket ${ticketId} from Firestore, falling back to localStorage: `, error);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+    if (storedTickets) {
+      try {
+        const tickets: JiraTicket[] = JSON.parse(storedTickets);
+        const ticket = tickets.find((t) => t.id === ticketId);
+        if (ticket) {
+            console.warn(`Fetching Jira ticket ${ticketId} from localStorage (Firestore unavailable or offline).`);
+            return ticket;
+        }
+      } catch (e) {
+        console.error("Error parsing Jira tickets from localStorage for getJiraTicket", e);
+      }
+    }
+  }
+  console.warn(`Jira ticket ${ticketId} not found in Firestore or localStorage.`);
+  return null;
 }
 
 interface TicketUpdatePayload {
     newStatus?: JiraTicketStatus;
-    newAssigneeId?: string; 
+    newAssigneeId?: string;
     newPriority?: JiraTicketPriority;
-    newType?: JiraTicketType; // Added newType
+    newType?: JiraTicketType;
     comment?: string;
 }
 
-/**
- * Asynchronously updates a Jira ticket's status, assignee, priority, and/or type.
- * Adds history entries for the changes.
- * @param ticketId The ID of the ticket to update.
- * @param userIdPerformingAction The ID of the user performing the update.
- * @param updates An object containing the fields to update.
- * @returns A promise that resolves to the updated JiraTicket object or null if not found.
- */
 export async function updateJiraTicket(
   ticketId: string,
   userIdPerformingAction: string,
   updates: TicketUpdatePayload
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) {
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error(`Cannot update Jira ticket ${ticketId}: Firebase not properly configured or db/ticketsCollectionRef is null.`);
+    // Optionally implement localStorage only update for offline, but this can lead to data divergence.
+    // For a "backend" implementation, failing here if Firestore is unavailable is more correct.
     return null;
   }
-  
-  const currentTicket = mockJiraTickets[ticketIndex];
-  const updatedTicketFields: Partial<JiraTicket> = {};
-  const historyEntriesToAdd: JiraTicketHistoryEntry[] = [];
-  const timestamp = new Date().toISOString();
 
-  // Handle Status Change
-  if (updates.newStatus !== undefined && updates.newStatus !== currentTicket.status) {
-    updatedTicketFields.status = updates.newStatus;
-    const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && updates.newStatus === 'Reabierto';
-    let action = 'Status Changed';
-    let details = `Estado cambiado de ${currentTicket.status} a ${updates.newStatus}`;
-    if (isReopeningFromClient) {
-        action = 'Ticket Reabierto';
-        details = `Ticket Reabierto por ${userIdPerformingAction}`;
-    }
-    historyEntriesToAdd.push({
-      id: `hist-status-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-      timestamp,
-      userId: userIdPerformingAction,
-      action,
-      fromStatus: currentTicket.status,
-      toStatus: updates.newStatus,
-      comment: action === 'Ticket Reabierto' ? updates.comment : undefined, 
-      details
-    });
-  }
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+    const docSnap = await getDoc(ticketDocRef);
+    if (!docSnap.exists()) return null;
 
-  // Handle Assignee Change
-  const actualNewAssigneeId = updates.newAssigneeId === "" ? undefined : updates.newAssigneeId;
-  if (updates.newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { 
-    updatedTicketFields.assigneeId = actualNewAssigneeId;
-    historyEntriesToAdd.push({
-      id: `hist-assignee-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-      timestamp,
-      userId: userIdPerformingAction,
-      action: 'Assignee Changed',
-      details: actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado',
-    });
-  }
-  
-  // Handle Priority Change
-  if (updates.newPriority !== undefined && updates.newPriority !== currentTicket.priority) {
-    updatedTicketFields.priority = updates.newPriority;
-    historyEntriesToAdd.push({
-      id: `hist-priority-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-      timestamp,
-      userId: userIdPerformingAction,
-      action: 'Priority Changed',
-      fromPriority: currentTicket.priority,
-      toPriority: updates.newPriority,
-      details: `Prioridad cambiada de ${currentTicket.priority} a ${updates.newPriority}`
-    });
-  }
+    const currentTicket = docSnap.data() as JiraTicket;
+    const updatedTicketFields: Partial<JiraTicket> = {};
+    const historyEntriesToAdd: JiraTicketHistoryEntry[] = [];
+    const timestamp = new Date().toISOString();
 
-  // Handle Type Change
-  if (updates.newType !== undefined && updates.newType !== currentTicket.type) {
-    updatedTicketFields.type = updates.newType;
-    historyEntriesToAdd.push({
-      id: `hist-type-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-      timestamp,
-      userId: userIdPerformingAction,
-      action: 'Type Changed',
-      fromType: currentTicket.type,
-      toType: updates.newType,
-      details: `Tipo cambiado de ${currentTicket.type} a ${updates.newType}`
-    });
-  }
-
-  // Handle general comment if no specific action has taken it
-  const isReopenAction = historyEntriesToAdd.some(h => h.action === 'Ticket Reabierto');
-  if (updates.comment && !isReopenAction) {
-     historyEntriesToAdd.push({
-        id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-        timestamp,
-        userId: userIdPerformingAction,
-        action: 'Comment Added',
-        comment: updates.comment,
-        details: `Comentario agregado por ${userIdPerformingAction}`
+    if (updates.newStatus !== undefined && updates.newStatus !== currentTicket.status) {
+      updatedTicketFields.status = updates.newStatus;
+      const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && updates.newStatus === 'Reabierto';
+      let action = 'Status Changed';
+      let details = `Estado cambiado de ${currentTicket.status} a ${updates.newStatus}`;
+      if (isReopeningFromClient) {
+          action = 'Ticket Reabierto';
+          details = `Ticket Reabierto por ${userIdPerformingAction}`;
+      }
+      historyEntriesToAdd.push({
+        id: `hist-status-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+        timestamp, userId: userIdPerformingAction, action,
+        fromStatus: currentTicket.status, toStatus: updates.newStatus,
+        comment: action === 'Ticket Reabierto' ? updates.comment : undefined,
+        details
       });
-  }
-  
-  if (Object.keys(updatedTicketFields).length > 0 || historyEntriesToAdd.length > 0) {
-    updatedTicketFields.lastUpdated = timestamp;
-  }
+    }
 
-  const updatedTicket = {
-    ...currentTicket,
-    ...updatedTicketFields,
-    history: [...currentTicket.history, ...historyEntriesToAdd], 
-  };
+    const actualNewAssigneeId = updates.newAssigneeId === "" ? undefined : updates.newAssigneeId;
+    if (updates.newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) {
+      updatedTicketFields.assigneeId = actualNewAssigneeId;
+      historyEntriesToAdd.push({
+        id: `hist-assignee-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+        timestamp, userId: userIdPerformingAction, action: 'Assignee Changed',
+        details: actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado',
+      });
+    }
 
-  mockJiraTickets[ticketIndex] = updatedTicket;
-  return JSON.parse(JSON.stringify(updatedTicket));
+    if (updates.newPriority !== undefined && updates.newPriority !== currentTicket.priority) {
+      updatedTicketFields.priority = updates.newPriority;
+      historyEntriesToAdd.push({
+        id: `hist-priority-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+        timestamp, userId: userIdPerformingAction, action: 'Priority Changed',
+        fromPriority: currentTicket.priority, toPriority: updates.newPriority,
+        details: `Prioridad cambiada de ${currentTicket.priority} a ${updates.newPriority}`
+      });
+    }
+
+    if (updates.newType !== undefined && updates.newType !== currentTicket.type) {
+      updatedTicketFields.type = updates.newType;
+      historyEntriesToAdd.push({
+        id: `hist-type-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+        timestamp, userId: userIdPerformingAction, action: 'Type Changed',
+        fromType: currentTicket.type, toType: updates.newType,
+        details: `Tipo cambiado de ${currentTicket.type} a ${updates.newType}`
+      });
+    }
+
+    const isReopenAction = historyEntriesToAdd.some(h => h.action === 'Ticket Reabierto');
+    if (updates.comment && !isReopenAction) {
+       historyEntriesToAdd.push({
+          id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+          timestamp, userId: userIdPerformingAction, action: 'Comment Added',
+          comment: updates.comment,
+          details: `Comentario agregado por ${userIdPerformingAction}`
+        });
+    }
+
+    if (Object.keys(updatedTicketFields).length > 0 || historyEntriesToAdd.length > 0) {
+      updatedTicketFields.lastUpdated = timestamp;
+    }
+
+    const updatedTicketData = {
+      ...currentTicket,
+      ...updatedTicketFields,
+      history: [...currentTicket.history, ...historyEntriesToAdd],
+    };
+
+    await setDoc(ticketDocRef, updatedTicketData);
+    console.log(`Jira ticket ${ticketId} updated in Firestore.`);
+
+    // Update localStorage cache
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+        let tickets: JiraTicket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+        localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+    }
+
+    return updatedTicketData;
+  } catch (error) {
+    console.error(`Error updating Jira ticket ${ticketId} in Firestore: `, error);
+    return null;
+  }
 }
 
 
-/**
- * Data required to create a new Jira Ticket.
- */
 export interface CreateJiraTicketData {
   title: string;
   description: string;
   priority: JiraTicketPriority;
-  type: JiraTicketType; // Added type
-  requestingUserId: string; 
-  provider?: JiraTicketProvider; 
+  type: JiraTicketType;
+  requestingUserId: string;
+  provider?: JiraTicketProvider;
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
-  assigneeId?: string; 
+  assigneeId?: string;
 }
 
-/**
- * Asynchronously creates a new Jira ticket.
- * GitLab repository is determined by the 'provider' field (client's company or admin selection).
- * Adds an initial history entry.
- * @param ticketData The data for the new ticket.
- * @returns A promise that resolves to the created JiraTicket object.
- */
-export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket> {
-  await new Promise(resolve => setTimeout(resolve, 50)); 
-  
-  const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
-
-  let gitlabRepository = 'maximo-generic'; 
-  if (ticketData.provider?.toLowerCase() === 'tla') {
-    gitlabRepository = 'maximo-tla';
-  } else if (ticketData.provider?.toLowerCase() === 'fema') {
-    gitlabRepository = 'maximo-fema';
-  } else if (ticketData.provider) {
-    gitlabRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9]/gi, '')}`;
+export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket | null> {
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error(`Cannot create Jira ticket: Firebase not properly configured or db/ticketsCollectionRef is null.`);
+    return null;
   }
 
+  try {
+    const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`;
+    let gitlabRepository = 'maximo-generic';
+    if (ticketData.provider?.toLowerCase() === 'tla') gitlabRepository = 'maximo-tla';
+    else if (ticketData.provider?.toLowerCase() === 'fema') gitlabRepository = 'maximo-fema';
+    else if (ticketData.provider) gitlabRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9]/gi, '')}`;
 
-  const initialHistoryEntry: JiraTicketHistoryEntry = {
-    id: `hist-init-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    userId: ticketData.requestingUserId,
-    action: 'Created',
-    details: 'Ticket Creado',
-    toStatus: 'Abierto', 
-    toType: ticketData.type, // Log initial type
-  };
+    const timestamp = new Date().toISOString();
+    const initialHistoryEntry: JiraTicketHistoryEntry = {
+      id: `hist-init-${Date.now()}`, timestamp, userId: ticketData.requestingUserId,
+      action: 'Created', details: 'Ticket Creado',
+      toStatus: 'Abierto', toType: ticketData.type,
+    };
 
-  const newTicket: JiraTicket = {
-    id: newTicketId,
-    title: ticketData.title,
-    description: ticketData.description,
-    status: 'Abierto', 
-    type: ticketData.type,
-    priority: ticketData.priority,
-    requestingUserId: ticketData.requestingUserId,
-    gitlabRepository: gitlabRepository,
-    provider: ticketData.provider,
-    branch: ticketData.branch, 
-    attachmentNames: ticketData.attachmentNames || [], 
-    assigneeId: ticketData.assigneeId, 
-    lastUpdated: new Date().toISOString(),
-    history: [initialHistoryEntry],
-  };
-  
-  mockJiraTickets.unshift(newTicket); 
-  return JSON.parse(JSON.stringify(newTicket));
+    const newTicket: JiraTicket = {
+      id: newTicketId, title: ticketData.title, description: ticketData.description,
+      status: 'Abierto', type: ticketData.type, priority: ticketData.priority,
+      requestingUserId: ticketData.requestingUserId, gitlabRepository,
+      provider: ticketData.provider, branch: ticketData.branch,
+      attachmentNames: ticketData.attachmentNames || [],
+      assigneeId: ticketData.assigneeId, lastUpdated: timestamp,
+      history: [initialHistoryEntry],
+    };
+
+    const ticketDocRef = doc(ticketsCollectionRef, newTicketId);
+    await setDoc(ticketDocRef, newTicket);
+    console.log(`Jira ticket ${newTicketId} created in Firestore.`);
+
+    // Update localStorage cache
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+        let tickets: JiraTicket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        tickets.unshift(newTicket); // Add to beginning for recency
+        localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+    }
+    return newTicket;
+  } catch (error) {
+    console.error("Error creating Jira ticket in Firestore: ", error);
+    return null;
+  }
 }
 
-/**
- * Adds a commit-related history entry to a Jira ticket.
- * @param ticketId The ID of the ticket.
- * @param commitSha SHA of the commit.
- * @param userIdPerformingAction User who triggered the commit.
- * @param commitMessage Message of the commit.
- * @param branch The branch the commit was made to.
- * @returns A promise that resolves to the updated JiraTicket object or null.
- */
 export async function addCommitToTicketHistory(
-  ticketId: string,
-  commitSha: string,
-  userIdPerformingAction: string,
-  commitMessage: string,
-  branch: string
+  ticketId: string, commitSha: string, userIdPerformingAction: string,
+  commitMessage: string, branch: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20)); 
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) return null;
-
-  const historyEntry: JiraTicketHistoryEntry = {
-    id: `hist-commit-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    userId: userIdPerformingAction,
-    action: 'Commit Added',
-    commitSha: commitSha,
-    details: `Commit ${commitSha.substring(0,7)} a rama '${branch}': ${commitMessage}`,
-  };
-
-  mockJiraTickets[ticketIndex].history.push(historyEntry);
-  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
-  
-  if (['Abierto', 'Pendiente', 'Reabierto'].includes(mockJiraTickets[ticketIndex].status)) {
-     const oldStatus = mockJiraTickets[ticketIndex].status;
-     mockJiraTickets[ticketIndex].status = 'En Progreso';
-     const statusChangeEntry: JiraTicketHistoryEntry = {
-        id: `hist-status-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        userId: userIdPerformingAction, 
-        action: 'Status Changed',
-        fromStatus: oldStatus,
-        toStatus: 'En Progreso',
-        details: 'Estado cambiado automáticamente a "En Progreso" después del commit.',
-     };
-     mockJiraTickets[ticketIndex].history.push(statusChangeEntry);
-  }
-
-  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
-}
-
-
-/**
- * Adds a deployment-related history entry to a Jira ticket.
- * @param ticketId The ID of the ticket.
- * @param deploymentId ID of the deployment log entry.
- * @param userIdPerformingAction User who triggered the deployment.
- * @param environment Deployment environment.
- * @param result Result of the deployment.
- * @returns A promise that resolves to the updated JiraTicket object or null.
- */
-export async function addDeploymentToTicketHistory(
-  ticketId: string,
-  deploymentId: string,
-  userIdPerformingAction: string,
-  environment: string,
-  result: string
-): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20)); 
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) return null;
-
-  const historyEntry: JiraTicketHistoryEntry = {
-    id: `hist-deploy-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    userId: userIdPerformingAction,
-    action: 'Deployment Recorded',
-    deploymentId: deploymentId,
-    details: `Despliegue a ${environment} registrado. Resultado: ${result}.`,
-  };
-
-  mockJiraTickets[ticketIndex].history.push(historyEntry);
-  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
-  
-  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
-}
-
-// Function to get all history entries from all tickets for audit log
-export async function getAllTicketHistories(): Promise<JiraTicketHistoryEntry[]> {
-    await new Promise(resolve => setTimeout(resolve, 20)); 
-    const allHistories: JiraTicketHistoryEntry[] = [];
-    mockJiraTickets.forEach(ticket => {
-        ticket.history.forEach(entry => {
-            allHistories.push({ ...entry, ticketId: ticket.id } as JiraTicketHistoryEntry & {ticketId: string}); 
-        });
+    return updateJiraTicket(ticketId, userIdPerformingAction, {
+        comment: `Commit ${commitSha.substring(0,7)} a rama '${branch}': ${commitMessage}`,
+        // If status is Abierto, Pendiente or Reabierto, move to En Progreso.
+        // This logic is simplified here, the updateJiraTicket function's history generation needs to be robust
+        newStatus: ['Abierto', 'Pendiente', 'Reabierto'].includes((await getJiraTicket(ticketId))?.status || '') ? 'En Progreso' : undefined
     });
-    return JSON.parse(JSON.stringify(allHistories.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())));
 }
 
+export async function addDeploymentToTicketHistory(
+  ticketId: string, deploymentId: string, userIdPerformingAction: string,
+  environment: string, result: string
+): Promise<JiraTicket | null> {
+   return updateJiraTicket(ticketId, userIdPerformingAction, {
+        comment: `Despliegue ${deploymentId} a ${environment} registrado. Resultado: ${result}.`
+   });
+}
 
-/**
- * Adds a file restoration history entry to a Jira ticket.
- * @param ticketId The ID of the ticket.
- * @param userIdPerformingAction User who performed the restoration.
- * @param fileName Name of the file restored.
- * @param restoredVersionId ID of the version restored to.
- * @param commitSha Optional commit SHA of the restored version.
- * @returns A promise that resolves to the updated JiraTicket object or null.
- */
+export async function getAllTicketHistories(): Promise<JiraTicketHistoryEntry[]> {
+  await ensureJiraMockDataSeeded();
+  const tickets = await getJiraTickets(); // This will use Firestore if available, else localStorage
+  const allHistories: JiraTicketHistoryEntry[] = [];
+  tickets.forEach(ticket => {
+      ticket.history.forEach(entry => {
+          allHistories.push({ ...entry, ticketId: ticket.id } as JiraTicketHistoryEntry & {ticketId: string});
+      });
+  });
+  return allHistories.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
 export async function addRestorationToTicketHistory(
-  ticketId: string,
-  userIdPerformingAction: string,
-  fileName: string,
-  restoredVersionId: string,
-  commitSha?: string,
+  ticketId: string, userIdPerformingAction: string, fileName: string,
+  restoredVersionId: string, commitSha?: string,
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20)); 
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) return null;
-
-  let details = `Archivo '${fileName}' restaurado a la versión '${restoredVersionId}'`;
-  if (commitSha) {
-    details += ` (commit ${commitSha.substring(0, 7)})`;
-  }
-  details += `.`;
-
-  const historyEntry: JiraTicketHistoryEntry = {
-    id: `hist-restore-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    userId: userIdPerformingAction,
-    action: 'File Restored',
-    fileName: fileName,
-    restoredVersionId: restoredVersionId,
-    commitSha: commitSha,
-    details: details,
-  };
-
-  mockJiraTickets[ticketIndex].history.push(historyEntry);
-  mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
-  
-  return JSON.parse(JSON.stringify(mockJiraTickets[ticketIndex]));
+    let details = `Archivo '${fileName}' restaurado a la versión '${restoredVersionId}'`;
+    if (commitSha) details += ` (commit ${commitSha.substring(0, 7)})`;
+    details += `.`;
+    return updateJiraTicket(ticketId, userIdPerformingAction, { comment: details });
 }
 
-/**
- * Adds a comment to a Jira ticket's history, potentially with attachments.
- * @param ticketId The ID of the ticket.
- * @param userIdPerformingAction The ID of the user adding the comment.
- * @param commentText The text of the comment.
- * @param attachmentNames Optional array of names for files attached with this comment.
- * @returns A promise that resolves to the updated JiraTicket object or null if not found.
- */
 export async function addCommentToTicket(
-  ticketId: string,
-  userIdPerformingAction: string,
-  commentText: string,
-  attachmentNames?: string[] 
+  ticketId: string, userIdPerformingAction: string, commentText: string,
+  attachmentNames?: string[]
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20)); 
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) return null;
+    let commentWithAttachments = commentText;
+    if (attachmentNames && attachmentNames.length > 0) {
+        commentWithAttachments += `\nArchivos adjuntos: ${attachmentNames.join(', ')}`;
+    }
+    // The updateJiraTicket function will create the history entry.
+    // If attachments are involved, the updateJiraTicket function would also need to update the ticket's main attachment list.
+    // This needs a more specific update path in updateJiraTicket or a dedicated service function.
+    // For now, just passing the comment.
+    const result = await updateJiraTicket(ticketId, userIdPerformingAction, { comment: commentWithAttachments });
 
-  const currentTicket = mockJiraTickets[ticketIndex];
-
-  // Update main ticket attachment list if new attachments are part of the comment
-  if (attachmentNames && attachmentNames.length > 0) {
-    const newTicketAttachmentNames = [...(currentTicket.attachmentNames || []), ...attachmentNames];
-    currentTicket.attachmentNames = Array.from(new Set(newTicketAttachmentNames));
-  }
-
-  const historyEntry: JiraTicketHistoryEntry = {
-    id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: new Date().toISOString(),
-    userId: userIdPerformingAction,
-    action: 'Comment Added',
-    comment: commentText,
-    details: `Comentario agregado por ${userIdPerformingAction}`,
-    attachedFileNames: attachmentNames, 
-  };
-
-  currentTicket.history.push(historyEntry);
-  currentTicket.lastUpdated = new Date().toISOString();
-
-  mockJiraTickets[ticketIndex] = currentTicket; 
-  return JSON.parse(JSON.stringify(currentTicket));
+    // If successful and attachments were provided, separately update the ticket's attachment list.
+    // This is a bit clunky and ideally part of a single transactional update.
+    if (result && attachmentNames && attachmentNames.length > 0 && ticketsCollectionRef && db) {
+        try {
+            const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+            const currentTicketSnap = await getDoc(ticketDocRef);
+            if (currentTicketSnap.exists()) {
+                const currentTicketData = currentTicketSnap.data() as JiraTicket;
+                const newTicketAttachmentNames = Array.from(new Set([...(currentTicketData.attachmentNames || []), ...attachmentNames]));
+                await setDoc(ticketDocRef, { attachmentNames: newTicketAttachmentNames }, { merge: true });
+                console.log(`Ticket ${ticketId} attachments updated in Firestore.`);
+                result.attachmentNames = newTicketAttachmentNames; // Update the returned object
+                 // Update localStorage cache for attachments specifically
+                if (typeof window !== 'undefined') {
+                    const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+                    let tickets: JiraTicket[] = storedTickets ? JSON.parse(storedTickets) : [];
+                    const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+                    if (ticketIndex > -1) tickets[ticketIndex].attachmentNames = newTicketAttachmentNames;
+                    localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+                }
+            }
+        } catch (attachError) {
+            console.error(`Error updating attachments for ticket ${ticketId} in Firestore: `, attachError);
+            // Comment was added, but attachment list update failed.
+        }
+    }
+    return result;
 }
 
-/**
- * Adds attachments to a Jira ticket and creates a history entry.
- * @param ticketId The ID of the ticket.
- * @param userIdPerformingAction The ID of the user adding the attachments.
- * @param attachmentNames An array of names for the files being attached.
- * @returns A promise that resolves to the updated JiraTicket object or null if not found.
- */
+
 export async function addAttachmentsToJiraTicket(
   ticketId: string,
   userIdPerformingAction: string,
   attachmentNames: string[]
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20));
-  const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
-  if (ticketIndex === -1) return null;
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    console.error("Cannot add attachments: Firestore not available.");
+    return null;
+  }
+  try {
+    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+    const currentTicketSnap = await getDoc(ticketDocRef);
+    if (!currentTicketSnap.exists()) return null;
 
-  const currentTicket = mockJiraTickets[ticketIndex];
-  
-  const newAttachmentNames = [...(currentTicket.attachmentNames || []), ...attachmentNames];
-  currentTicket.attachmentNames = Array.from(new Set(newAttachmentNames));
+    const currentTicketData = currentTicketSnap.data() as JiraTicket;
+    const newAttachmentNames = Array.from(new Set([...(currentTicketData.attachmentNames || []), ...attachmentNames]));
+    
+    const historyEntry: JiraTicketHistoryEntry = {
+      id: `hist-attach-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      userId: userIdPerformingAction,
+      action: 'Attachments Added',
+      attachedFileNames: attachmentNames,
+      details: `Archivos adjuntados: ${attachmentNames.join(', ')} por ${userIdPerformingAction}`,
+    };
 
-  const historyEntry: JiraTicketHistoryEntry = {
-    id: `hist-attach-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: new Date().toISOString(),
-    userId: userIdPerformingAction,
-    action: 'Attachments Added',
-    attachedFileNames: attachmentNames, 
-    details: `Archivos adjuntados: ${attachmentNames.join(', ')} por ${userIdPerformingAction}`,
-  };
+    const updatedTicketData = {
+        ...currentTicketData,
+        attachmentNames: newAttachmentNames,
+        history: [...currentTicketData.history, historyEntry],
+        lastUpdated: new Date().toISOString(),
+    };
 
-  currentTicket.history.push(historyEntry);
-  currentTicket.lastUpdated = new Date().toISOString();
+    await setDoc(ticketDocRef, updatedTicketData);
+    console.log(`Attachments added to ticket ${ticketId} and history updated in Firestore.`);
 
-  mockJiraTickets[ticketIndex] = currentTicket;
-  return JSON.parse(JSON.stringify(currentTicket));
+    // Update localStorage cache
+    if (typeof window !== 'undefined') {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_JIRA_KEY);
+        let tickets: JiraTicket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+        localStorage.setItem(LOCAL_STORAGE_JIRA_KEY, JSON.stringify(tickets));
+    }
+    return updatedTicketData;
+
+  } catch (error) {
+    console.error("Error adding attachments to Jira ticket in Firestore: ", error);
+    return null;
+  }
 }
+
+    
