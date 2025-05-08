@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { JiraTicket, JiraTicketStatus } from '@/services/jira';
 import type { User as AuthUser } from '@/context/auth-context'; // Renamed to avoid conflict with service User
-import type { User as ServiceUser } from '@/services/users'; // Keep this for the list of assignable users
+import type { UserDoc as ServiceUser } from '@/services/users'; // Keep this for the list of assignable users
 import { updateJiraTicketAction } from '@/app/actions/jira-actions';
 import { Briefcase, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -104,8 +104,10 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
     const result = await updateJiraTicketAction(
       values.ticketId,
       currentUser.id, // Pass the ID of the user performing the action
-      values.newStatus,
-      actualAssigneeId 
+      {
+        newStatus: values.newStatus,
+        newAssigneeId: actualAssigneeId
+      }
     );
 
     if (result.success && result.ticket) {
@@ -145,93 +147,7 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
         <CardDescription>Asignar tickets, y cambiar su estado.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="ticketId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Seleccionar Ticket</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Elija un ticket..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {tickets.map(ticket => (
-                        <SelectItem key={ticket.id} value={ticket.id}>
-                          {ticket.id} - {ticket.title} ({ticket.status})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {selectedTicketId && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="assigneeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Asignar Usuario (opcional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un usuario o deje vacío..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={UNASSIGNED_VALUE}>-- Sin Asignar --</SelectItem>
-                          {users.map(userServiceUser => ( // Iterate over ServiceUser[]
-                            <SelectItem key={userServiceUser.id} value={userServiceUser.id}>
-                              {userServiceUser.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="newStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nuevo Estado</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un nuevo estado..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {ticketStatusOptions.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={form.formState.isSubmitting || !selectedTicketId}>
-                  {form.formState.isSubmitting ? "Actualizando..." : "Actualizar Ticket"}
-                   <RotateCcw className="ml-2 h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </form>
-        </Form>
+        {/* Content removed as per user request */}
       </CardContent>
     </Card>
   );
