@@ -1,10 +1,11 @@
+
 "use server";
 
 import type { Ticket, TicketStatus, TicketProvider, TicketBranch, CreateTicketData, TicketPriority, TicketType } from "@/services/tickets";
-import { updateTicket as updateTicketServiceCall, createTicket as createTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/tickets"; 
+import { updateTicket as updateTicketServiceCall, createTicket as createTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/tickets";
 import { revalidatePath } from "next/cache";
-import { getUserById } from "@/services/users"; 
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
+import { getUserById } from "@/services/users";
+import { isFirebaseProperlyConfigured } from "@/lib/firebase";
 
 interface UpdateTicketResult {
   success: boolean;
@@ -24,7 +25,7 @@ export async function updateTicketAction(
   userIdPerformingAction: string,
   updates: {
     newStatus?: TicketStatus;
-    newAssigneeId?: string; 
+    newAssigneeId?: string;
     newPriority?: TicketPriority;
     newType?: TicketType;
     comment?: string;
@@ -46,12 +47,17 @@ export async function updateTicketAction(
     return { success: false, error: "At least one update (status, assignee, priority, type, or comment) must be provided." };
   }
 
+  if (!isFirebaseProperlyConfigured) {
+    console.warn(`[ACTION updateTicketAction] Firebase is not configured. This action cannot persist data on the server side without Firebase for ticket ${ticketId}.`);
+    return { success: false, error: "El servicio de base de datos no está disponible. No se pudo actualizar el ticket en el servidor." };
+  }
+
   try {
     const updatedTicket = await updateTicketServiceCall(ticketId, userIdPerformingAction, updates);
     if (updatedTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); 
-      revalidatePath("/(app)/tickets", "page"); 
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page");
+      revalidatePath("/(app)/tickets", "page");
       revalidatePath("/(app)/my-tickets", "page");
 
       if (isFirebaseProperlyConfigured) {
@@ -63,8 +69,8 @@ export async function updateTicketAction(
         if (performingUser?.email) notificationRecipients.add(performingUser.email);
         if (requester?.email) notificationRecipients.add(requester.email);
         if (assignee?.email) notificationRecipients.add(assignee.email);
-        
-        const superUser = await getUserById('superuser'); 
+
+        const superUser = await getUserById('superuser');
         if(superUser?.email) notificationRecipients.add(superUser.email);
 
 
@@ -79,15 +85,15 @@ export async function updateTicketAction(
         if (updates.newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${updates.newAssigneeId || 'Unassigned'}.`;
         if (updates.newPriority) notificationMessage += ` Priority changed to ${updates.newPriority}.`;
         if (updates.newType) notificationMessage += ` Type changed to ${updates.newType}.`;
-        if (updates.comment && updates.newStatus !== 'Reabierto') notificationMessage += ` Comment: "${updates.comment}".`; 
-        
+        if (updates.comment && updates.newStatus !== 'Reabierto') notificationMessage += ` Comment: "${updates.comment}".`;
+
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
       } else {
         console.log("Skipped Ticket update email notification as Firebase is not properly configured.");
       }
-      
+
       return { success: true, ticket: updatedTicket };
     } else {
       return { success: false, error: "Failed to update ticket. Ticket not found or an error occurred with the data service." };
@@ -110,10 +116,10 @@ export interface CreateTicketActionFormValues {
   description: string;
   priority: TicketPriority;
   type: TicketType;
-  requestingUserId: string; 
-  requestingUserEmail?: string; 
-  provider?: TicketProvider; 
-  branch?: TicketBranch; 
+  requestingUserId: string;
+  requestingUserEmail?: string;
+  provider?: TicketProvider;
+  branch?: TicketBranch;
   attachmentNames?: string[];
 }
 
@@ -129,7 +135,14 @@ export async function createTicketAction(
   if (!data.title || !data.description || !data.priority || !data.type || !data.requestingUserId) {
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
-  const requestingUser = await getUserById(data.requestingUserId); 
+
+  // For server actions, if Firebase is not configured, we cannot rely on localStorage fallback.
+  if (!isFirebaseProperlyConfigured) {
+    console.warn("[ACTION createTicketAction] Firebase is not configured. This action cannot persist data on the server side without Firebase.");
+    return { success: false, error: "El servicio de base de datos no está configurado en el servidor. No se pudo crear el ticket." };
+  }
+
+  const requestingUser = await getUserById(data.requestingUserId);
   if (requestingUser?.role === 'client' && !data.branch) {
     return { success: false, error: "El ambiente/branch es obligatorio para los clientes." };
   }
@@ -142,24 +155,28 @@ export async function createTicketAction(
       priority: data.priority,
       type: data.type,
       requestingUserId: data.requestingUserId,
-      provider: data.provider, 
-      branch: data.branch, 
+      provider: data.provider,
+      branch: data.branch,
       attachmentNames: data.attachmentNames || [],
     };
 
-    const newTicket = await createTicketService(createData);
+    const newTicket = await createTicketService(createData); // createTicketService handles Firebase vs LocalStorage for its own context
+    
     if (newTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath("/(app)/tickets", "page"); 
-      revalidatePath("/(app)/my-tickets", "page"); 
+      revalidatePath("/(app)/tickets", "page");
+      revalidatePath("/(app)/my-tickets", "page");
 
-      if (isFirebaseProperlyConfigured) {
+      // Email simulation logic remains, assuming Firebase (or an alternative for notifications) might be configured even if primary DB persistence is mocked for some services.
+      // The isFirebaseProperlyConfigured check here is more about whether the primary DB connection is expected.
+      // If notifications were a separate service, this check might differ.
+      if (isFirebaseProperlyConfigured) { // Kept for notification logic consistency
         const notificationRecipients = new Set<string>();
         if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
-        
-        const superUser = await getUserById('superuser'); 
+
+        const superUser = await getUserById('superuser');
         if (superUser?.email) notificationRecipients.add(superUser.email);
-        
+
         let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Type: ${newTicket.type}. Priority: ${newTicket.priority}.`;
         if (newTicket.branch) {
           notificationMessage += ` Environment/Branch: ${newTicket.branch}.`;
@@ -169,21 +186,20 @@ export async function createTicketAction(
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
       } else {
-        console.log("Skipped Ticket creation email notification as Firebase is not properly configured.");
+        console.log("Skipped Ticket creation email notification as Firebase (for user lookup/notifications) is not properly configured.");
       }
 
 
       return { success: true, ticket: newTicket };
     } else {
-      // If newTicket is null, it implies an issue with local creation (e.g., localStorage error or mock server issue)
-      // when Firebase isn't configured.
-      const errorMsg = !isFirebaseProperlyConfigured 
-                       ? "No se pudo crear el ticket localmente. Verifique la consola para errores de almacenamiento." 
-                       : "No se pudo crear el ticket. Error del servicio de datos o almacenamiento.";
-      return { success: false, error: errorMsg };
+      // This block is reached if createTicketService returns null.
+      // If isFirebaseProperlyConfigured was true, it means an actual error occurred during Firestore operation in createTicketService.
+      // If isFirebaseProperlyConfigured was false, this specific action already returned an error above.
+      // So, this 'else' implies an error from createTicketService even when Firebase was expected to work.
+      return { success: false, error: "No se pudo crear el ticket. Error del servicio de datos." };
     }
   } catch (error) {
-    console.error("Error creating Ticket:", error);
+    console.error("Error creating Ticket in Action:", error);
     const errorMessage = error instanceof Error ? error.message : "Un error desconocido del servidor ocurrió durante la creación del ticket.";
     return { success: false, error: errorMessage };
   }
@@ -192,7 +208,7 @@ export async function createTicketAction(
 
 interface AddCommentResult {
   success: boolean;
-  ticket?: Ticket; 
+  ticket?: Ticket;
   error?: string;
 }
 
@@ -208,16 +224,21 @@ export async function addCommentToTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
   commentText: string,
-  attachmentNames?: string[] 
+  attachmentNames?: string[]
 ): Promise<AddCommentResult> {
   if (!ticketId || !userIdPerformingAction || !commentText) {
     return { success: false, error: "Ticket ID, user ID, and comment text are required." };
   }
 
+  if (!isFirebaseProperlyConfigured) {
+    console.warn(`[ACTION addCommentToTicketAction] Firebase is not configured. This action cannot persist data on the server side for ticket ${ticketId}.`);
+    return { success: false, error: "El servicio de base de datos no está disponible. No se pudo agregar el comentario en el servidor." };
+  }
+
   try {
     const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText, attachmentNames);
     if (updatedTicket) {
-      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); 
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page");
 
       if (isFirebaseProperlyConfigured) {
         const performingUser = await getUserById(userIdPerformingAction);
@@ -225,12 +246,12 @@ export async function addCommentToTicketAction(
         const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
 
         const notificationRecipients = new Set<string>();
-        if (performingUser?.email && performingUser.email !== requester?.email) notificationRecipients.add(performingUser.email); 
+        if (performingUser?.email && performingUser.email !== requester?.email) notificationRecipients.add(performingUser.email);
         if (requester?.email) notificationRecipients.add(requester.email);
         if (assignee?.email && assignee.email !== performingUser?.email) notificationRecipients.add(assignee.email);
         const superUser = await getUserById('superuser');
         if(superUser?.email) notificationRecipients.add(superUser.email);
-        
+
         let notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
         if (attachmentNames && attachmentNames.length > 0) {
             notificationMessage += ` Attachments: ${attachmentNames.join(', ')}.`;
@@ -254,4 +275,4 @@ export async function addCommentToTicketAction(
   }
 }
 
-
+    
