@@ -1,4 +1,5 @@
 
+
 "use client"; 
 
 import { useEffect, useState, type ChangeEvent }  from 'react';
@@ -8,7 +9,7 @@ import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon, FileText } from 'lucide-react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -531,4 +532,5 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+
 
