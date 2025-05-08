@@ -140,11 +140,10 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
 
   return (
     <Card className="shadow-lg rounded-xl">
-      <CardContent>
-        {/* Content removed as per user request */}
-      </CardContent>
+      {/* CardContent and CardHeader removed as per user request */}
     </Card>
   );
 }
+
 
 
