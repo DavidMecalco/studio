@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ListChecks, AlertTriangle, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
@@ -36,7 +36,7 @@ export default function MyTicketsPage() {
       }
       setIsPageLoading(true);
       try {
-          const userTickets = await getTickets(user.id); // Use local getTickets, passing user.id
+          const userTickets = await getTickets(user.id); 
           setTickets(userTickets);
       } catch (error) {
           console.error("Failed to fetch tickets:", error);
@@ -136,6 +136,7 @@ export default function MyTicketsPage() {
                 Create New Ticket
               </Button>
             }
+            onTicketCreated={fetchUserTickets} // Refresh ticket list on creation
           />
         )}
       </div>
@@ -152,7 +153,7 @@ export default function MyTicketsPage() {
             tickets={filteredTickets} 
             title="" 
             showRequestingUser={false} 
-            onTicketActionSuccess={fetchUserTickets} // Pass the fetchUserTickets to refresh list on action
+            onTicketActionSuccess={fetchUserTickets} 
             isClientView={true} 
           />
         </CardContent>
@@ -160,3 +161,4 @@ export default function MyTicketsPage() {
     </div>
   );
 }
+

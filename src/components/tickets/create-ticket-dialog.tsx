@@ -33,16 +33,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createTicketAction } from "@/app/actions/ticket-actions"; // Updated import
-import type { TicketBranch, TicketPriority, TicketProvider, TicketType } from "@/services/tickets"; // Updated import
-import { TICKET_TYPES } from "@/services/tickets"; // Updated import
-import { Plus, FileUp, Loader2 } from 'lucide-react';
+import { createTicketAction } from "@/app/actions/ticket-actions"; 
+import type { TicketBranch, TicketPriority, TicketProvider, TicketType } from "@/services/tickets"; 
+import { TICKET_TYPES } from "@/services/tickets"; 
+import { Plus, FileUp, Loader2, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { getOrganizations, type Organization } from '@/services/users';
 
 
-const ticketBranches: TicketBranch[] = ['DEV', 'QA', 'PROD']; // Updated type
-const ticketPriorities: TicketPriority[] = ['Alta', 'Media', 'Baja']; // Updated type
+const ticketBranches: TicketBranch[] = ['DEV', 'QA', 'PROD']; 
+const ticketPriorities: TicketPriority[] = ['Alta', 'Media', 'Baja']; 
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
 const ALLOWED_MIME_TYPES = [
@@ -61,7 +61,7 @@ const createTicketFormSchemaBase = z.object({
   priority: z.enum(ticketPriorities, {
     required_error: "Seleccione una prioridad.",
   }),
-  type: z.enum(TICKET_TYPES as [TicketType, ...TicketType[]]), // Updated type
+  type: z.enum(TICKET_TYPES as [TicketType, ...TicketType[]]), 
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
   requestingUserEmail: z.string().email().optional(), 
 });
@@ -84,11 +84,12 @@ export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & 
 
 interface CreateTicketDialogProps {
     triggerButton?: ReactNode; 
+    onTicketCreated?: () => void; // Callback to refresh list
 }
 
 const NONE_VALUE_SENTINEL = "__NONE_SENTINEL__";
 
-export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
+export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTicketDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -175,14 +176,14 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
 
     const attachmentNames = selectedFiles.map(file => file.name);
     
-    let providerForAction: TicketProvider | undefined = undefined; // Updated type
+    let providerForAction: TicketProvider | undefined = undefined; 
     if (isClient) {
         providerForAction = user.company; 
     } else if (isAdminOrSuperUser) {
         providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider; 
     }
 
-    let branchForAction: TicketBranch | undefined = undefined; // Updated type
+    let branchForAction: TicketBranch | undefined = undefined; 
     if (isAdminOrSuperUser) {
         branchForAction = values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch;
     } else if (isClient) {
@@ -202,7 +203,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       attachmentNames: attachmentNames,
     };
 
-    const result = await createTicketAction(ticketDataForAction); // Use createTicketAction
+    const result = await createTicketAction(ticketDataForAction); 
 
     if (result.success && result.ticket) {
       toast({
@@ -212,6 +213,9 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       form.reset();
       setSelectedFiles([]);
       setIsOpen(false);
+      if (onTicketCreated) { // Call the callback
+        onTicketCreated();
+      }
     } else {
       toast({
         title: "Error al Crear Ticket",
@@ -240,11 +244,11 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
             <DialogTrigger asChild>
                 {triggerButton}
             </DialogTrigger>
-        ) : isAdminOrSuperUser ? ( 
+        ) : ( 
             <DialogTrigger asChild>
                 {defaultFabTrigger}
             </DialogTrigger>
-        ) : null 
+        ) 
         }
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
@@ -348,7 +352,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {TICKET_TYPES.map(type => ( // Use TICKET_TYPES from local service
+                        {TICKET_TYPES.map(type => ( 
                           <SelectItem key={type} value={type}>
                             {type}
                           </SelectItem>
