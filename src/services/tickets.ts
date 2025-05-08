@@ -166,9 +166,13 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
 
   if (!isSeededInLocalStorage) {
     console.log(`[${SERVICE_NAME}] Attempting to seed Tickets mock data (v6) to localStorage...`);
-    localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(ticketsToSeed));
-    localStorage.setItem(MOCK_TICKETS_SEEDED_FLAG_V6, 'true');
-    console.log(`[${SERVICE_NAME}] Tickets mock data (v6) seeded to localStorage. Seeding flag set.`);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(ticketsToSeed));
+      localStorage.setItem(MOCK_TICKETS_SEEDED_FLAG_V6, 'true');
+      console.log(`[${SERVICE_NAME}] Tickets mock data (v6) seeded to localStorage. Seeding flag set.`);
+    } catch (e) {
+      console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed Tickets mock data to localStorage. Local fallback may not work. Error:`, e);
+    }
   }
   
 
@@ -218,11 +222,15 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
         tickets.push(docSnap.data() as Ticket);
       });
       if (typeof window !== 'undefined') { 
-        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(
-            requestingUserId ? 
-            (JSON.parse(localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY) || '[]') as Ticket[]).filter(t => t.requestingUserId !== requestingUserId).concat(tickets)
-            : tickets
-        ));
+        try {
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(
+                requestingUserId ? 
+                (JSON.parse(localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY) || '[]') as Ticket[]).filter(t => t.requestingUserId !== requestingUserId).concat(tickets)
+                : tickets
+            ));
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for tickets after Firestore fetch. Error:`, e);
+        }
       }
       return tickets;
     } catch (error) {
@@ -263,11 +271,15 @@ export async function getTicketById(ticketId: string): Promise<Ticket | null> {
       if (docSnap.exists()) {
         const ticketData = docSnap.data() as Ticket;
         if (typeof window !== 'undefined') { 
-            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-            if (ticketIndex > -1) tickets[ticketIndex] = ticketData; else tickets.push(ticketData);
-            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            try {
+                const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+                let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+                const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+                if (ticketIndex > -1) tickets[ticketIndex] = ticketData; else tickets.push(ticketData);
+                localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            } catch (e) {
+                console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for ticket ${ticketId} after Firestore fetch. Error:`, e);
+            }
         }
         return ticketData;
       }
@@ -420,12 +432,16 @@ export async function updateTicket(
     console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in Firestore.`);
     
     if (typeof window !== 'undefined') {
-        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-        console.log(`[${SERVICE_NAME}] (updateTicket): Local ticket cache updated after Firestore update.`);
+        try {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            console.log(`[${SERVICE_NAME}] (updateTicket): Local ticket cache updated after Firestore update.`);
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] (updateTicket): Failed to update localStorage cache for ticket ${ticketId} after Firestore update. Error:`, e);
+        }
     }
     return updatedTicketData;
   } catch (error) {
@@ -448,26 +464,18 @@ export interface CreateTicketData {
 }
 
 export async function createTicket(ticketData: CreateTicketData): Promise<Ticket | null> {
-  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
-    console.error(
-      `[${SERVICE_NAME}] (createTicket): Cannot create ticket. `+
-      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
-      `Firebase not properly configured, or db/collection instance is null.`
-    );
-    return null;
-  }
-  
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`;
   let githubRepository: string | undefined;
   
-  const organizations = await getOrganizations(); 
+  // Determine githubRepository based on provider
   if (ticketData.provider) {
-    const organization = organizations.find(org => org.name === ticketData.provider);
-    if (organization && organization.githubRepository) {
-      githubRepository = organization.githubRepository;
-    } else {
-      githubRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9-]/gi, '')}`;
-    }
+      const organizations = await getOrganizations(); // This might use localStorage if Firebase is down
+      const organization = organizations.find(org => org.name === ticketData.provider);
+      if (organization?.githubRepository) {
+          githubRepository = organization.githubRepository;
+      } else {
+          githubRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9-]/gi, '')}`;
+      }
   }
 
   const timestamp = new Date().toISOString();
@@ -488,17 +496,42 @@ export async function createTicket(ticketData: CreateTicketData): Promise<Ticket
     history: [initialHistoryEntry],
   };
 
+  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
+    if (typeof window !== 'undefined') {
+      console.warn(`[${SERVICE_NAME}] (createTicket): Attempting to save ticket locally due to Firebase issue.`);
+      try {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        tickets.unshift(newTicket);
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        console.log(`[${SERVICE_NAME}] (createTicket): Ticket ${newTicketId} saved to localStorage successfully.`);
+      } catch (localError) {
+        console.error(`[${SERVICE_NAME}] (createTicket): CRITICAL - Error saving ticket to localStorage. The ticket is created in memory for this session but will not persist locally across sessions if Firebase remains unavailable. Error: `, localError);
+      }
+      return newTicket; // Return ticket even if localStorage fails, for in-session use
+    }
+    // If not client-side and Firebase isn't configured
+    console.error(
+      `[${SERVICE_NAME}] (createTicket): Cannot create ticket. Firebase not properly configured, or db/collection instance is null, and not in a client environment for localStorage fallback.`
+    );
+    return null;
+  }
+  
   try {
     const ticketDocRef = doc(ticketsCollectionRef, newTicketId);
     await setDoc(ticketDocRef, newTicket);
     console.log(`[${SERVICE_NAME}] (createTicket): Ticket ${newTicketId} created in Firestore.`);
 
     if (typeof window !== 'undefined') {
-        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-        tickets.unshift(newTicket);
-        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-        console.log(`[${SERVICE_NAME}] (createTicket): Local ticket cache updated after Firestore create.`);
+        try {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            tickets.unshift(newTicket);
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            console.log(`[${SERVICE_NAME}] (createTicket): Local ticket cache updated after Firestore create.`);
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] (createTicket): Failed to update localStorage cache after Firestore create. Error:`, e);
+        }
     }
     return newTicket;
   } catch (error) {
@@ -592,11 +625,15 @@ export async function addRestorationToTicketHistory(
         await setDoc(doc(ticketsCollectionRef, ticketId), updatedTicketData);
         console.log(`[${SERVICE_NAME}] (addRestorationToTicketHistory): File restoration history added to ticket ${ticketId} in Firestore.`);
         if (typeof window !== 'undefined') {
-            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            try {
+                const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+                let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+                const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+                if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+                localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            } catch (e) {
+                console.warn(`[${SERVICE_NAME}] (addRestorationToTicketHistory): Failed to update localStorage cache for ticket ${ticketId}. Error:`, e);
+            }
         }
         return updatedTicketData;
     } catch (error) {
@@ -652,11 +689,15 @@ export async function addCommentToTicket(
         await setDoc(ticketDocRef, updatedTicketData); 
         console.log(`[${SERVICE_NAME}] (addCommentToTicket): Comment added to ticket ${ticketId} and history updated in Firestore.`);
         if (typeof window !== 'undefined') {
-            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            try {
+                const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+                let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+                const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+                if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+                localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+            } catch (e) {
+                console.warn(`[${SERVICE_NAME}] (addCommentToTicket): Failed to update localStorage cache for ticket ${ticketId}. Error:`, e);
+            }
         }
         return updatedTicketData;
     } catch (error) {
@@ -709,11 +750,15 @@ export async function addAttachmentsToTicket(
     await setDoc(ticketDocRef, updatedTicketData);
     console.log(`[${SERVICE_NAME}] (addAttachmentsToTicket): Attachments added to ticket ${ticketId} and history updated in Firestore.`);
     if (typeof window !== 'undefined') {
-        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-        if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        try {
+            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
+            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] (addAttachmentsToTicket): Failed to update localStorage cache for ticket ${ticketId}. Error:`, e);
+        }
     }
     return updatedTicketData;
   } catch (error) {
@@ -721,3 +766,4 @@ export async function addAttachmentsToTicket(
      return null;
   }
 }
+

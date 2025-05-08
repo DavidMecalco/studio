@@ -110,10 +110,14 @@ export async function ensureMockDataSeeded(): Promise<void> {
   
   if (!isSeededInLocalStorage) {
     console.log(`[${SERVICE_NAME}] Attempting to seed initial mock data (v5) to localStorage...`);
-    localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
-    localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
-    localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V5, 'true');
-    console.log(`[${SERVICE_NAME}] Mock data (v5) seeded to localStorage. Seeding flag set.`);
+    try {
+        localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
+        localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
+        localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V5, 'true');
+        console.log(`[${SERVICE_NAME}] Mock data (v5) seeded to localStorage. Seeding flag set.`);
+    } catch (e) {
+        console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed initial mock data (v5) to localStorage. Local fallback may not work. Error:`, e);
+    }
   }
 
 
@@ -181,7 +185,11 @@ export async function getUsers(): Promise<UserDoc[]> {
         users.push({ id: docSnap.id, ...docSnap.data() } as UserDoc);
       });
       if (typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users)); 
+        try {
+            localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users)); 
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for users after Firestore fetch. Error:`, e);
+        }
       }
       return users;
     } catch (error) {
@@ -218,11 +226,15 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
       if (docSnap.exists()) {
         const userData = { id: docSnap.id, ...docSnap.data() } as UserDoc;
         if (typeof window !== 'undefined') { 
-            const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-            let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-            const userIndex = users.findIndex(u => u.id === userId);
-            if (userIndex > -1) users[userIndex] = userData; else users.push(userData);
-            localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+            try {
+                const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
+                let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
+                const userIndex = users.findIndex(u => u.id === userId);
+                if (userIndex > -1) users[userIndex] = userData; else users.push(userData);
+                localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+            } catch (e) {
+                console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for user ${userId} after Firestore fetch. Error:`, e);
+            }
         }
         return userData;
       }
@@ -261,10 +273,24 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
   }
   
   if (!isFirebaseProperlyConfigured || !db || !usersCollectionRef) {
+    if (typeof window !== 'undefined') {
+      console.warn(`[${SERVICE_NAME}] (createUserInFirestoreService): Attempting to save user ${userData.username} locally due to Firebase issue.`);
+      try {
+        const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
+        let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
+        const userIndex = users.findIndex(u => u.id === userData.id);
+        const userToCache: UserDoc = { ...userData, password: userData.password! }; 
+        if (userIndex > -1) users[userIndex] = userToCache; else users.push(userToCache);
+        localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+        console.log(`[${SERVICE_NAME}] (createUserInFirestoreService): User ${userData.username} saved to localStorage successfully.`);
+      } catch (localError) {
+        console.error(`[${SERVICE_NAME}] (createUserInFirestoreService): CRITICAL - Error saving user ${userData.username} to localStorage. The user is created in memory for this session but will not persist locally across sessions if Firebase remains unavailable. Error: `, localError);
+      }
+      return true; // Return true as the user object is in memory, even if localStorage fails
+    }
+    // If not client-side and Firebase isn't configured
     console.error(
-      `[${SERVICE_NAME}] (createUserInFirestoreService): Cannot create/update user ${userData.username}. ` +
-      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, usersCollectionRef: ${!!usersCollectionRef}. ` +
-      `Firebase not properly configured, or db/collection instance is null.`
+      `[${SERVICE_NAME}] (createUserInFirestoreService): Cannot create/update user ${userData.username}. Firebase not properly configured, or db/collection instance is null, and not in a client environment for localStorage fallback.`
     );
     return false;
   }
@@ -276,13 +302,17 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
     console.log(`[${SERVICE_NAME}] (createUserInFirestoreService): User ${userData.username} (email: ${userData.email}) created/updated in Firestore.`);
     
      if (typeof window !== 'undefined') {
-        const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-        let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-        const userIndex = users.findIndex(u => u.id === userData.id);
-        const userToCache: UserDoc = { ...userData, password: userData.password! }; 
-        if (userIndex > -1) users[userIndex] = userToCache; else users.push(userToCache);
-        localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
-        console.log(`[${SERVICE_NAME}] (createUserInFirestoreService): Local user cache updated after Firestore operation.`);
+        try {
+            const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
+            let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
+            const userIndex = users.findIndex(u => u.id === userData.id);
+            const userToCache: UserDoc = { ...userData, password: userData.password! }; 
+            if (userIndex > -1) users[userIndex] = userToCache; else users.push(userToCache);
+            localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+            console.log(`[${SERVICE_NAME}] (createUserInFirestoreService): Local user cache updated after Firestore operation.`);
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] (createUserInFirestoreService): Failed to update localStorage cache for user ${userData.username} after Firestore operation. Error:`, e);
+        }
     }
     return true;
   } catch (error) {
@@ -304,7 +334,11 @@ export async function getOrganizations(): Promise<Organization[]> {
         organizations.push({ id: docSnap.id, ...docSnap.data() } as Organization);
       });
       if (typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations)); 
+        try {
+            localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations)); 
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for organizations after Firestore fetch. Error:`, e);
+        }
       }
       return organizations;
     } catch (error) {
@@ -337,10 +371,23 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
   }
 
   if (!isFirebaseProperlyConfigured || !db || !organizationsCollectionRef) {
+     if (typeof window !== 'undefined') {
+      console.warn(`[${SERVICE_NAME}] (createOrUpdateOrganization): Attempting to save organization ${orgData.name} locally due to Firebase issue.`);
+      try {
+        const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
+        let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
+        const orgIndex = organizations.findIndex(o => o.id === orgData.id);
+        if (orgIndex > -1) organizations[orgIndex] = orgData; else organizations.push(orgData);
+        localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations));
+        console.log(`[${SERVICE_NAME}] (createOrUpdateOrganization): Organization ${orgData.name} saved to localStorage successfully.`);
+      } catch (localError) {
+        console.error(`[${SERVICE_NAME}] (createOrUpdateOrganization): CRITICAL - Error saving organization ${orgData.name} to localStorage. The organization is created in memory for this session but will not persist locally across sessions if Firebase remains unavailable. Error: `, localError);
+      }
+      return true; // Return true as the org object is in memory, even if localStorage fails
+    }
+    // If not client-side and Firebase isn't configured
     console.error(
-      `[${SERVICE_NAME}] (createOrUpdateOrganization): Cannot create/update organization ${orgData.name}. ` +
-      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, organizationsCollectionRef: ${!!organizationsCollectionRef}. ` +
-      `Firebase not properly configured, or db/collection instance is null.`
+      `[${SERVICE_NAME}] (createOrUpdateOrganization): Cannot create/update organization ${orgData.name}. Firebase not properly configured, or db/collection instance is null, and not in a client environment for localStorage fallback.`
     );
     return false; 
   }
@@ -352,12 +399,16 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
     console.log(`[${SERVICE_NAME}] (createOrUpdateOrganization): Organization ${orgData.name} created/updated in Firestore.`);
     
     if (typeof window !== 'undefined') {
-        const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
-        let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
-        const orgIndex = organizations.findIndex(o => o.id === orgData.id);
-        if (orgIndex > -1) organizations[orgIndex] = orgData; else organizations.push(orgData);
-        localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations));
-        console.log(`[${SERVICE_NAME}] (createOrUpdateOrganization): Local organization cache updated after Firestore operation.`);
+        try {
+            const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
+            let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
+            const orgIndex = organizations.findIndex(o => o.id === orgData.id);
+            if (orgIndex > -1) organizations[orgIndex] = orgData; else organizations.push(orgData);
+            localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations));
+            console.log(`[${SERVICE_NAME}] (createOrUpdateOrganization): Local organization cache updated after Firestore operation.`);
+        } catch (e) {
+            console.warn(`[${SERVICE_NAME}] (createOrUpdateOrganization): Failed to update localStorage cache for organization ${orgData.name} after Firestore operation. Error:`, e);
+        }
     }
     return true;
   } catch (error) {
@@ -377,11 +428,15 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
       if (docSnap.exists()) {
          const orgData = { id: docSnap.id, ...docSnap.data() } as Organization;
         if (typeof window !== 'undefined') { 
-            const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
-            let orgs: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
-            const orgIndex = orgs.findIndex(o => o.id === orgId);
-            if (orgIndex > -1) orgs[orgIndex] = orgData; else orgs.push(orgData);
-            localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgs));
+            try {
+                const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
+                let orgs: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
+                const orgIndex = orgs.findIndex(o => o.id === orgId);
+                if (orgIndex > -1) orgs[orgIndex] = orgData; else orgs.push(orgData);
+                localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgs));
+            } catch (e) {
+                console.warn(`[${SERVICE_NAME}] Failed to update localStorage cache for organization ${orgId} after Firestore fetch. Error:`, e);
+            }
         }
         return orgData;
       }
@@ -411,3 +466,4 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
   console.warn(`[${SERVICE_NAME}] Organization ${orgId} not found. (Server-side context and Firestore is unavailable/not configured).`);
   return undefined;
 }
+
