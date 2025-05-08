@@ -25,6 +25,7 @@ export interface GitHubCommit {
   date: string;
   /**
    * Optional: Files changed in the commit.
+   * This will now be empty as files are not passed from the form.
    */
   filesChanged?: string[];
 }
@@ -64,7 +65,7 @@ function initializeMockCommits() {
       author: 'Alice Wonderland',
       url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6',
       date: getRandomPastDateISO(),
-      filesChanged: ['auth.py', 'user_model.py'],
+      filesChanged: ['auth.py', 'user_model.py'], // Keep for existing mock data
     },
     {
       sha: 'f6e5d4c3b2a1',
@@ -72,7 +73,7 @@ function initializeMockCommits() {
       author: 'Bob The Builder',
       url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1',
       date: getRandomPastDateISO(),
-      filesChanged: ['payment.js', 'checkout.xml'],
+      filesChanged: ['payment.js', 'checkout.xml'], // Keep for existing mock data
     },
     {
       sha: 'c7g8h9i0j1k2',
@@ -94,7 +95,7 @@ function initializeMockCommits() {
       author: 'Edward Scissorhands',
       url: 'https://github.com/example/repo/commit/r9s0t1u2v3w4',
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-      filesChanged: ['query_optimizer.sql'],
+      filesChanged: ['query_optimizer.sql'], // Keep for existing mock data
     },
     {
       sha: 'x5y6z7a8b9c0',
@@ -135,7 +136,6 @@ export async function getGitHubCommits(ticketId: string): Promise<GitHubCommit[]
  * @param ticketId The ID of the Jira ticket to associate the commit with.
  * @param message The commit message (without the ticket ID prefix).
  * @param author The author of the commit.
- * @param fileNames Optional array of filenames changed.
  * @param branch The branch to commit to (simulated).
  * @returns A promise that resolves to the created GitHubCommit object.
  */
@@ -143,7 +143,7 @@ export async function createGitHubCommit(
     ticketId: string, 
     message: string, 
     author: string, 
-    fileNames?: string[],
+    // fileNames?: string[], // Removed fileNames parameter
     branch: string = 'dev' 
 ): Promise<GitHubCommit> {
     await new Promise(resolve => setTimeout(resolve, 100)); 
@@ -160,7 +160,7 @@ export async function createGitHubCommit(
         author: author,
         url: `https://github.com/${repoName}/commit/${newSha}`, 
         date: new Date().toISOString(),
-        filesChanged: fileNames,
+        filesChanged: [], // filesChanged is now an empty array as files are not passed
     };
 
     mockCommits.unshift(newCommit); 

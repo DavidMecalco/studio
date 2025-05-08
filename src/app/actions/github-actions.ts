@@ -19,17 +19,17 @@ interface CreateCommitResult {
  * @param ticketId The ID of the Jira ticket.
  * @param commitMessage The main commit message (ticket ID will be prepended).
  * @param authorUsername The username of the commit author.
- * @param fileNames List of files changed (simulated).
  * @param branch The branch to commit to (default 'dev').
+ * @param newTicketStatus The new status to set for the ticket.
  * @returns A promise that resolves to an object indicating success or failure and the created commit.
  */
 export async function createCommitAndPushAction(
   ticketId: string,
   commitMessage: string,
   authorUsername: string,
-  fileNames: string[],
-  branch: string = "dev"
-  // newTicketStatus is now handled by addCommitToTicketHistory
+  // fileNames: string[], // Removed fileNames parameter
+  branch: string = "dev",
+  newTicketStatus: JiraTicketStatus // This was passed previously but not used directly, now it's clear
 ): Promise<CreateCommitResult> {
   if (!ticketId || !commitMessage || !authorUsername) {
     return { success: false, error: "Ticket ID, commit message, and author are required." };
@@ -40,7 +40,7 @@ export async function createCommitAndPushAction(
       ticketId,
       commitMessage,
       authorUsername,
-      fileNames,
+      // fileNames, // Removed fileNames argument
       branch
     );
 
@@ -58,7 +58,13 @@ export async function createCommitAndPushAction(
 
     if (!ticketWithCommitHistory) {
         console.warn(`Commit ${newCommit.sha} created, but failed to add commit to Jira ticket ${ticketId} history or update status.`);
+    } else if (newTicketStatus && ticketWithCommitHistory.status !== newTicketStatus) {
+        // Explicitly update ticket status if needed after commit history is added
+        // The addCommitToTicketHistory might already handle this for 'En Progreso'
+        // This ensures any specific status change requested is applied
+        await updateJiraTicket(ticketId, authorUsername, { newStatus: newTicketStatus });
     }
+
 
     revalidatePath(`/jira/${ticketId}`);
     revalidatePath("/jira");
