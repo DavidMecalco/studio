@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type ChangeEvent, useEffect } from 'react';
+import { useState, type ChangeEvent, useEffect, type ReactNode } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -80,8 +80,11 @@ type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
 // Unified form values type for useForm, specific values will be handled by the action
 export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & ClientFormValues>;
 
+interface CreateTicketDialogProps {
+    triggerButton?: ReactNode; // Optional trigger button
+}
 
-export function CreateTicketDialog() {
+export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -115,13 +118,13 @@ export function CreateTicketDialog() {
         branch: undefined,
       });
     }
-    if (isOpen && isAdminOrSuperUser) {
+    if (isOpen && (user?.role === 'admin' || user?.role === 'superuser')) { // Only fetch for admin/superuser
         getOrganizations().then(setOrganizations).catch(err => {
             console.error("Failed to fetch organizations for ticket dialog", err);
             toast({title: "Error", description: "Could not load organizations.", variant: "destructive"});
         });
     }
-  }, [user, form, isOpen, isAdminOrSuperUser, toast]);
+  }, [user, form, isOpen, toast]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -161,14 +164,12 @@ export function CreateTicketDialog() {
     }
     setIsSubmitting(true);
 
-    const attachmentNames = isAdminOrSuperUser ? selectedFiles.map(file => file.name) : [];
+    const attachmentNames = (user.role === 'admin' || user.role === 'superuser') ? selectedFiles.map(file => file.name) : [];
     
     let providerForAction: JiraTicketProvider | undefined = undefined;
     if (user.role === 'client') {
-        // For clients, derive provider from their company.
-        // This assumes user.company is set correctly during login/user creation.
         providerForAction = user.company;
-    } else if (isAdminOrSuperUser) {
+    } else if (user.role === 'admin' || user.role === 'superuser') {
         providerForAction = values.provider;
     }
 
@@ -178,8 +179,8 @@ export function CreateTicketDialog() {
       priority: values.priority!,
       requestingUserId: user.username!,
       provider: providerForAction, 
-      branch: isAdminOrSuperUser ? values.branch : undefined,
-      attachmentNames: isAdminOrSuperUser ? attachmentNames : [],
+      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined,
+      attachmentNames: (user.role === 'admin' || user.role === 'superuser') ? attachmentNames : [],
     };
 
     const result = await createJiraTicketAction(ticketDataForAction);
@@ -202,19 +203,31 @@ export function CreateTicketDialog() {
     setIsSubmitting(false);
   }
   
-  if (!user) return null; // Don't render button if no user (e.g., on login page)
+  if (!user) return null; 
+
+  // Default FAB trigger if no custom trigger is provided
+  const defaultTrigger = (
+     <Button
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl"
+        size="icon"
+        aria-label="Crear nuevo ticket"
+        onClick={() => setIsOpen(true)} // Ensure dialog opens
+      >
+        <Plus className="h-7 w-7" />
+      </Button>
+  );
+  
+  // Only show dialog trigger for admin/superusers (clients create from My Tickets page)
+  const canDisplayTrigger = user.role === 'admin' || user.role === 'superuser';
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl"
-          size="icon"
-          aria-label="Crear nuevo ticket"
-        >
-          <Plus className="h-7 w-7" />
-        </Button>
-      </DialogTrigger>
+        {canDisplayTrigger && (
+            <DialogTrigger asChild>
+                {triggerButton || defaultTrigger}
+            </DialogTrigger>
+        )}
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Ticket</DialogTitle>
@@ -295,7 +308,7 @@ export function CreateTicketDialog() {
               )}
             />
 
-            {isAdminOrSuperUser && (
+            {(user.role === 'admin' || user.role === 'superuser') && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

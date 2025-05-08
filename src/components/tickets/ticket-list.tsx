@@ -1,18 +1,26 @@
 
-import type { JiraTicket } from '@/services/jira';
+"use client";
+
+import { useState } from 'react';
+import type { JiraTicket, JiraTicketStatus } from '@/services/jira';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowRight, Ticket as TicketIcon, GitBranch, User } from 'lucide-react'; 
+import { ArrowRight, Ticket as TicketIcon, GitBranch, User, RotateCcw, Loader2 } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/auth-context';
+import { useToast } from '@/hooks/use-toast';
+import { updateJiraTicketAction } from '@/app/actions/jira-actions';
 
 interface TicketListProps {
   tickets: JiraTicket[];
   title?: string;
   maxItems?: number;
-  showRequestingUser?: boolean; // To conditionally show this column
-  showAssignee?: boolean; // To conditionally show assignee
+  showRequestingUser?: boolean; 
+  showAssignee?: boolean; 
+  onTicketActionSuccess?: () => void; // Callback for successful actions like reopen
+  isClientView?: boolean; // To show reopen button for clients
 }
 
 export function TicketList({ 
@@ -20,9 +28,33 @@ export function TicketList({
     title = "Jira Tickets", 
     maxItems, 
     showRequestingUser = true,
-    showAssignee = false 
+    showAssignee = false,
+    onTicketActionSuccess,
+    isClientView = false,
 }: TicketListProps) {
   const displayedTickets = maxItems ? tickets.slice(0, maxItems) : tickets;
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [reopeningTicketId, setReopeningTicketId] = useState<string | null>(null);
+
+  const handleReopenTicket = async (ticketId: string) => {
+    if (!user) {
+        toast({ title: "Error", description: "Debe iniciar sesión para reabrir un ticket.", variant: "destructive"});
+        return;
+    }
+    setReopeningTicketId(ticketId);
+    const result = await updateJiraTicketAction(ticketId, user.id, 'Abierto', undefined, 'Ticket reabierto por el cliente.');
+    if (result.success) {
+        toast({ title: "Ticket Reabierto", description: `El ticket ${ticketId} ha sido reabierto.` });
+        if (onTicketActionSuccess) {
+            onTicketActionSuccess();
+        }
+    } else {
+        toast({ title: "Error", description: result.error || "No se pudo reabrir el ticket.", variant: "destructive"});
+    }
+    setReopeningTicketId(null);
+  };
+
 
   if (!displayedTickets.length) {
     return (
@@ -112,12 +144,28 @@ export function TicketList({
                     '-'
                   )}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-1">
                   <Button asChild variant="ghost" size="sm">
                     <Link href={`/jira/${ticket.id}`} className="flex items-center gap-1">
                       View <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
+                  {isClientView && (ticket.status === 'Cerrado' || ticket.status === 'Resuelto') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReopenTicket(ticket.id)}
+                      disabled={reopeningTicketId === ticket.id}
+                      className="text-xs"
+                    >
+                      {reopeningTicketId === ticket.id ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="mr-1 h-3 w-3" />
+                      )}
+                      Reabrir
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

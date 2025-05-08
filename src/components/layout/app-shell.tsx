@@ -13,19 +13,27 @@ import {
 } from "@/components/ui/sidebar";
 import { SidebarNav } from "./sidebar-nav";
 import Link from "next/link";
-import { MountainIcon } from "lucide-react"; 
+import { MountainIcon, Plus } from "lucide-react"; 
 import CompanyLogo from "./company-logo";
 import { UserNav } from "@/components/auth/user-nav";
 import { CreateTicketDialog } from "@/components/tickets/create-ticket-dialog";
+import { useAuth } from "@/context/auth-context"; // Import useAuth
 
 interface AppShellProps {
   children: ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const { user } = useAuth(); // Get the current user
+
   const defaultOpen = typeof window !== "undefined" 
     ? document.cookie.includes("sidebar_state=true")
     : true;
+
+  // Determine if the create ticket FAB should be shown
+  // Show for admin and superuser, not for client (client will have button on My Tickets page)
+  const showCreateTicketFab = user && (user.role === 'admin' || user.role === 'superuser');
+
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
@@ -62,7 +70,19 @@ export function AppShell({ children }: AppShellProps) {
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           {children}
         </main>
-        <CreateTicketDialog />
+        {/* Conditionally render CreateTicketDialog FAB */}
+        {showCreateTicketFab && (
+          <CreateTicketDialog 
+            triggerButton={
+              <button 
+                className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Crear nuevo ticket"
+              >
+                <Plus className="h-7 w-7" />
+              </button>
+            } 
+          />
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

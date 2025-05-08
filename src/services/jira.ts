@@ -1,3 +1,4 @@
+
 /**
  * Represents the possible statuses of a Jira ticket.
  */
@@ -213,7 +214,7 @@ export async function getJiraTickets(requestingUserId?: string): Promise<JiraTic
   if (requestingUserId) {
     tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
   }
-  return tickets;
+  return tickets.sort((a, b) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
 }
 
 /**
@@ -256,15 +257,19 @@ export async function updateJiraTicket(
 
   if (newStatus !== undefined && newStatus !== currentTicket.status) {
     updatedTicketDetails.status = newStatus;
+    const isReopening = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && newStatus === 'Abierto';
+    const action = isReopening ? 'Ticket Reabierto' : 'Status Changed';
+    const details = isReopening ? `Ticket Reabierto por ${userIdPerformingAction}` : `Estado cambiado de ${currentTicket.status} a ${newStatus}`;
+    
     historyEntry = {
       id: `hist-${Date.now()}`,
       timestamp: new Date().toISOString(),
       userId: userIdPerformingAction,
-      action: 'Status Changed',
+      action: action,
       fromStatus: currentTicket.status,
       toStatus: newStatus,
       comment: comment,
-      details: `Estado cambiado de ${currentTicket.status} a ${newStatus}`
+      details: details
     };
   }
   
@@ -299,7 +304,7 @@ export async function updateJiraTicket(
   }
   
   // Only update if there are changes
-  if (Object.keys(updatedTicketDetails).length > 0 || historyEntry?.action === 'Comment Added') {
+  if (Object.keys(updatedTicketDetails).length > 0 || historyEntry?.action === 'Comment Added' || historyEntry?.action === 'Ticket Reabierto') {
     updatedTicketDetails.lastUpdated = new Date().toISOString();
   }
 
@@ -352,6 +357,7 @@ export async function addCommitToTicketHistory(
   mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
   
   // If ticket status was 'Abierto' or 'Pendiente', move to 'En Progreso'
+  // Avoid changing status if it's already Resolved, Closed, or En espera del visto bueno
   if (['Abierto', 'Pendiente'].includes(mockJiraTickets[ticketIndex].status)) {
      const oldStatus = mockJiraTickets[ticketIndex].status;
      mockJiraTickets[ticketIndex].status = 'En Progreso';
