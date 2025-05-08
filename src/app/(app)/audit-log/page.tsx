@@ -2,9 +2,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { getAllTicketHistories, type JiraTicketHistoryEntry } from '@/services/jira';
+import { getAllTicketHistories, type TicketHistoryEntry as LocalTicketHistoryEntry } from '@/services/tickets'; // Updated import
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Changed to UserDoc
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users';
 import { AuditLogList } from '@/components/audit/audit-log-list';
 import { AuditLogFilters, type AuditFilters } from '@/components/audit/audit-log-filters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,10 +13,8 @@ import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, isWithinInterval, subDays } from 'date-fns';
 
-// Define a unified type for combined audit entries
-export type CombinedAuditEntry = JiraTicketHistoryEntry & {
+export type CombinedAuditEntry = LocalTicketHistoryEntry & { // Updated type
   entryType: 'ticket' | 'deployment';
-  // Add specific fields if needed, e.g., environment for deployment entries
   environment?: string; 
   filesDeployedCount?: number;
   deploymentStatus?: string;
@@ -25,10 +23,10 @@ export type CombinedAuditEntry = JiraTicketHistoryEntry & {
 
 export default function AuditLogPage() {
   const { user, loading: authLoading } = useAuth();
-  const [allHistory, setAllHistory] = useState<JiraTicketHistoryEntry[]>([]);
+  const [allHistory, setAllHistory] = useState<LocalTicketHistoryEntry[]>([]); // Updated type
   const [allDeployments, setAllDeployments] = useState<DeploymentLogEntry[]>([]);
-  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]); // Renamed users to serviceUsers to avoid conflict
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
+  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]);
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [filters, setFilters] = useState<AuditFilters>({
     dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -42,14 +40,14 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     async function fetchData() {
-       if (authLoading || !canViewPage || !user) { // Ensure user is available
+       if (authLoading || !canViewPage || !user) {
         setIsPageLoading(false);
         return;
       }
       setIsPageLoading(true);
       try {
         const [ticketHistories, deploymentLogs, fetchedServiceUsers] = await Promise.all([
-          getAllTicketHistories(),
+          getAllTicketHistories(), // Uses local ticket service
           getDeploymentLogs(),
           getUsers(),
         ]);
@@ -61,7 +59,7 @@ export default function AuditLogPage() {
       }
       setIsPageLoading(false);
     }
-    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
+    if (canViewPage && !authLoading && user) {
         fetchData();
     } else if (!authLoading) {
         setIsPageLoading(false);
@@ -77,7 +75,7 @@ export default function AuditLogPage() {
       userId: dep.userId,
       action: `Deployment: ${dep.status}`,
       details: `Deployed ${dep.filesDeployed.length} file(s) to ${dep.environment}. ${dep.message || ''}`,
-      deploymentId: dep.id,
+      // deploymentId: dep.id, // This field is not in LocalTicketHistoryEntry, so we can remove or map if needed
       ticketId: dep.ticketIds && dep.ticketIds.length > 0 ? dep.ticketIds.join(', ') : undefined,
       entryType: 'deployment',
       environment: dep.environment,
@@ -115,9 +113,9 @@ export default function AuditLogPage() {
           entry.userId,
           entry.action,
           entry.details,
-          entry.ticketId,
+          (entry as any).ticketId, // Cast to any if ticketId might not be on LocalTicketHistoryEntry directly
           entry.commitSha,
-          entry.deploymentId,
+          (entry as any).deploymentId, // Cast to any if deploymentId might not be on LocalTicketHistoryEntry
           entry.comment,
           (entry as CombinedAuditEntry).environment,
           (entry as CombinedAuditEntry).deploymentStatus,
@@ -131,7 +129,7 @@ export default function AuditLogPage() {
   }, [isPageLoading, allHistory, allDeployments, filters, canViewPage]);
 
 
-  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
+  if (authLoading || (isPageLoading && canViewPage)) {
     return (
         <div className="space-y-8">
              <div className="flex items-center gap-2">
@@ -153,7 +151,7 @@ export default function AuditLogPage() {
     );
   }
   
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />

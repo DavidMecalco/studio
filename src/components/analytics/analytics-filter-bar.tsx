@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter, RotateCcw } from 'lucide-react';
-import type { UserDoc as ServiceUser } from '@/services/users'; // Updated to UserDoc
-import type { JiraTicketStatus, JiraTicketProvider } from '@/services/jira';
+import type { UserDoc as ServiceUser } from '@/services/users';
+import type { TicketStatus } from '@/services/tickets'; // Updated import
 import type { DeploymentEnvironment } from '@/services/deployment';
 import { format, subDays } from 'date-fns';
 import { Skeleton } from '../ui/skeleton';
@@ -17,9 +17,9 @@ import { Skeleton } from '../ui/skeleton';
 export interface AnalyticsFilters {
   dateFrom: string;
   dateTo: string;
-  selectedUserId: string; // 'all' or user ID
-  selectedStatus: JiraTicketStatus | 'all';
-  selectedClient: string | 'all'; // Changed from JiraTicketProvider to string
+  selectedUserId: string; 
+  selectedStatus: TicketStatus | 'all'; // Updated type
+  selectedClient: string | 'all'; 
   selectedEnvironment: DeploymentEnvironment | 'all';
 }
 
@@ -27,12 +27,12 @@ interface AnalyticsFilterBarProps {
   filters: AnalyticsFilters;
   onFiltersChange: Dispatch<SetStateAction<AnalyticsFilters>>;
   users: ServiceUser[];
-  clients: string[]; // Changed from JiraTicketProvider[] to string[]
+  clients: string[]; 
   environments: DeploymentEnvironment[];
   isLoading?: boolean;
 }
 
-const ticketStatuses: Array<JiraTicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno'];
+const ticketStatuses: Array<TicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno']; // Updated type
 
 export function AnalyticsFilterBar({
   filters,

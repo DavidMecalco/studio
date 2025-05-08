@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect } from 'react';
@@ -18,24 +17,24 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/auth-context';
-import { updateJiraTicketAction } from '@/app/actions/jira-actions';
-import type { JiraTicket, JiraTicketStatus, JiraTicketPriority, JiraTicketType } from '@/services/jira'; // Added JiraTicketType
-import { JIRA_TICKET_TYPES } from '@/services/jira'; // Import defined types
+import { updateTicketAction } from '@/app/actions/ticket-actions'; // Updated import
+import type { Ticket as LocalTicket, TicketStatus, TicketPriority, TicketType } from '@/services/tickets'; // Updated import
+import { TICKET_TYPES } from '@/services/tickets'; // Updated import
 import type { UserDoc as ServiceUser } from '@/services/users';
 import { Edit, Loader2 } from 'lucide-react';
 
-const ticketStatusOptions: JiraTicketStatus[] = ['Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno', 'Reabierto'];
-const ticketPriorityOptions: JiraTicketPriority[] = ['Alta', 'Media', 'Baja'];
+const ticketStatusOptions: TicketStatus[] = ['Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno', 'Reabierto']; // Updated type
+const ticketPriorityOptions: TicketPriority[] = ['Alta', 'Media', 'Baja']; // Updated type
 const UNASSIGNED_VALUE = "__UNASSIGNED__";
 
 const adminTicketActionSchema = z.object({
-  newStatus: z.custom<JiraTicketStatus>((val) => ticketStatusOptions.includes(val as JiraTicketStatus), {
+  newStatus: z.custom<TicketStatus>((val) => ticketStatusOptions.includes(val as TicketStatus), { // Updated type
     message: "Invalid status selected.",
   }),
-  newPriority: z.custom<JiraTicketPriority>((val) => ticketPriorityOptions.includes(val as JiraTicketPriority), {
+  newPriority: z.custom<TicketPriority>((val) => ticketPriorityOptions.includes(val as TicketPriority), { // Updated type
     message: "Invalid priority selected.",
   }),
-  newType: z.custom<JiraTicketType>((val) => JIRA_TICKET_TYPES.includes(val as JiraTicketType), { // Added type validation
+  newType: z.custom<TicketType>((val) => TICKET_TYPES.includes(val as TicketType), { // Updated type
     message: "Invalid type selected.",
   }),
   newAssigneeId: z.string().optional(), 
@@ -44,7 +43,7 @@ const adminTicketActionSchema = z.object({
 type AdminTicketActionFormValues = z.infer<typeof adminTicketActionSchema>;
 
 interface TicketAdminActionsProps {
-  ticket: JiraTicket;
+  ticket: LocalTicket; // Updated type
   users: ServiceUser[]; 
   onTicketUpdate: () => void; 
 }
@@ -58,7 +57,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
     defaultValues: {
       newStatus: ticket.status,
       newPriority: ticket.priority,
-      newType: ticket.type, // Added type
+      newType: ticket.type,
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
     },
   });
@@ -67,7 +66,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
     form.reset({
       newStatus: ticket.status,
       newPriority: ticket.priority,
-      newType: ticket.type, // Added type
+      newType: ticket.type,
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
     });
   }, [ticket, form]);
@@ -79,10 +78,10 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
     }
 
     const updates: {
-      newStatus?: JiraTicketStatus;
+      newStatus?: TicketStatus; // Updated type
       newAssigneeId?: string;
-      newPriority?: JiraTicketPriority;
-      newType?: JiraTicketType; // Added newType
+      newPriority?: TicketPriority; // Updated type
+      newType?: TicketType; // Updated type
       comment?: string; 
     } = {};
 
@@ -95,7 +94,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       updates.newPriority = values.newPriority;
       changed = true;
     }
-    if (values.newType !== ticket.type) { // Added type change check
+    if (values.newType !== ticket.type) {
       updates.newType = values.newType;
       changed = true;
     }
@@ -110,7 +109,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
         return;
     }
 
-    const result = await updateJiraTicketAction(ticket.id, currentUser.id, updates);
+    const result = await updateTicketAction(ticket.id, currentUser.id, updates); // Use updateTicketAction
 
     if (result.success && result.ticket) {
       toast({
@@ -188,7 +187,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {JIRA_TICKET_TYPES.map(type => (
+                        {TICKET_TYPES.map(type => ( // Use TICKET_TYPES from local service
                           <SelectItem key={type} value={type}>{type}</SelectItem>
                         ))}
                       </SelectContent>

@@ -13,7 +13,7 @@ import { TicketsByPriorityChart } from '@/components/analytics/charts/tickets-by
 import { TechnicianActivityChart } from '@/components/analytics/charts/technician-activity-chart';
 import { ComponentTypeFrequencyChart } from '@/components/analytics/charts/component-type-frequency-chart';
 
-import { getJiraTickets, type JiraTicket } from '@/services/jira';
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
 import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users';
@@ -43,9 +43,9 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [allServiceUsers, setAllServiceUsers] = useState<ServiceUser[]>([]);
-  const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
+  const [allTickets, setAllTickets] = useState<LocalTicket[]>([]); // Updated type
   const [allCommits, setAllCommits] = useState<GitHubCommit[]>([]);
   const [allDeployments, setAllDeployments] = useState<DeploymentLogEntry[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -64,14 +64,14 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage || !user) { // Ensure user is available
+      if (authLoading || !canViewPage || !user) {
         setIsPageLoading(false);
         return;
       }
       setIsPageLoading(true);
       try {
         const [tickets, commits, deployments, serviceUsers, fetchedOrganizations] = await Promise.all([
-          getJiraTickets(),
+          getTickets(), // Use local getTickets
           getGitHubCommits("ALL_PROJECTS"),
           getDeploymentLogs(),
           getUsers(),
@@ -88,7 +88,7 @@ export default function AnalyticsPage() {
       }
       setIsPageLoading(false);
     }
-    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
+    if (canViewPage && !authLoading && user) {
         fetchData();
     } else if (!authLoading) { 
         setIsPageLoading(false);
@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
     };
   }, [isPageLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage, organizations]);
 
-  const handleExport = (formatType: 'pdf' | 'json') => { // Renamed variable to avoid conflict
+  const handleExport = (formatType: 'pdf' | 'json') => {
     toast({
         title: `Export ${formatType.toUpperCase()} (Simulated)`,
         description: `Simulating export of analytics data as ${formatType.toUpperCase()}. This feature is under development.`,
@@ -225,7 +225,7 @@ export default function AnalyticsPage() {
     });
   };
 
-  if (authLoading) { // Initial auth check loading
+  if (authLoading) { 
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-1/3" /> <Skeleton className="h-4 w-2/3" />

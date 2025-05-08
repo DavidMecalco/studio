@@ -2,11 +2,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addDeploymentToTicketHistory } from "@/services/jira";
+import { addDeploymentToTicketHistory } from "@/services/tickets"; // Updated import
 import type { DeploymentLogEntry, CreateDeploymentLogData as ServiceCreateData } from "@/services/deployment";
 import { createDeploymentLog as createDeploymentLogService } from "@/services/deployment";
 import { getUserById } from "@/services/users"; 
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
 interface CreateDeploymentResult {
   success: boolean;
@@ -15,7 +15,7 @@ interface CreateDeploymentResult {
 }
 
 /**
- * Server action to create a new deployment log and link it to Jira tickets.
+ * Server action to create a new deployment log and link it to Tickets.
  * @param data The data for the new deployment log.
  * @returns A promise that resolves to an object indicating success or failure and the created log.
  */
@@ -51,12 +51,11 @@ export async function createDeploymentLogAction(
     revalidatePath("/(app)/deployments", "page");
     revalidatePath("/(app)/audit-log", "page"); 
     if (newLog.ticketIds && newLog.ticketIds.length > 0) {
-      newLog.ticketIds.forEach(tid => revalidatePath(`/(app)/jira/${tid}`, "page"));
-      revalidatePath("/(app)/jira", "page");
+      newLog.ticketIds.forEach(tid => revalidatePath(`/(app)/tickets/${tid}`, "page")); // Updated path
+      revalidatePath("/(app)/tickets", "page"); // Updated path
     }
     revalidatePath("/(app)/dashboard", "page");
 
-    // Simulate Email Notification
     if (isFirebaseProperlyConfigured) {
       const deployingUser = await getUserById(newLog.userId);
       const notificationRecipients = new Set<string>();

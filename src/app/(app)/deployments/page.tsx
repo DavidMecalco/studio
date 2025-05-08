@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { DeploymentForm } from '@/components/deployments/deployment-form';
 import { DeploymentList } from '@/components/deployments/deployment-list';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Changed User to UserDoc
-import { getJiraTickets, type JiraTicket } from '@/services/jira';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users';
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Layers, AlertTriangle } from 'lucide-react';
@@ -16,34 +16,34 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function DeploymentsPage() {
   const { user, loading: authLoading } = useAuth();
   const [deploymentLogs, setDeploymentLogs] = useState<DeploymentLogEntry[]>([]);
-  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]); // Renamed users to serviceUsers
-  const [tickets, setTickets] = useState<JiraTicket[]>([]);
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
+  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]);
+  const [tickets, setTickets] = useState<LocalTicket[]>([]); // Updated type
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage || !user) { // Ensure user is available
+      if (authLoading || !canViewPage || !user) {
         setIsPageLoading(false);
         return;
       }
       setIsPageLoading(true);
       try {
-        const [logs, fetchedServiceUsers, jiraTickets] = await Promise.all([
+        const [logs, fetchedServiceUsers, localTickets] = await Promise.all([ // Renamed variable
           getDeploymentLogs(),
           getUsers(),
-          getJiraTickets() 
+          getTickets() // Use local getTickets
         ]);
         setDeploymentLogs(logs);
         setServiceUsers(fetchedServiceUsers);
-        setTickets(jiraTickets);
+        setTickets(localTickets);
       } catch (error) {
         console.error("Error fetching deployment data:", error);
       }
       setIsPageLoading(false);
     }
-    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
+    if (canViewPage && !authLoading && user) {
       fetchData();
     } else if (!authLoading) {
         setIsPageLoading(false);
@@ -54,7 +54,7 @@ export default function DeploymentsPage() {
     setDeploymentLogs(prevLogs => [newLog, ...prevLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
   };
 
-  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
+  if (authLoading || (isPageLoading && canViewPage)) {
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export default function DeploymentsPage() {
     );
   }
 
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />

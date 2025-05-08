@@ -1,10 +1,11 @@
+
 "use client";
 
-import type { JiraTicketHistoryEntry } from '@/services/jira';
+import type { TicketHistoryEntry as LocalTicketHistoryEntry } from '@/services/tickets'; // Updated import
 import { TicketHistoryItem } from './ticket-history-item';
 
 interface TicketHistoryListProps {
-  history: JiraTicketHistoryEntry[];
+  history: LocalTicketHistoryEntry[]; // Updated type
   title?: string;
 }
 
@@ -13,7 +14,6 @@ export function TicketHistoryList({ history, title = "Historial del Ticket" }: T
     return <p className="text-sm text-muted-foreground">No hay historial para este ticket.</p>;
   }
 
-  // Sort history by timestamp descending (most recent first)
   const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (

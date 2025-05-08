@@ -1,16 +1,15 @@
 
-
 "use client"; 
 
 import { useEffect, useState, type ChangeEvent }  from 'react';
 import { useParams } from 'next/navigation'; 
-import { getJiraTicket, type JiraTicket } from '@/services/jira';
+import { getTicketById, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; 
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon, FileText, Tag } from 'lucide-react'; // Added Tag icon
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -25,7 +24,7 @@ import { TicketAdminActions } from '@/components/tickets/ticket-admin-actions';
 
 
 interface TicketDetailsData {
-  ticket: JiraTicket;
+  ticket: LocalTicket;
   commits: GitHubCommit[];
   users: ServiceUser[]; 
 }
@@ -33,12 +32,12 @@ interface TicketDetailsData {
 
 async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
   try {
-    const ticket = await getJiraTicket(ticketId);
+    const ticket = await getTicketById(ticketId); // Use local getTicketById
     if (!ticket) {
       return null;
     }
     const [commits, users] = await Promise.all([
-        getGitHubCommits(ticket.id), // Get commits specific to this ticket ID
+        getGitHubCommits(ticket.id), 
         getUsers() 
     ]);
     return { ticket, commits, users };
@@ -60,11 +59,11 @@ export default function TicketDetailPage() {
 
   const refreshTicketData = () => {
     if (ticketId) {
-        setIsLoading(true); // Set loading true before refetch
+        setIsLoading(true); 
         fetchTicketDetails(ticketId)
             .then(data => setTicketData(data))
             .catch(error => console.error("Failed to refresh ticket data:", error))
-            .finally(() => setIsLoading(false)); // Set loading false after fetch attempt
+            .finally(() => setIsLoading(false)); 
     }
   };
 
@@ -99,7 +98,7 @@ export default function TicketDetailPage() {
               <div className="flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
                 <Skeleton className="h-7 w-24" /> 
                 <Skeleton className="h-5 w-20" /> 
-                <Skeleton className="h-5 w-28" /> {/* Placeholder for type */}
+                <Skeleton className="h-5 w-28" /> 
               </div>
             </div>
           </CardHeader>
@@ -139,7 +138,7 @@ export default function TicketDetailPage() {
           The ticket with ID <span className="font-mono">{ticketId}</span> could not be found.
         </p>
         <Button asChild>
-          <Link href={user?.role === 'client' ? "/my-tickets" : "/jira"}>
+          <Link href={user?.role === 'client' ? "/my-tickets" : "/tickets"}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Go back to Tickets
           </Link>
         </Button>
@@ -149,7 +148,7 @@ export default function TicketDetailPage() {
 
   const { ticket, commits, users: allUsers } = ticketData;
 
-  const canManageTicketCommits = user?.role === 'admin' || user?.role === 'superuser'; // Superusers can also commit
+  const canManageTicketCommits = user?.role === 'admin' || user?.role === 'superuser';
   const canManageTicketAdminActions = user?.role === 'admin' || user?.role === 'superuser';
   const canInteractWithTicket = !!user; 
 
@@ -158,7 +157,7 @@ export default function TicketDetailPage() {
     <div className="space-y-8">
       <div>
         <Button asChild variant="outline" size="sm" className="mb-4">
-          <Link href={user?.role === 'client' ? "/my-tickets" : "/jira"} className="flex items-center gap-1">
+          <Link href={user?.role === 'client' ? "/my-tickets" : "/tickets"} className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" /> Back to Tickets
           </Link>
         </Button>
@@ -210,11 +209,11 @@ export default function TicketDetailPage() {
                     <p className="text-foreground flex items-center gap-1"><UserIconLucide className="h-4 w-4"/>{ticket.requestingUserId}</p>
                 </div>
                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">GitLab Repository</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground">GitHub Repository</h3>
                     <p className="text-foreground flex items-center gap-1">
-                        {ticket.gitlabRepository ? 
-                            <Link href={`https://gitlab.com/${ticket.gitlabRepository}`} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
-                                <GitBranch className="h-4 w-4"/>{ticket.gitlabRepository}
+                        {ticket.githubRepository ? 
+                            <Link href={`https://github.com/${ticket.githubRepository}`} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                <GitBranch className="h-4 w-4"/>{ticket.githubRepository}
                             </Link> 
                             : '-'}
                     </p>
@@ -299,7 +298,7 @@ export default function TicketDetailPage() {
             <CommitChangesForm 
                 ticketId={ticketId} 
                 currentTicketStatus={ticketData.ticket.status}
-                allCommits={commits} // Pass all commits related to the ticket/project
+                allCommits={commits}
             />
         </>
       )}

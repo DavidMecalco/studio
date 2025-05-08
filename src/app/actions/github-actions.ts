@@ -3,9 +3,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createGitHubCommit as createGitHubCommitService, type GitHubCommit } from "@/services/github";
-import { addCommitToTicketHistory, type JiraTicketStatus, updateJiraTicket } from "@/services/jira";
+import { addCommitToTicketHistory, type TicketStatus, updateTicket } from "@/services/tickets"; // Updated import
 import { getUserById } from "@/services/users"; 
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
 interface CreateCommitResult {
   success: boolean;
@@ -14,9 +14,9 @@ interface CreateCommitResult {
 }
 
 /**
- * Server action to create a new GitHub commit associated with a Jira ticket
+ * Server action to create a new GitHub commit associated with a Ticket
  * and update the ticket's status.
- * @param ticketId The ID of the Jira ticket.
+ * @param ticketId The ID of the Ticket.
  * @param commitMessage The main commit message (ticket ID will be prepended).
  * @param authorUsername The username of the commit author.
  * @param branch The branch to commit to (default 'dev').
@@ -27,9 +27,8 @@ export async function createCommitAndPushAction(
   ticketId: string,
   commitMessage: string,
   authorUsername: string,
-  // fileNames: string[], // Removed fileNames parameter
   branch: string = "dev",
-  newTicketStatus: JiraTicketStatus // This was passed previously but not used directly, now it's clear
+  newTicketStatus: TicketStatus 
 ): Promise<CreateCommitResult> {
   if (!ticketId || !commitMessage || !authorUsername) {
     return { success: false, error: "Ticket ID, commit message, and author are required." };
@@ -40,7 +39,6 @@ export async function createCommitAndPushAction(
       ticketId,
       commitMessage,
       authorUsername,
-      // fileNames, // Removed fileNames argument
       branch
     );
 
@@ -57,21 +55,17 @@ export async function createCommitAndPushAction(
     );
 
     if (!ticketWithCommitHistory) {
-        console.warn(`Commit ${newCommit.sha} created, but failed to add commit to Jira ticket ${ticketId} history or update status.`);
+        console.warn(`Commit ${newCommit.sha} created, but failed to add commit to Ticket ${ticketId} history or update status.`);
     } else if (newTicketStatus && ticketWithCommitHistory.status !== newTicketStatus) {
-        // Explicitly update ticket status if needed after commit history is added
-        // The addCommitToTicketHistory might already handle this for 'En Progreso'
-        // This ensures any specific status change requested is applied
-        await updateJiraTicket(ticketId, authorUsername, { newStatus: newTicketStatus });
+        await updateTicket(ticketId, authorUsername, { newStatus: newTicketStatus });
     }
 
 
-    revalidatePath(`/jira/${ticketId}`);
-    revalidatePath("/jira");
-    revalidatePath("/dashboard");
-    revalidatePath("/github"); 
+    revalidatePath(`/(app)/tickets/${ticketId}`); // Updated path
+    revalidatePath("/(app)/tickets"); // Updated path
+    revalidatePath("/(app)/dashboard");
+    revalidatePath("/(app)/github"); 
 
-    // Simulate Email Notification
     if (isFirebaseProperlyConfigured) {
       const committer = await getUserById(authorUsername);
       const ticketRequester = ticketWithCommitHistory ? await getUserById(ticketWithCommitHistory.requestingUserId) : null;

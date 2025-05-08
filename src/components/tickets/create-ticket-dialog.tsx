@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, type ChangeEvent, useEffect, type ReactNode } from 'react';
@@ -34,16 +33,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createJiraTicketAction } from "@/app/actions/jira-actions";
-import type { JiraTicketBranch, JiraTicketPriority, JiraTicketProvider, JiraTicketType } from "@/services/jira"; // Added JiraTicketType
-import { JIRA_TICKET_TYPES } from "@/services/jira"; // Import defined types
+import { createTicketAction } from "@/app/actions/ticket-actions"; // Updated import
+import type { TicketBranch, TicketPriority, TicketProvider, TicketType } from "@/services/tickets"; // Updated import
+import { TICKET_TYPES } from "@/services/tickets"; // Updated import
 import { Plus, FileUp, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { getOrganizations, type Organization } from '@/services/users';
 
 
-const ticketBranches: JiraTicketBranch[] = ['DEV', 'QA', 'PROD'];
-const ticketPriorities: JiraTicketPriority[] = ['Alta', 'Media', 'Baja'];
+const ticketBranches: TicketBranch[] = ['DEV', 'QA', 'PROD']; // Updated type
+const ticketPriorities: TicketPriority[] = ['Alta', 'Media', 'Baja']; // Updated type
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
 const ALLOWED_MIME_TYPES = [
@@ -62,9 +61,7 @@ const createTicketFormSchemaBase = z.object({
   priority: z.enum(ticketPriorities, {
     required_error: "Seleccione una prioridad.",
   }),
-  type: z.enum(JIRA_TICKET_TYPES as [JiraTicketType, ...JiraTicketType[]], { // Ensure Zod enum gets a non-empty array
-    required_error: "Seleccione un tipo de ticket.",
-  }),
+  type: z.enum(TICKET_TYPES as [TicketType, ...TicketType[]]), // Updated type
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
   requestingUserEmail: z.string().email().optional(), 
 });
@@ -178,14 +175,14 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
 
     const attachmentNames = selectedFiles.map(file => file.name);
     
-    let providerForAction: JiraTicketProvider | undefined = undefined;
+    let providerForAction: TicketProvider | undefined = undefined; // Updated type
     if (isClient) {
         providerForAction = user.company; 
     } else if (isAdminOrSuperUser) {
         providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider; 
     }
 
-    let branchForAction: JiraTicketBranch | undefined = undefined;
+    let branchForAction: TicketBranch | undefined = undefined; // Updated type
     if (isAdminOrSuperUser) {
         branchForAction = values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch;
     } else if (isClient) {
@@ -197,7 +194,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       title: values.title!,
       description: values.description!,
       priority: values.priority!,
-      type: values.type!, // Added type
+      type: values.type!,
       requestingUserId: user.username!,
       requestingUserEmail: user.email,
       provider: providerForAction, 
@@ -205,7 +202,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       attachmentNames: attachmentNames,
     };
 
-    const result = await createJiraTicketAction(ticketDataForAction);
+    const result = await createTicketAction(ticketDataForAction); // Use createTicketAction
 
     if (result.success && result.ticket) {
       toast({
@@ -351,7 +348,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {JIRA_TICKET_TYPES.map(type => (
+                        {TICKET_TYPES.map(type => ( // Use TICKET_TYPES from local service
                           <SelectItem key={type} value={type}>
                             {type}
                           </SelectItem>

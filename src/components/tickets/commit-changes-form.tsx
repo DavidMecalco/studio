@@ -14,7 +14,7 @@ import { createCommitAndPushAction } from "@/app/actions/github-actions";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { GitCommit, Loader2, RefreshCcw } from "lucide-react";
-import type { JiraTicketStatus } from "@/services/jira";
+import type { TicketStatus } from "@/services/tickets"; // Updated import
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
 import type { GitHubCommit } from "@/services/github";
@@ -33,8 +33,8 @@ type CommitFormValues = z.infer<typeof commitFormSchema>;
 
 interface CommitChangesFormProps {
   ticketId: string;
-  currentTicketStatus: JiraTicketStatus;
-  allCommits?: GitHubCommit[]; // Added to receive all commits for the ticket/repo
+  currentTicketStatus: TicketStatus; // Updated type
+  allCommits?: GitHubCommit[];
 }
 
 export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = [] }: CommitChangesFormProps) {
@@ -60,7 +60,7 @@ export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = 
 
     setIsSubmitting(true);
 
-    const newStatusForTicket: JiraTicketStatus = "En Progreso";
+    const newStatusForTicket: TicketStatus = "En Progreso"; // Updated type
 
     const result = await createCommitAndPushAction(
       ticketId,
@@ -92,7 +92,6 @@ export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = 
       return;
     }
     setIsRestoringCommit(true);
-    // Simulate server action
     await new Promise(resolve => setTimeout(resolve, 1000));
     toast({
       title: "Restauración a Commit (Simulada)",
@@ -144,7 +143,7 @@ export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = 
                   <Label htmlFor="branch">Rama (Branch)</Label>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value} // Ensure value is controlled
+                    value={field.value}
                     disabled={isSubmitting}
                   >
                     <FormControl>

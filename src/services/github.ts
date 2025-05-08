@@ -6,37 +6,13 @@ import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, writeB
  * Represents a GitHub commit.
  */
 export interface GitHubCommit {
-  /**
-   * The SHA of the commit. This will be the document ID in Firestore.
-   */
   sha: string;
-  /**
-   * The message of the commit.
-   */
   message: string;
-  /**
-   * The author of the commit. (Should be username or unique ID)
-   */
   author: string;
-  /**
-   * The URL of the commit.
-   */
   url: string;
-  /**
-   * The date of the commit in ISO string format.
-   */
   date: string;
-  /**
-   * Files changed in the commit.
-   */
   filesChanged?: string[];
-  /**
-   * Optional: Ticket ID this commit is associated with, for querying.
-   */
-  ticketId?: string;
-  /**
-   * Optional: Branch this commit was made to.
-   */
+  ticketId?: string; // Local ticket ID
   branch?: string;
 }
 
@@ -44,7 +20,7 @@ export interface GitHubCommit {
  * Represents a specific version of a file.
  */
 export interface FileVersion {
-  id: string; // Could be commit SHA or a version number
+  id: string; 
   timestamp: string;
   commitSha: string;
   author: string;
@@ -57,13 +33,12 @@ if (isFirebaseProperlyConfigured && db) {
   commitsCollectionRef = collection(db, 'github_commits');
 }
 
-const MOCK_GITHUB_SEEDED_FLAG_V5 = 'mock_github_seeded_v5';
-const LOCAL_STORAGE_GITHUB_KEY = 'firestore_mock_github_commits_cache_v5';
+const MOCK_GITHUB_SEEDED_FLAG_V6 = 'mock_github_seeded_v6'; // Updated version
+const LOCAL_STORAGE_GITHUB_KEY = 'firestore_mock_github_commits_cache_v6'; // Updated version
 
-// Helper to generate a date within the last month
 const getRandomPastDateISO = () => {
   const now = new Date();
-  const randomDaysAgo = Math.floor(Math.random() * 30); // 0 to 29 days ago
+  const randomDaysAgo = Math.floor(Math.random() * 30);
   now.setDate(now.getDate() - randomDaysAgo);
   return now.toISOString();
 };
@@ -72,12 +47,12 @@ const commitsToSeed: GitHubCommit[] = [
     {
       sha: 'a1b2c3d4e5f6', message: 'Feat: Implement user authentication module', author: 'alice-wonderland',
       url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6', date: getRandomPastDateISO(),
-      filesChanged: ['auth.py', 'user_model.py'], ticketId: 'MAX-123', branch: 'dev'
+      filesChanged: ['auth.py', 'user_model.py'], ticketId: 'MAS-001', branch: 'dev' // Updated ticketId format
     },
     {
       sha: 'f6e5d4c3b2a1', message: 'Fix: Resolve issue in payment processing', author: 'bob-the-builder',
       url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1', date: getRandomPastDateISO(),
-      filesChanged: ['payment.js', 'checkout.xml'], ticketId: 'MAX-456', branch: 'main'
+      filesChanged: ['payment.js', 'checkout.xml'], ticketId: 'MAS-002', branch: 'main' // Updated ticketId format
     },
     {
       sha: 'c7g8h9i0j1k2', message: 'Chore: Update dependencies and configuration', author: 'admin',
@@ -93,7 +68,7 @@ const commitsToSeed: GitHubCommit[] = [
       sha: 'r9s0t1u2v3w4', message: 'Refactor: Optimize database query performance', author: 'bob-the-builder',
       url: 'https://github.com/example/repo/commit/r9s0t1u2v3w4',
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      filesChanged: ['query_optimizer.sql'], ticketId: 'MAX-101', branch: 'perf-opt'
+      filesChanged: ['query_optimizer.sql'], ticketId: 'MAS-003', branch: 'perf-opt' // Updated ticketId format
     },
     {
       sha: 'x5y6z7a8b9c0', message: 'Style: Improve UI consistency across pages', author: 'admin',
@@ -104,16 +79,16 @@ const commitsToSeed: GitHubCommit[] = [
 
 async function ensureGitHubMockDataSeeded(): Promise<void> {
   if (typeof window === 'undefined') return;
-   if (localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V5) === 'true' && isFirebaseProperlyConfigured && db && commitsCollectionRef) {
+   if (localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V6) === 'true' && isFirebaseProperlyConfigured && db && commitsCollectionRef) {
     try {
         const firstCommit = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
         if (firstCommit.exists()) return;
     } catch(e) {/* ignore, proceed to seed */}
   }
 
-  console.log("Attempting to seed GitHub mock data (v5)...");
+  console.log("Attempting to seed GitHub mock data (v6)...");
   localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commitsToSeed));
-  console.log("GitHub mock data (v5) seeded to localStorage.");
+  console.log("GitHub mock data (v6) seeded to localStorage.");
 
   if (isFirebaseProperlyConfigured && db && navigator.onLine && commitsCollectionRef) {
     try {
@@ -123,24 +98,24 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
 
       if (!firstCommitSnap.exists()) {
         firestoreNeedsSeeding = true;
-        console.log("Preparing to seed GitHub commits to Firestore (v5)...");
+        console.log("Preparing to seed GitHub commits to Firestore (v6)...");
         for (const commitData of commitsToSeed) {
           batch.set(doc(commitsCollectionRef, commitData.sha), commitData);
         }
       }
       if (firestoreNeedsSeeding) {
         await batch.commit();
-        console.log("Initial GitHub commits (v5) committed to Firestore.");
+        console.log("Initial GitHub commits (v6) committed to Firestore.");
       } else {
-        console.log("Firestore already contains key GitHub mock data (v5). Skipping Firestore GitHub seed.");
+        console.log("Firestore already contains key GitHub mock data (v6). Skipping Firestore GitHub seed.");
       }
     } catch (error) {
-      console.warn("Error during Firestore GitHub seeding (v5): ", error);
+      console.warn("Error during Firestore GitHub seeding (v6): ", error);
     }
   } else {
-     console.log("Skipping Firestore GitHub seeding (v5). Firebase not configured, offline, or collection ref missing.");
+     console.log("Skipping Firestore GitHub seeding (v6). Firebase not configured, offline, or collection ref missing.");
   }
-  localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V5, 'true');
+  localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V6, 'true');
 }
 
 
@@ -153,9 +128,8 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       console.log(`Fetching GitHub commits from Firestore for: ${ticketIdOrProjectId}`);
       let q;
       if (ticketIdOrProjectId === "ALL_PROJECTS") {
-        q = query(commitsCollectionRef, orderBy("date", "desc"), limit(50)); // General recent commits
+        q = query(commitsCollectionRef, orderBy("date", "desc"), limit(50)); 
       } else {
-        // Assuming ticketIdOrProjectId could be a ticket ID for filtering
         q = query(commitsCollectionRef, where("ticketId", "==", ticketIdOrProjectId), orderBy("date", "desc"));
       }
       const querySnapshot = await getDocs(q);
@@ -163,7 +137,7 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       querySnapshot.forEach((docSnap) => {
         commits.push(docSnap.data() as GitHubCommit);
       });
-       if (typeof window !== 'undefined' && ticketIdOrProjectId === "ALL_PROJECTS") { // Only cache "ALL_PROJECTS" for simplicity
+       if (typeof window !== 'undefined' && ticketIdOrProjectId === "ALL_PROJECTS") {
         localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commits));
       }
       return commits;
@@ -195,9 +169,9 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
 export async function createGitHubCommit(
     ticketId: string,
     message: string,
-    author: string, // This should be the username of the logged-in user
+    author: string,
     branch: string = 'dev',
-    filesChanged: string[] = [] // Allow passing files changed if needed
+    filesChanged: string[] = []
 ): Promise<GitHubCommit | null> {
   if (!isFirebaseProperlyConfigured || !db || !commitsCollectionRef) {
     console.error("Cannot create GitHub commit: Firebase not properly configured or db/commitsCollectionRef is null.");
@@ -207,8 +181,12 @@ export async function createGitHubCommit(
   try {
     const newSha = Math.random().toString(36).substring(2, 12);
     const fullMessage = `${ticketId}: ${message}`;
-    const repoName = ticketId.startsWith('MAX-TLA') || ticketId.includes('-TLA') ? 'maximo-tla' :
-                     ticketId.startsWith('MAX-FEMA') || ticketId.includes('-FEMA') ? 'maximo-fema' : 'example/repo';
+    
+    // Simplified repo name logic, assuming ticket provider can be parsed from ID or message.
+    let repoName = 'example/repo'; // default
+    if(ticketId.includes('-TLA') || ticketId.toUpperCase().startsWith('MAS-TLA')) repoName = 'maximo-tla';
+    else if(ticketId.includes('-FEMA') || ticketId.toUpperCase().startsWith('MAS-FEMA')) repoName = 'maximo-fema';
+
 
     const newCommit: GitHubCommit = {
         sha: newSha, message: fullMessage, author,
@@ -220,7 +198,6 @@ export async function createGitHubCommit(
     await setDoc(commitDocRef, newCommit);
     console.log(`GitHub commit ${newSha} created in Firestore.`);
 
-    // Update localStorage cache
     if (typeof window !== 'undefined') {
         const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
         let commits: GitHubCommit[] = storedCommits ? JSON.parse(storedCommits) : [];
@@ -236,7 +213,7 @@ export async function createGitHubCommit(
 
 
 export async function getFileVersions(fileName: string): Promise<FileVersion[]> {
-    await ensureGitHubMockDataSeeded(); // Ensures commits are available in cache/Firestore
+    await ensureGitHubMockDataSeeded();
     await new Promise(resolve => setTimeout(resolve, 50));
 
     let relevantCommits: GitHubCommit[] = [];
@@ -250,7 +227,7 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
         }
     }
 
-    if (relevantCommits.length === 0 && typeof window !== 'undefined') { // Fallback to localStorage if Firestore failed or offline
+    if (relevantCommits.length === 0 && typeof window !== 'undefined') { 
         const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
         if (storedCommits) {
             try {
@@ -282,5 +259,3 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
         fileName: fileName,
     })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
-
-    

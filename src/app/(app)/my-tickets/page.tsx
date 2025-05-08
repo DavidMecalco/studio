@@ -1,10 +1,9 @@
 
-
 "use client"; 
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getJiraTickets, type JiraTicket } from '@/services/jira'; 
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ListChecks, AlertTriangle, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
@@ -16,7 +15,7 @@ import { Button } from '@/components/ui/button';
 
 export default function MyTicketsPage() {
   const { user, loading: authLoading } = useAuth();
-  const [tickets, setTickets] = useState<JiraTicket[]>([]);
+  const [tickets, setTickets] = useState<LocalTicket[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const [filters, setFilters] = useState<MyTicketsFilters>({
@@ -24,7 +23,7 @@ export default function MyTicketsPage() {
     dateTo: '', 
     status: 'all',
     priority: 'all',
-    type: 'all', // Added type filter
+    type: 'all',
     searchTerm: '',
   });
 
@@ -37,7 +36,7 @@ export default function MyTicketsPage() {
       }
       setIsPageLoading(true);
       try {
-          const userTickets = await getJiraTickets(user.id); 
+          const userTickets = await getTickets(user.id); // Use local getTickets
           setTickets(userTickets);
       } catch (error) {
           console.error("Failed to fetch tickets:", error);
@@ -70,7 +69,7 @@ export default function MyTicketsPage() {
 
       if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
-      if (filters.type !== 'all' && ticket.type !== filters.type) return false; // Filter by type
+      if (filters.type !== 'all' && ticket.type !== filters.type) return false;
       if (filters.searchTerm) {
         const term = filters.searchTerm.toLowerCase();
         if (!ticket.title.toLowerCase().includes(term) && !ticket.description.toLowerCase().includes(term) && !ticket.id.toLowerCase().includes(term)) {
@@ -92,7 +91,7 @@ export default function MyTicketsPage() {
           </div>
           { canViewPage && <Skeleton className="h-10 w-40" /> }
         </div>
-        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card> {/* Adjusted skeleton count for filters */}
+        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
         <Card className="bg-card shadow-lg rounded-xl">
           <CardHeader>
             <Skeleton className="h-6 w-1/2" />

@@ -2,10 +2,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addRestorationToTicketHistory, getJiraTicket } from "@/services/jira";
+import { addRestorationToTicketHistory, getTicketById } from "@/services/tickets"; // Updated import
 import { getUserById } from "@/services/users"; 
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
-
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
 interface RestoreFileVersionResult {
   success: boolean;
@@ -50,13 +49,12 @@ export async function restoreFileVersionAction(
     }
 
     if (ticketId) {
-      revalidatePath(`/(app)/jira/${ticketId}`, "page");
-      revalidatePath("/(app)/jira", "page"); 
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); // Updated path
+      revalidatePath("/(app)/tickets", "page");  // Updated path
     }
     revalidatePath("/(app)/maximo", "page"); 
     revalidatePath("/(app)/dashboard", "page"); 
 
-    // Simulate Email Notification
     if (isFirebaseProperlyConfigured) {
       const performingUser = await getUserById(userIdPerformingAction);
       const notificationRecipients = new Set<string>();
@@ -64,7 +62,7 @@ export async function restoreFileVersionAction(
       
       let ticketRequesterEmail: string | undefined;
       if (ticketId) {
-          const ticket = await getJiraTicket(ticketId);
+          const ticket = await getTicketById(ticketId); // Use local ticket service
           if (ticket) {
               const requester = await getUserById(ticket.requestingUserId);
               if(requester?.email) ticketRequesterEmail = requester.email;

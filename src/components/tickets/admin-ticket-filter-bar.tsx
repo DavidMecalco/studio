@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import type { Dispatch, SetStateAction } from 'react';
@@ -9,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter, RotateCcw, Search } from 'lucide-react';
-import type { JiraTicketStatus, JiraTicketPriority, JiraTicketType } from '@/services/jira'; // Added JiraTicketType
-import { JIRA_TICKET_TYPES } from '@/services/jira'; // Import defined types
+import type { TicketStatus, TicketPriority, TicketType } from '@/services/tickets'; // Updated import
+import { TICKET_TYPES } from '@/services/tickets'; // Updated import
 import type { UserDoc as ServiceUser } from '@/services/users';
 import { format, subDays } from 'date-fns';
 
@@ -19,9 +18,9 @@ export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = "__UNASSIGNED_ASSIGNEE__";
 export interface AdminTicketFilters {
   dateFrom: string;
   dateTo: string;
-  status: JiraTicketStatus | 'all';
-  priority: JiraTicketPriority | 'all';
-  type: JiraTicketType | 'all'; // Added type filter
+  status: TicketStatus | 'all'; // Updated type
+  priority: TicketPriority | 'all'; // Updated type
+  type: TicketType | 'all'; 
   assigneeId: string | 'all'; 
   requestingClient: string | 'all'; 
   searchTerm: string;
@@ -34,9 +33,9 @@ interface AdminTicketFilterBarProps {
   organizations: string[]; 
 }
 
-const ticketStatuses: Array<JiraTicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno', 'Reabierto'];
-const ticketPriorities: Array<JiraTicketPriority | 'all'> = ['all', 'Alta', 'Media', 'Baja'];
-const ticketTypesForFilter: Array<JiraTicketType | 'all'> = ['all', ...JIRA_TICKET_TYPES];
+const ticketStatuses: Array<TicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno', 'Reabierto']; // Updated type
+const ticketPriorities: Array<TicketPriority | 'all'> = ['all', 'Alta', 'Media', 'Baja']; // Updated type
+const ticketTypesForFilter: Array<TicketType | 'all'> = ['all', ...TICKET_TYPES]; // Updated type
 
 
 export function AdminTicketFilterBar({ filters, onFiltersChange, users, organizations }: AdminTicketFilterBarProps) {
@@ -51,7 +50,7 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
       dateTo: '', 
       status: 'all',
       priority: 'all',
-      type: 'all', // Reset type filter
+      type: 'all',
       assigneeId: 'all',
       requestingClient: 'all',
       searchTerm: '',
@@ -61,10 +60,10 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5" /> Filter Jira Tickets</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5" /> Filter Tickets</CardTitle> {/* Updated title */}
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end"> {/* Adjusted grid for more filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end">
           <div>
             <Label htmlFor="adminTicketsDateFromFilter" className="text-sm font-medium">From</Label>
             <Input id="adminTicketsDateFromFilter" type="date" value={filters.dateFrom} onChange={(e) => handleInputChange('dateFrom', e.target.value)} />

@@ -1,15 +1,14 @@
 
 import { db, isFirebaseProperlyConfigured } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, query, orderBy, writeBatch, type CollectionReference, type DocumentData } from 'firebase/firestore';
-import type { JiraTicket } from './jira'; // Not directly used here anymore, but actions might need it
-// import { addDeploymentToTicketHistory } from './jira'; // This logic is now in actions
+// import type { Ticket } from './tickets'; // No direct use of Ticket type here after removal of addDeploymentToTicketHistory
 
 export type DeploymentEnvironment = 'DEV' | 'QA' | 'PROD' | 'Staging' | 'Other';
 export type DeploymentStatus = 'Success' | 'Failure' | 'In Progress' | 'Pending';
 
 export interface DeploymentLogEntry {
-  id: string; // Document ID in Firestore
-  timestamp: string; // ISO string
+  id: string; 
+  timestamp: string; 
   userId: string;
   filesDeployed: Array<{ name: string; version?: string; type: 'script' | 'xml' | 'report' | 'other' }>;
   environment: DeploymentEnvironment;
@@ -39,7 +38,7 @@ const deploymentsToSeed: DeploymentLogEntry[] = [
         environment: 'DEV',
         status: 'Success',
         resultCode: '200',
-        ticketIds: ['MAX-123'],
+        ticketIds: ['MAS-001'], // Updated to local ticket ID format
       },
       {
         id: 'deploy-2',
@@ -50,7 +49,7 @@ const deploymentsToSeed: DeploymentLogEntry[] = [
         status: 'Failure',
         resultCode: '500',
         message: 'Database connection timeout during deployment.',
-        ticketIds: ['MAX-456'],
+        ticketIds: ['MAS-002'], // Updated to local ticket ID format
       },
 ];
 
@@ -207,11 +206,10 @@ export async function createDeploymentLog(data: CreateDeploymentLogData): Promis
     await setDoc(logDocRef, newLogEntry);
     console.log(`Deployment log ${newLogId} created in Firestore.`);
 
-    // Update localStorage cache
     if (typeof window !== 'undefined') {
         const storedLogs = localStorage.getItem(LOCAL_STORAGE_DEPLOYMENTS_KEY);
         let logs: DeploymentLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
-        logs.unshift(newLogEntry); // Add to beginning for recency
+        logs.unshift(newLogEntry);
         localStorage.setItem(LOCAL_STORAGE_DEPLOYMENTS_KEY, JSON.stringify(logs));
     }
     return newLogEntry;
@@ -220,5 +218,3 @@ export async function createDeploymentLog(data: CreateDeploymentLogData): Promis
     return null;
   }
 }
-
-    

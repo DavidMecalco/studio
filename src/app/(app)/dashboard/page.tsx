@@ -8,8 +8,8 @@ import Link from 'next/link';
 import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks, LineChart as AnalyticsIcon, Users, Settings, PieChartIcon } from 'lucide-react';
 import Image from 'next/image';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import { TicketManagementCard } from '@/components/dashboard/ticket-management-card';
-import { getJiraTickets, type JiraTicket } from '@/services/jira';
+// import { TicketManagementCard } from '@/components/dashboard/ticket-management-card'; // This component was removed
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; 
 import { subWeeks, isAfter, format, parseISO } from 'date-fns';
@@ -18,17 +18,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsOverTimeChart } from '@/components/analytics/charts/my-tickets-over-time-chart';
 
 interface DashboardData {
-  jiraTickets: JiraTicket[]; 
-  allJiraTickets?: JiraTicket[]; 
+  tickets: LocalTicket[]; // Updated type
+  allTickets?: LocalTicket[]; // Updated type
   githubCommits: GitHubCommit[];
   users: ServiceUser[];
   
-  // Admin/Superuser KPIs
   closedTicketsCount?: number; 
   pendingTicketsCount?: number; 
   commitsLastWeekCount?: number; 
   
-  // Client KPIs
   myActiveTicketsCount?: number;
   myTotalTicketsCount?: number; 
   myClosedTicketsCount?: number; 
@@ -37,25 +35,25 @@ interface DashboardData {
 
 async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client' | 'superuser'): Promise<DashboardData | null> {
   try {
-    const [allJiraTicketsFromService, githubCommits, users] = await Promise.all([
-      getJiraTickets(), 
+    const [allTicketsFromService, githubCommits, users] = await Promise.all([
+      getTickets(), // Use local getTickets
       getGitHubCommits("ALL_PROJECTS"), 
       getUsers(), 
     ]);
 
     let dashboardResult: DashboardData = {
-        jiraTickets: [], 
+        tickets: [], 
         githubCommits,
         users,
     };
 
     if (userRole === 'admin' || userRole === 'superuser') {
-      dashboardResult.allJiraTickets = allJiraTicketsFromService;
-      dashboardResult.jiraTickets = allJiraTicketsFromService;
-      dashboardResult.closedTicketsCount = allJiraTicketsFromService.filter(
+      dashboardResult.allTickets = allTicketsFromService;
+      dashboardResult.tickets = allTicketsFromService;
+      dashboardResult.closedTicketsCount = allTicketsFromService.filter(
         ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
       ).length;
-      dashboardResult.pendingTicketsCount = allJiraTicketsFromService.filter(
+      dashboardResult.pendingTicketsCount = allTicketsFromService.filter(
         ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno', 'Reabierto'].includes(ticket.status)
       ).length;
       const oneWeekAgo = subWeeks(new Date(), 1);
@@ -63,8 +61,8 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
         commit => isAfter(new Date(commit.date), oneWeekAgo)
       ).length;
     } else if (userRole === 'client' && userId) {
-      const clientTickets = allJiraTicketsFromService.filter(ticket => ticket.requestingUserId === userId);
-      dashboardResult.jiraTickets = clientTickets; // These are the client's tickets
+      const clientTickets = allTicketsFromService.filter(ticket => ticket.requestingUserId === userId);
+      dashboardResult.tickets = clientTickets;
       dashboardResult.myActiveTicketsCount = clientTickets.filter(
           ticket => ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto'
       ).length;
@@ -130,7 +128,7 @@ export default function DashboardOverviewPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(skeletonNavCardsCount)].map((_, i) => <NavCardSkeleton key={`nav-skel-${i}`}/>)}
         </div>
-        {isAdminOrSuperUser && <TicketManagementCardSkeleton />}
+        {/* TicketManagementCardSkeleton was here, but the component was removed */}
         {isClientUser && <ChartSkeleton />}
       </div>
     );
@@ -141,7 +139,7 @@ export default function DashboardOverviewPage() {
   }
 
   const { 
-    jiraTickets, 
+    tickets, // Renamed from jiraTickets
     users, 
     closedTicketsCount, 
     pendingTicketsCount, 
@@ -172,7 +170,6 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* KPIs Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {(isAdmin || isSuperUser) && (
           <>
@@ -226,7 +223,6 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* Navigation Cards Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {isClient && (
             <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
@@ -255,17 +251,17 @@ export default function DashboardOverviewPage() {
               <CardHeader>
                 <CardTitle className="flex items-center text-xl gap-2">
                   <Ticket className="h-6 w-6 text-accent" />
-                  Tickets de Jira
+                  Tickets
                 </CardTitle>
                 <CardDescription>Seguimiento de incidencias y progreso.</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Vea, gestione y monitorice los tickets de Jira relacionados con los proyectos Maximo.
+                  Vea, gestione y monitorice los tickets relacionados con los proyectos Maximo.
                 </p>
                 <Button asChild>
-                  <Link href="/jira">
-                    Ir a Tickets de Jira <ArrowRight className="ml-2 h-4 w-4" />
+                  <Link href="/tickets"> 
+                    Ir a Tickets <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </CardContent>
@@ -337,13 +333,7 @@ export default function DashboardOverviewPage() {
           </>
         )}
       </div>
-
-      {/* Ticket Management Section - Only for Admin/SuperUser */}
-      {(isAdmin || isSuperUser) && (
-        <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
-      )}
       
-      {/* Client-specific Chart */}
       {isClient && myTicketsOverTime && (
         <MyTicketsOverTimeChart data={myTicketsOverTime} />
       )}
@@ -372,7 +362,6 @@ export default function DashboardOverviewPage() {
 }
 
 
-// Skeleton components for loading state
 const KpiCardSkeleton = () => (
     <Card className="shadow-lg rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -396,30 +385,6 @@ const NavCardSkeleton = () => (
             <Skeleton className="h-4 w-full mb-2" />
             <Skeleton className="h-4 w-full mb-4" />
             <Skeleton className="h-10 w-32" />
-        </CardContent>
-    </Card>
-);
-
-const TicketManagementCardSkeleton = () => (
-    <Card className="shadow-lg rounded-xl">
-        <CardHeader>
-            <Skeleton className="h-7 w-1/2 mb-1" />
-            <Skeleton className="h-4 w-3/4" />
-        </CardHeader>
-        <CardContent className="space-y-6">
-            <div className="space-y-2">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-10 w-full" />
-            </div>
-             <div className="space-y-2">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-10 w-full" />
-            </div>
-             <div className="space-y-2">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-10 w-full" />
-            </div>
-            <Skeleton className="h-10 w-1/3" />
         </CardContent>
     </Card>
 );

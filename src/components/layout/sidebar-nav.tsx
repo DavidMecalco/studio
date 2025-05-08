@@ -8,13 +8,13 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers, Users, Building } from "lucide-react"; // Added Users, Building
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers, Users, Building } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
 const baseAdminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jira", label: "Jira Tickets", icon: Ticket },
+  { href: "/tickets", label: "Tickets", icon: Ticket }, // Changed from /jira to /tickets
   { href: "/github", label: "GitHub Commits", icon: Github },
   { href: "/maximo", label: "Maximo Mgmt", icon: Server },
   { href: "/deployments", label: "Deployment Logs", icon: Layers },
@@ -42,7 +42,7 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  if (!user) return null; // Or a loading state/skeleton
+  if (!user) return null;
 
   let navItems;
   if (user.role === 'client') {
@@ -53,7 +53,7 @@ export function SidebarNav() {
     navItems = superUserNavItems;
   }
    else {
-    return null; // Should not happen for authenticated users
+    return null;
   }
 
 

@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from "@/hooks/use-toast";
 import { createDeploymentLogAction } from '@/app/actions/deployment-actions';
 import type { User as ServiceUser } from '@/services/users';
-import type { JiraTicket } from '@/services/jira';
+import type { Ticket as LocalTicket } from '@/services/tickets'; // Updated import
 import type { DeploymentEnvironment, DeploymentStatus, DeploymentLogEntry } from '@/services/deployment';
 import { UploadCloud, Loader2, FileText, XIcon } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
@@ -24,7 +24,6 @@ const deploymentEnvironments: DeploymentEnvironment[] = ['DEV', 'QA', 'PROD', 'S
 const deploymentStatuses: DeploymentStatus[] = ['Success', 'Failure', 'In Progress', 'Pending'];
 const fileTypes: Array<'script' | 'xml' | 'report' | 'other'> = ['script', 'xml', 'report', 'other'];
 
-// Max file size 2MB for simulation
 const MAX_FILE_SIZE_BYTES_SIM = 2 * 1024 * 1024; 
 
 const deploymentFormSchema = z.object({
@@ -32,7 +31,6 @@ const deploymentFormSchema = z.object({
   status: z.enum(deploymentStatuses, { required_error: "Status is required." }),
   ticketIds: z.array(z.string()).optional(),
   message: z.string().optional(),
-  // filesDeployed are handled separately by local state
 });
 
 type DeploymentFormValues = z.infer<typeof deploymentFormSchema>;
@@ -41,13 +39,12 @@ interface FileToDeploy {
   name: string;
   type: 'script' | 'xml' | 'report' | 'other';
   version?: string;
-  // We won't store the File object itself long-term here, just its metadata for the log.
 }
 
 
 interface DeploymentFormProps {
-  users: ServiceUser[]; // For selecting user if needed, though typically it's the logged-in user
-  tickets: JiraTicket[]; // For linking deployments to tickets
+  users: ServiceUser[];
+  tickets: LocalTicket[]; // Updated type
   onDeploymentCreated: (newLog: DeploymentLogEntry) => void;
 }
 
@@ -83,7 +80,7 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
             variant: "destructive",
           });
           setCurrentFile(null);
-          event.target.value = ""; // Reset file input
+          event.target.value = ""; 
           return;
         }
       setCurrentFile(file);
@@ -103,7 +100,6 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
     setCurrentFile(null);
     setCurrentFileType('other');
     setCurrentFileVersion('');
-    // Reset the file input element visually. A bit hacky but works.
     const fileInput = document.getElementById('deploymentFile') as HTMLInputElement;
     if (fileInput) fileInput.value = "";
   };
@@ -204,16 +200,16 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
 
             <FormField
               control={form.control}
-              name="ticketIds" // This is an array in the form schema
+              name="ticketIds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Associated Jira Ticket (Optional)</FormLabel>
+                  <FormLabel>Associated Ticket (Optional)</FormLabel> {/* Updated label */}
                   <Select
                     onValueChange={(selectedValue) => {
                       if (selectedValue === NONE_VALUE_SENTINEL) {
-                        field.onChange([]); // No tickets selected
+                        field.onChange([]);
                       } else if (selectedValue) {
-                        field.onChange([selectedValue]); // Single ticket selected, stored as array
+                        field.onChange([selectedValue]);
                       } else {
                         field.onChange([]); 
                       }
@@ -243,7 +239,6 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
               )}
             />
             
-            {/* Files Deployed Section */}
             <div className="space-y-4 p-4 border rounded-md">
                 <h4 className="text-md font-medium">Files Deployed (Simulated Upload)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
@@ -314,4 +309,3 @@ export function DeploymentForm({ users, tickets, onDeploymentCreated }: Deployme
     </Card>
   );
 }
-

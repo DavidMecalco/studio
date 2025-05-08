@@ -1,15 +1,14 @@
 
-
 "use client";
 
-import type { JiraTicketHistoryEntry } from '@/services/jira';
+import type { TicketHistoryEntry as LocalTicketHistoryEntry } from '@/services/tickets'; // Updated import
 import { format, parseISO } from 'date-fns';
-import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers, RefreshCcw, FileText, AlertCircle, Tag } from 'lucide-react'; // Added Tag icon
+import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers, RefreshCcw, FileText, AlertCircle, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
 interface TicketHistoryItemProps {
-  entry: JiraTicketHistoryEntry & { ticketId?: string }; 
+  entry: LocalTicketHistoryEntry & { ticketId?: string }; // Updated type
   isLastItem: boolean;
 }
 
@@ -18,7 +17,7 @@ const getIconForAction = (action: string) => {
   if (action.toLowerCase().includes('status changed')) return <Edit3 className="h-4 w-4 text-yellow-500" />;
   if (action.toLowerCase().includes('assignee changed')) return <User className="h-4 w-4 text-blue-400" />;
   if (action.toLowerCase().includes('priority changed')) return <AlertCircle className="h-4 w-4 text-orange-500" />;
-  if (action.toLowerCase().includes('type changed')) return <Tag className="h-4 w-4 text-purple-500" />; // Icon for type change
+  if (action.toLowerCase().includes('type changed')) return <Tag className="h-4 w-4 text-purple-500" />;
   if (action.toLowerCase().includes('commit added')) return <GitCommit className="h-4 w-4 text-blue-500" />;
   if (action.toLowerCase().includes('comment added')) return <MessageSquare className="h-4 w-4 text-green-500" />;
   if (action.toLowerCase().includes('deployment')) return <Layers className="h-4 w-4 text-purple-500" />; 
@@ -46,7 +45,7 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
             <span className="text-xs font-medium text-foreground">{entry.userId}</span>
              {(entry as any).ticketId && entry.action !== 'Created' && !isComment && ( 
               <Badge variant="outline" className="text-xs">
-                Ticket: <Link href={`/jira/${(entry as any).ticketId}`} className="hover:underline ml-1">{(entry as any).ticketId}</Link>
+                Ticket: <Link href={`/tickets/${(entry as any).ticketId}`} className="hover:underline ml-1">{(entry as any).ticketId}</Link> {/* Updated path */}
               </Badge>
             )}
           </div>

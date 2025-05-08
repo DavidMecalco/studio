@@ -1,37 +1,36 @@
 
-
 "use server";
 
-import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority, JiraTicketType } from "@/services/jira"; // Added JiraTicketType
-import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; 
+import type { Ticket, TicketStatus, TicketProvider, TicketBranch, CreateTicketData, TicketPriority, TicketType } from "@/services/tickets";
+import { updateTicket as updateTicketServiceCall, createTicket as createTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/tickets"; 
 import { revalidatePath } from "next/cache";
 import { getUserById } from "@/services/users"; 
 import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
-interface UpdateJiraTicketResult {
+interface UpdateTicketResult {
   success: boolean;
-  ticket?: JiraTicket;
+  ticket?: Ticket;
   error?: string;
 }
 
 /**
- * Server action to update a Jira ticket's status, assignee, priority, and/or type.
+ * Server action to update a Ticket's status, assignee, priority, and/or type.
  * @param ticketId The ID of the ticket to update.
  * @param userIdPerformingAction The ID of the user performing the action.
  * @param updates An object containing fields to update.
  * @returns A promise that resolves to an object indicating success or failure.
  */
-export async function updateJiraTicketAction(
+export async function updateTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
   updates: {
-    newStatus?: JiraTicketStatus;
+    newStatus?: TicketStatus;
     newAssigneeId?: string; 
-    newPriority?: JiraTicketPriority;
-    newType?: JiraTicketType; // Added newType
+    newPriority?: TicketPriority;
+    newType?: TicketType;
     comment?: string;
   }
-): Promise<UpdateJiraTicketResult> {
+): Promise<UpdateTicketResult> {
   if (!ticketId) {
     return { success: false, error: "Ticket ID is required." };
   }
@@ -42,18 +41,18 @@ export async function updateJiraTicketAction(
     updates.newStatus === undefined &&
     updates.newAssigneeId === undefined &&
     updates.newPriority === undefined &&
-    updates.newType === undefined && // Added newType check
+    updates.newType === undefined &&
     updates.comment === undefined
   ) {
     return { success: false, error: "At least one update (status, assignee, priority, type, or comment) must be provided." };
   }
 
   try {
-    const updatedTicket = await updateJiraTicketServiceCall(ticketId, userIdPerformingAction, updates);
+    const updatedTicket = await updateTicketServiceCall(ticketId, userIdPerformingAction, updates);
     if (updatedTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath(`/(app)/jira/${ticketId}`, "page");
-      revalidatePath("/(app)/jira", "page");
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); // Updated path
+      revalidatePath("/(app)/tickets", "page"); // Updated path
       revalidatePath("/(app)/my-tickets", "page");
 
       if (isFirebaseProperlyConfigured) {
@@ -80,14 +79,14 @@ export async function updateJiraTicketAction(
         }
         if (updates.newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${updates.newAssigneeId || 'Unassigned'}.`;
         if (updates.newPriority) notificationMessage += ` Priority changed to ${updates.newPriority}.`;
-        if (updates.newType) notificationMessage += ` Type changed to ${updates.newType}.`; // Added type change notification
+        if (updates.newType) notificationMessage += ` Type changed to ${updates.newType}.`;
         if (updates.comment && updates.newStatus !== 'Reabierto') notificationMessage += ` Comment: "${updates.comment}".`; 
         
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
       } else {
-        console.log("Skipped Jira ticket update email notification as Firebase is not properly configured.");
+        console.log("Skipped Ticket update email notification as Firebase is not properly configured.");
       }
       
       return { success: true, ticket: updatedTicket };
@@ -95,40 +94,40 @@ export async function updateJiraTicketAction(
       return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
     }
   } catch (error) {
-    console.error("Error updating Jira ticket:", error);
+    console.error("Error updating Ticket:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred during ticket update.";
     return { success: false, error: errorMessage };
   }
 }
 
-interface CreateJiraTicketResult {
+interface CreateTicketResult {
   success: boolean;
-  ticket?: JiraTicket;
+  ticket?: Ticket;
   error?: string;
 }
 
 export interface CreateTicketActionFormValues {
   title: string;
   description: string;
-  priority: JiraTicketPriority;
-  type: JiraTicketType; // Added type
+  priority: TicketPriority;
+  type: TicketType;
   requestingUserId: string; 
   requestingUserEmail?: string; 
-  provider?: JiraTicketProvider; 
-  branch?: JiraTicketBranch; 
+  provider?: TicketProvider; 
+  branch?: TicketBranch; 
   attachmentNames?: string[];
 }
 
 
 /**
- * Server action to create a new Jira ticket.
+ * Server action to create a new Ticket.
  * @param data The data for the new ticket from the form.
  * @returns A promise that resolves to an object indicating success or failure.
  */
-export async function createJiraTicketAction(
+export async function createTicketAction(
   data: CreateTicketActionFormValues
-): Promise<CreateJiraTicketResult> {
-  if (!data.title || !data.description || !data.priority || !data.type || !data.requestingUserId) { // Added type check
+): Promise<CreateTicketResult> {
+  if (!data.title || !data.description || !data.priority || !data.type || !data.requestingUserId) {
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
   const requestingUser = await getUserById(data.requestingUserId); 
@@ -138,21 +137,21 @@ export async function createJiraTicketAction(
 
 
   try {
-    const createData: CreateJiraTicketData = {
+    const createData: CreateTicketData = {
       title: data.title,
       description: data.description,
       priority: data.priority,
-      type: data.type, // Pass type
+      type: data.type,
       requestingUserId: data.requestingUserId,
       provider: data.provider, 
       branch: data.branch, 
       attachmentNames: data.attachmentNames || [],
     };
 
-    const newTicket = await createJiraTicketService(createData);
+    const newTicket = await createTicketService(createData);
     if (newTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath("/(app)/jira", "page"); 
+      revalidatePath("/(app)/tickets", "page"); 
       revalidatePath("/(app)/my-tickets", "page"); 
 
       if (isFirebaseProperlyConfigured) {
@@ -162,7 +161,7 @@ export async function createJiraTicketAction(
         const superUser = await getUserById('superuser'); 
         if (superUser?.email) notificationRecipients.add(superUser.email);
         
-        let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Type: ${newTicket.type}. Priority: ${newTicket.priority}.`; // Added type
+        let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Type: ${newTicket.type}. Priority: ${newTicket.priority}.`;
         if (newTicket.branch) {
           notificationMessage += ` Environment/Branch: ${newTicket.branch}.`;
         }
@@ -171,7 +170,7 @@ export async function createJiraTicketAction(
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
       } else {
-        console.log("Skipped Jira ticket creation email notification as Firebase is not properly configured.");
+        console.log("Skipped Ticket creation email notification as Firebase is not properly configured.");
       }
 
 
@@ -180,7 +179,7 @@ export async function createJiraTicketAction(
       return { success: false, error: "No se pudo crear el ticket. Error de la API." };
     }
   } catch (error) {
-    console.error("Error creating Jira ticket:", error);
+    console.error("Error creating Ticket:", error);
     const errorMessage = error instanceof Error ? error.message : "Un error desconocido del servidor ocurrió durante la creación del ticket.";
     return { success: false, error: errorMessage };
   }
@@ -189,12 +188,12 @@ export async function createJiraTicketAction(
 
 interface AddCommentResult {
   success: boolean;
-  ticket?: JiraTicket; 
+  ticket?: Ticket; 
   error?: string;
 }
 
 /**
- * Server action to add a comment to a Jira ticket.
+ * Server action to add a comment to a Ticket.
  * @param ticketId The ID of the ticket.
  * @param userIdPerformingAction The ID of the user adding the comment.
  * @param commentText The text of the comment.
@@ -214,7 +213,7 @@ export async function addCommentToTicketAction(
   try {
     const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText, attachmentNames);
     if (updatedTicket) {
-      revalidatePath(`/(app)/jira/${ticketId}`, "page");
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); // Updated path
 
       if (isFirebaseProperlyConfigured) {
         const performingUser = await getUserById(userIdPerformingAction);
@@ -237,7 +236,7 @@ export async function addCommentToTicketAction(
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
         });
       } else {
-        console.log("Skipped Jira comment email notification as Firebase is not properly configured.");
+        console.log("Skipped Ticket comment email notification as Firebase is not properly configured.");
       }
 
       return { success: true, ticket: updatedTicket };
@@ -245,7 +244,7 @@ export async function addCommentToTicketAction(
       return { success: false, error: "Failed to add comment. Ticket not found or API error." };
     }
   } catch (error) {
-    console.error("Error adding comment to Jira ticket:", error);
+    console.error("Error adding comment to Ticket:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred while adding comment.";
     return { success: false, error: errorMessage };
   }

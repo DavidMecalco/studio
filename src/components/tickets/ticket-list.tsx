@@ -1,21 +1,20 @@
 
-
 "use client";
 
 import { useState } from 'react';
-import type { JiraTicket, JiraTicketStatus } from '@/services/jira';
+import type { Ticket as LocalTicket, TicketStatus } from '@/services/tickets'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowRight, Ticket as TicketIcon, GitBranch, User, RotateCcw, Loader2, Tag } from 'lucide-react'; // Added Tag icon
+import { ArrowRight, Ticket as TicketIcon, GitBranch, User, RotateCcw, Loader2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { updateJiraTicketAction } from '@/app/actions/jira-actions';
+import { updateTicketAction } from '@/app/actions/ticket-actions'; // Updated import
 
 interface TicketListProps {
-  tickets: JiraTicket[];
+  tickets: LocalTicket[]; // Updated type
   title?: string;
   maxItems?: number;
   showRequestingUser?: boolean; 
@@ -26,7 +25,7 @@ interface TicketListProps {
 
 export function TicketList({ 
     tickets, 
-    title = "Jira Tickets", 
+    title = "Tickets", // Updated default title
     maxItems, 
     showRequestingUser = true,
     showAssignee = false,
@@ -44,8 +43,7 @@ export function TicketList({
         return;
     }
     setReopeningTicketId(ticketId);
-    // When reopening, we don't change the assignee or priority here, just the status and add a comment.
-    const result = await updateJiraTicketAction(ticketId, user.id, {newStatus: 'Reabierto', comment: 'Ticket reabierto por el cliente.'});
+    const result = await updateTicketAction(ticketId, user.id, {newStatus: 'Reabierto', comment: 'Ticket reabierto por el cliente.'}); // Use updateTicketAction
     if (result.success) {
         toast({ title: "Ticket Reabierto", description: `El ticket ${ticketId} ha sido reabierto.` });
         if (onTicketActionSuccess) {
@@ -146,9 +144,9 @@ export function TicketList({
                   </TableCell>
                 )}
                 <TableCell>
-                  {ticket.gitlabRepository ? (
+                  {ticket.githubRepository ? ( // Changed from gitlabRepository
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <GitBranch className="h-3 w-3" /> {ticket.gitlabRepository}
+                      <GitBranch className="h-3 w-3" /> {ticket.githubRepository}
                     </span>
                   ) : (
                     '-'
@@ -156,7 +154,7 @@ export function TicketList({
                 </TableCell>
                 <TableCell className="text-right space-x-1">
                   <Button asChild variant="ghost" size="sm">
-                    <Link href={`/jira/${ticket.id}`} className="flex items-center gap-1">
+                    <Link href={`/tickets/${ticket.id}`} className="flex items-center gap-1"> {/* Updated path */}
                       View <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
