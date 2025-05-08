@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter, RotateCcw } from 'lucide-react';
-import type { User as ServiceUser } from '@/services/users';
+import type { UserDoc as ServiceUser } from '@/services/users'; // Updated to UserDoc
 import type { JiraTicketStatus, JiraTicketProvider } from '@/services/jira';
 import type { DeploymentEnvironment } from '@/services/deployment';
 import { format, subDays } from 'date-fns';
@@ -19,7 +19,7 @@ export interface AnalyticsFilters {
   dateTo: string;
   selectedUserId: string; // 'all' or user ID
   selectedStatus: JiraTicketStatus | 'all';
-  selectedClient: JiraTicketProvider | 'all'; // 'all' or TLA/FEMA
+  selectedClient: string | 'all'; // Changed from JiraTicketProvider to string
   selectedEnvironment: DeploymentEnvironment | 'all';
 }
 
@@ -27,7 +27,7 @@ interface AnalyticsFilterBarProps {
   filters: AnalyticsFilters;
   onFiltersChange: Dispatch<SetStateAction<AnalyticsFilters>>;
   users: ServiceUser[];
-  clients: JiraTicketProvider[];
+  clients: string[]; // Changed from JiraTicketProvider[] to string[]
   environments: DeploymentEnvironment[];
   isLoading?: boolean;
 }
@@ -107,11 +107,11 @@ export function AnalyticsFilterBar({
             </Select>
           </div>
           <div>
-            <Label htmlFor="clientFilter" className="text-sm font-medium">Cliente/Proveedor</Label>
+            <Label htmlFor="clientFilter" className="text-sm font-medium">Cliente/Organización</Label>
             <Select value={filters.selectedClient} onValueChange={(val) => handleInputChange('selectedClient', val)}>
               <SelectTrigger id="clientFilter"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los Clientes</SelectItem>
+                <SelectItem value="all">Todas las Organizaciones</SelectItem>
                 {clients.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
               </SelectContent>
             </Select>

@@ -16,7 +16,7 @@ import { ComponentTypeFrequencyChart } from '@/components/analytics/charts/compo
 import { getJiraTickets, type JiraTicket, type JiraTicketProvider } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type User as ServiceUser } from '@/services/users';
+import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users'; // Updated to UserDoc
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LineChart as AnalyticsIcon, Download, AlertCircle, CheckCircle2, ClipboardList, GitMerge, Users, ServerIcon, PieChart, Ticket } from 'lucide-react';
@@ -36,7 +36,7 @@ interface AnalyticsData {
   ticketsByPriority: { name: string; value: number }[];
   technicianActivity: { name: string; ticketsResolved: number; commitsMade: number }[];
   componentFrequency: { name: string; value: number }[];
-  clients: JiraTicketProvider[]; // For filter
+  clients: string[]; // Changed from JiraTicketProvider[] to string[]
   environments: string[]; // For filter
 }
 
@@ -48,6 +48,8 @@ export default function AnalyticsPage() {
   const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
   const [allCommits, setAllCommits] = useState<GitHubCommit[]>([]);
   const [allDeployments, setAllDeployments] = useState<DeploymentLogEntry[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+
 
   const [filters, setFilters] = useState<AnalyticsFilters>({
     dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -68,16 +70,18 @@ export default function AnalyticsPage() {
       }
       setIsLoading(true);
       try {
-        const [tickets, commits, deployments, serviceUsers] = await Promise.all([
+        const [tickets, commits, deployments, serviceUsers, fetchedOrganizations] = await Promise.all([
           getJiraTickets(),
           getGitHubCommits("ALL_PROJECTS"),
           getDeploymentLogs(),
-          getUsers()
+          getUsers(),
+          getOrganizations()
         ]);
         setAllTickets(tickets);
         setAllCommits(commits);
         setAllDeployments(deployments);
         setAllServiceUsers(serviceUsers);
+        setOrganizations(fetchedOrganizations);
       } catch (error) {
         console.error("Error fetching analytics data:", error);
         toast({ title: "Error", description: "Failed to load analytics data.", variant: "destructive" });
@@ -92,7 +96,7 @@ export default function AnalyticsPage() {
   }, [authLoading, canViewPage, toast]);
 
   const processedData = useMemo((): AnalyticsData | null => {
-    if (isLoading || allTickets.length === 0 || !canViewPage) return null;
+    if (isLoading || allTickets.length === 0 || !canViewPage || organizations.length === 0) return null;
 
     const dateFrom = filters.dateFrom ? parseISO(filters.dateFrom) : null;
     const dateTo = filters.dateTo ? parseISO(filters.dateTo) : null;
@@ -192,6 +196,8 @@ export default function AnalyticsPage() {
     const componentFrequency = Array.from(componentFreqMap.entries())
         .map(([name, value]) => ({ name, value }));
 
+    const clientNamesForFilter = organizations.map(org => org.name);
+
 
     return {
       totalTickets: filteredTickets.length,
@@ -205,10 +211,10 @@ export default function AnalyticsPage() {
       ticketsByPriority,
       technicianActivity,
       componentFrequency,
-      clients: ['TLA', 'FEMA'],
+      clients: clientNamesForFilter,
       environments: ['DEV', 'QA', 'PROD', 'Staging', 'Other']
     };
-  }, [isLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage]);
+  }, [isLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage, organizations]);
 
   const handleExport = (format: 'pdf' | 'json') => {
     toast({
@@ -255,7 +261,7 @@ export default function AnalyticsPage() {
             filters={filters} 
             onFiltersChange={setFilters} 
             users={allServiceUsers} 
-            clients={['TLA', 'FEMA']} 
+            clients={organizations.map(o => o.name)} 
             environments={['DEV', 'QA', 'PROD', 'Staging', 'Other']} 
             isLoading={true}
         />
@@ -302,7 +308,7 @@ export default function AnalyticsPage() {
         filters={filters} 
         onFiltersChange={setFilters} 
         users={allServiceUsers}
-        clients={clients}
+        clients={clients} // Pass dynamic client names
         environments={environments}
         isLoading={isLoading}
       />
@@ -382,4 +388,3 @@ const ChartSkeleton = ({title}: {title: string}) => (
         </CardContent>
     </Card>
 );
-

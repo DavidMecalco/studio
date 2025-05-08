@@ -34,11 +34,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { createJiraTicketAction } from "@/app/actions/jira-actions";
-import type { JiraTicketProvider, JiraTicketBranch, JiraTicketPriority } from "@/services/jira";
+import type { JiraTicketBranch, JiraTicketPriority, JiraTicketProvider } from "@/services/jira";
 import { Plus, FileUp, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { getOrganizations, type Organization } from '@/services/users';
 
-const ticketProviders: JiraTicketProvider[] = ['TLA', 'FEMA'];
+
 const ticketBranches: JiraTicketBranch[] = ['DEV', 'QA', 'PROD'];
 const ticketPriorities: JiraTicketPriority[] = ['Alta', 'Media', 'Baja'];
 
@@ -66,7 +67,7 @@ const createTicketFormSchemaBase = z.object({
 
 // Schema for admin/superuser users, includes optional provider, branch, and attachments
 const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
-  provider: z.enum(ticketProviders).optional(),
+  provider: z.string().optional(), // Provider/Organization name as string
   branch: z.enum(ticketBranches).optional(),
 });
 
@@ -84,6 +85,7 @@ export function CreateTicketDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -113,7 +115,13 @@ export function CreateTicketDialog() {
         branch: undefined,
       });
     }
-  }, [user, form, isOpen]);
+    if (isOpen && isAdminOrSuperUser) {
+        getOrganizations().then(setOrganizations).catch(err => {
+            console.error("Failed to fetch organizations for ticket dialog", err);
+            toast({title: "Error", description: "Could not load organizations.", variant: "destructive"});
+        });
+    }
+  }, [user, form, isOpen, isAdminOrSuperUser, toast]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -157,10 +165,9 @@ export function CreateTicketDialog() {
     
     let providerForAction: JiraTicketProvider | undefined = undefined;
     if (user.role === 'client') {
-        // For clients, derive provider from their company if it's TLA or FEMA
-        if (user.company === 'TLA' || user.company === 'FEMA') {
-            providerForAction = user.company;
-        }
+        // For clients, derive provider from their company.
+        // This assumes user.company is set correctly during login/user creation.
+        providerForAction = user.company;
     } else if (isAdminOrSuperUser) {
         providerForAction = values.provider;
     }
@@ -293,20 +300,21 @@ export function CreateTicketDialog() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="provider"
+                    name="provider" // This is the organization/company name
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Proveedor</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormLabel>Organización (Proveedor)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Seleccione proveedor" />
+                              <SelectValue placeholder="Seleccione organización" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {ticketProviders.map(provider => (
-                              <SelectItem key={provider} value={provider}>
-                                {provider}
+                             <SelectItem value="">-- Ninguna --</SelectItem>
+                            {organizations.map(org => (
+                              <SelectItem key={org.id} value={org.name}>
+                                {org.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -328,6 +336,7 @@ export function CreateTicketDialog() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                             <SelectItem value="">-- Ninguna --</SelectItem>
                             {ticketBranches.map(branch => (
                               <SelectItem key={branch} value={branch}>
                                 {branch}
@@ -393,4 +402,3 @@ export function CreateTicketDialog() {
     </Dialog>
   );
 }
-

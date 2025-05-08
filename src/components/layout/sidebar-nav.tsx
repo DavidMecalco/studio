@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers, Users } from "lucide-react"; // Added Users for superuser
+import { LayoutDashboard, Ticket, Github, Server, Settings, ListChecks, UserCog, ShieldCheck, LineChart as AnalyticsIcon, History, Layers, Users, Building } from "lucide-react"; // Added Users, Building
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 
@@ -23,11 +23,11 @@ const baseAdminNavItems = [
 ];
 
 const superUserNavItems = [
-  ...baseAdminNavItems.filter(item => item.href !== "/admin-profile"), // Remove default admin profile
+  ...baseAdminNavItems.filter(item => item.href !== "/admin-profile"), 
   { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
-  // Add superuser specific items like User Management if needed in the future
-  // { href: "/user-management", label: "User Management", icon: Users }, 
-  { href: "/admin-profile", label: "SuperUser Profile", icon: ShieldCheck }, // Specific profile link for superuser
+  { href: "/user-management", label: "User Management", icon: Users }, 
+  { href: "/organization-management", label: "Org Management", icon: Building },
+  { href: "/admin-profile", label: "SuperUser Profile", icon: ShieldCheck }, 
 ];
 
 
@@ -81,4 +81,3 @@ export function SidebarNav() {
     </SidebarMenu>
   );
 }
-

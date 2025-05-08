@@ -7,7 +7,7 @@ export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuel
  * Represents the possible providers for a Jira ticket.
  * These can also represent client company names for repository mapping.
  */
-export type JiraTicketProvider = 'TLA' | 'FEMA';
+export type JiraTicketProvider = string; // Changed from 'TLA' | 'FEMA' to string
 
 /**
  * Represents the possible branches for a Jira ticket.
@@ -397,12 +397,17 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
   
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
 
+  // Determine GitLab repository based on provider name (case-insensitive for safety)
   let gitlabRepository = 'maximo-generic'; 
-  if (ticketData.provider === 'TLA') {
+  if (ticketData.provider?.toLowerCase() === 'tla') {
     gitlabRepository = 'maximo-tla';
-  } else if (ticketData.provider === 'FEMA') {
+  } else if (ticketData.provider?.toLowerCase() === 'fema') {
     gitlabRepository = 'maximo-fema';
+  } else if (ticketData.provider) {
+    // For other providers, create a generic repo name
+    gitlabRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9]/gi, '')}`;
   }
+
 
   const initialHistoryEntry: JiraTicketHistoryEntry = {
     id: `hist-init-${Date.now()}`,
