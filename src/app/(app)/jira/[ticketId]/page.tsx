@@ -21,9 +21,9 @@ import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
 // import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog'; // VersionHistoryCard was removed
 import { CommentForm } from '@/components/tickets/CommentForm';
 import { useToast } from '@/hooks/use-toast';
-import { addAttachmentsToTicketAction } from '@/app/actions/jira-actions'; 
-import { Input } from '@/components/ui/input'; 
-import { Label } from '@/components/ui/label'; 
+// import { addAttachmentsToTicketAction } from '@/app/actions/jira-actions'; // Removed as form is removed
+// import { Input } from '@/components/ui/input'; // Removed as form is removed
+// import { Label } from '@/components/ui/label'; // Removed as form is removed
 import { TicketAdminActions } from '@/components/tickets/ticket-admin-actions'; 
 
 
@@ -33,164 +33,7 @@ interface TicketDetailsData {
   users: ServiceUser[]; 
 }
 
-// Form for adding new attachments
-const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
-const ALLOWED_ATTACHMENT_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 
-  'application/pdf', 
-  'application/msword', 
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-  'text/plain', 'text/xml', 'application/xml',
-  'application/vnd.ms-excel', 
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/zip', 'application/x-zip-compressed',
-  // For code files
-  'text/x-python', 'application/python',
-  'text/javascript', 'application/javascript',
-  'application/json',
-];
-
-function AddAttachmentsForm({ ticketId, onAttachmentsAdded }: { ticketId: string, onAttachmentsAdded: () => void }) {
-    const { user } = useAuth();
-    const { toast } = useToast();
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files) {
-            const filesArray = Array.from(event.target.files);
-            const validFiles = filesArray.filter(file => {
-                if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
-                    toast({
-                        title: "Archivo Demasiado Grande",
-                        description: `El archivo "${file.name}" excede el límite de 5MB.`,
-                        variant: "destructive",
-                    });
-                    return false;
-                }
-                // Basic MIME type check; for more robustness, consider server-side validation or more specific client-side checks
-                // Allow common code file extensions explicitly if MIME type is generic (e.g. application/octet-stream)
-                const fileExtension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-                const commonCodeExtensions = ['.py', '.xml', '.rptdesign', '.sql', '.java', '.js', '.ts', '.cs', '.json', '.yaml', '.yml', '.txt', '.md'];
-
-                if (!ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.type) && !commonCodeExtensions.includes(fileExtension) && file.type !== 'application/octet-stream') {
-                    toast({
-                        title: "Tipo de Archivo No Permitido",
-                        description: `El tipo de archivo de "${file.name}" (${file.type || 'desconocido'}) no está permitido. Extensiones permitidas: ${commonCodeExtensions.join(', ')}`,
-                        variant: "destructive",
-                    });
-                    return false;
-                }
-                return true;
-            }).slice(0, 5 - selectedFiles.length); // Limit to 5 files total
-
-            setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5));
-            if (filesArray.length + selectedFiles.length > 5) {
-                toast({
-                    title: "Límite de Archivos Alcanzado",
-                    description: `Solo se pueden subir hasta 5 archivos. Se ignoraron los adicionales.`,
-                    variant: "warning",
-                })
-            }
-            event.target.value = ""; // Reset file input
-        }
-    };
-
-    const removeFile = (fileName: string) => {
-        setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
-    };
-
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!user) {
-            toast({ title: "Error", description: "Usuario no autenticado.", variant: "destructive" });
-            return;
-        }
-        if (selectedFiles.length === 0) {
-            toast({ title: "Sin Archivos", description: "Por favor, seleccione al menos un archivo para adjuntar.", variant: "destructive" });
-            return;
-        }
-
-        setIsSubmitting(true);
-        const attachmentNames = selectedFiles.map(file => file.name);
-        // Here, you would typically upload files to a storage service and get URLs/references
-        // For this simulation, we pass names to the action.
-        const result = await addAttachmentsToTicketAction(ticketId, user.id, attachmentNames);
-
-        if (result.success) {
-            toast({
-                title: "Adjuntos Agregados",
-                description: "Los archivos han sido adjuntados al ticket. (Simulado)",
-            });
-            setSelectedFiles([]);
-            onAttachmentsAdded(); // Callback to refresh ticket data
-        } else {
-            toast({
-                title: "Error al Adjuntar",
-                description: result.error || "No se pudieron adjuntar los archivos.",
-                variant: "destructive",
-            });
-        }
-        setIsSubmitting(false);
-    };
-    
-    return (
-        <Card className="shadow-md rounded-lg mt-6">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                    <Paperclip className="h-5 w-5 text-primary" /> Adjuntar Nuevos Archivos
-                </CardTitle>
-                <CardDescription>
-                    Suba archivos relevantes para este ticket (máx. 5 archivos, 5MB c/u). Permitidos: imágenes, PDF, Office, texto, ZIP y archivos de código comunes.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <Label htmlFor={`attachments-${ticketId}`}>Seleccionar archivos</Label>
-                        <div className="mt-1 flex items-center gap-2">
-                            <Input
-                                id={`attachments-${ticketId}`}
-                                type="file"
-                                multiple
-                                onChange={handleFileChange}
-                                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                                accept={[...ALLOWED_ATTACHMENT_MIME_TYPES, '.py','.xml','.zip','.js','.ts','.java','.cs','.json','.yaml','.yml','.txt','.md', 'application/octet-stream'].join(',')}
-                                disabled={selectedFiles.length >= 5 || isSubmitting}
-                            />
-                            <UploadCloud className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        {selectedFiles.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                                <p className="text-sm font-medium">Archivos seleccionados:</p>
-                                <ul className="list-none space-y-1">
-                                    {selectedFiles.map(file => (
-                                        <li key={file.name} className="flex justify-between items-center text-sm p-2 border rounded-md bg-muted/50">
-                                            <div className="flex items-center gap-2">
-                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                                <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                                            </div>
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(file.name)} className="text-destructive hover:bg-destructive/10 h-6 w-6" disabled={isSubmitting}>
-                                                <XIcon className="h-4 w-4" />
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                        {selectedFiles.length >= 5 && (
-                            <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
-                        )}
-                    </div>
-                    <Button type="submit" disabled={isSubmitting || selectedFiles.length === 0}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
-                        {isSubmitting ? "Adjuntando..." : "Adjuntar Archivos"}
-                    </Button>
-                </form>
-            </CardContent>
-        </Card>
-    );
-}
+// AddAttachmentsForm was removed as per user request.
 
 
 async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
@@ -214,7 +57,9 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
 
 export default function TicketDetailPage() {
   const { user, loading: authLoading } = useAuth();
-  const { ticketId } = useParams<{ ticketId: string }>(); 
+  const params = useParams<{ ticketId: string }>(); 
+  const ticketId = params?.ticketId;
+
 
   const [ticketData, setTicketData] = useState<TicketDetailsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -280,9 +125,7 @@ export default function TicketDetailPage() {
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* History heading */}
             <Skeleton className="h-24 w-full" /> {/* History list placeholder */}
-             <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Attachments form heading */}
-            <Skeleton className="h-40 w-full" /> {/* Attachments form placeholder */}
+             {/* Attachments form placeholder removed */}
              <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments form heading */}
             <Skeleton className="h-32 w-full" /> {/* Comments form placeholder */}
@@ -310,11 +153,9 @@ export default function TicketDetailPage() {
   }
 
   const { ticket, commits, users: allUsers } = ticketData;
-  // const filesForVersionHistory = ticket.attachmentNames || []; // VersionHistoryCard was removed
 
   const canManageTicketCommits = user?.role === 'admin'; 
   const canManageTicketAdminActions = user?.role === 'admin' || user?.role === 'superuser';
-  // const canViewVersionHistory = user?.role === 'admin' || user?.role === 'superuser'; // VersionHistoryCard was removed
   const canInteractWithTicket = !!user; 
 
 
@@ -413,30 +254,7 @@ export default function TicketDetailPage() {
               {ticket.description}
             </p>
 
-            {ticket.attachmentNames && ticket.attachmentNames.length > 0 && (
-              <>
-                <Separator className="my-6" />
-                <h3 className="text-lg font-semibold mb-3 text-foreground flex items-center gap-2">
-                    <Paperclip className="h-5 w-5" /> Attachments
-                </h3>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  {ticket.attachmentNames.map((name, index) => (
-                    <li key={index} className="flex items-center gap-2">
-                        <HardDriveUpload className="h-4 w-4 text-muted-foreground" /> 
-                        {name}
-                    </li>))}
-                </ul>
-                <div className="mt-4 p-4 border rounded-md bg-muted/50">
-                    <h4 className="text-sm font-medium text-foreground flex items-center gap-2 mb-2">
-                        <FileClock className="h-4 w-4" /> Version Comparison (Placeholder)
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                        File version comparison and diff view for .py, .xml, and .rptdesign files will be displayed here.
-                        This feature is under development.
-                    </p>
-                </div>
-              </>
-            )}
+            {/* Attachments display section removed */}
             
             {canManageTicketAdminActions && allUsers.length > 0 && (
                 <>
@@ -462,11 +280,10 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
+            {/* AddAttachmentsForm removed */}
 
             {canInteractWithTicket && ticketId && ( 
                 <>
-                    <Separator className="my-6"/>
-                    <AddAttachmentsForm ticketId={ticketId} onAttachmentsAdded={refreshTicketData} />
                     <Separator className="my-6"/>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
                         <MessageSquare className="h-5 w-5"/> Comentarios
