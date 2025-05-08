@@ -12,7 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { getUsers, createUserInFirestore, type UserDoc, getOrganizations, type Organization } from '@/services/users';
+import { getUsers, type UserDoc, getOrganizations, type Organization } from '@/services/users';
+import { createOrUpdateUserAction } from '@/app/actions/user-actions'; // Import the server action
+import type { User as AuthUserType } from '@/context/auth-context'; // For payload type
 import { useAuth } from '@/context/auth-context';
 import { Users as UsersIcon, AlertTriangle, Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,14 +39,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const userFormSchema = z.object({
-  id: z.string().optional(), // For editing existing users
+  id: z.string().optional(), // For editing existing users, this will be the username (document ID)
   username: z.string().min(3, "Username must be at least 3 characters.").max(50),
   name: z.string().min(1, "Name is required.").max(100),
   role: z.enum(['client', 'admin', 'superuser'], { required_error: "Role is required." }),
   company: z.string().optional(), // Company name as string
   phone: z.string().optional(),
   position: z.string().optional(),
-  // No password field here, as it's handled by mock login or external auth
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -99,22 +100,23 @@ export default function UserManagementPage() {
 
   const handleCreateOrUpdateUser = async (values: UserFormValues) => {
     setIsSubmitting(true);
-    const userDataToSave = {
-      id: values.id || values.username, // Use existing id if editing, else username
+    
+    const payloadForAction: AuthUserType = {
+      id: values.id || values.username, // This 'id' is the username, for AuthUserType and Firestore doc ID
       username: values.username,
-      name: values.name,
+      name: values.name, // 'name' is now part of AuthUserType
       role: values.role,
       company: values.company,
       phone: values.phone,
       position: values.position,
     };
 
-    const success = await createUserInFirestore(userDataToSave);
+    const result = await createOrUpdateUserAction(payloadForAction);
 
-    if (success) {
+    if (result.success) {
       toast({
-        title: values.id ? "User Updated" : "User Created",
-        description: `User ${values.username} has been successfully ${values.id ? 'updated' : 'created'}.`,
+        title: editingUser ? "User Updated" : "User Created",
+        description: `User ${values.username} has been successfully ${editingUser ? 'updated' : 'created'}.`,
       });
       setUsers(await getUsers()); // Refresh user list
       setIsFormOpen(false);
@@ -123,7 +125,7 @@ export default function UserManagementPage() {
     } else {
       toast({
         title: "Operation Failed",
-        description: `Could not ${values.id ? 'update' : 'create'} user. Username might already exist or server error.`,
+        description: result.error || `Could not ${editingUser ? 'update' : 'create'} user. Username might already exist or server error.`,
         variant: "destructive",
       });
     }
@@ -133,7 +135,7 @@ export default function UserManagementPage() {
   const openEditForm = (userToEdit: UserDoc) => {
     setEditingUser(userToEdit);
     form.reset({
-      id: userToEdit.id,
+      id: userToEdit.id, // This is the username (document ID)
       username: userToEdit.username,
       name: userToEdit.name,
       role: userToEdit.role,
@@ -386,3 +388,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
