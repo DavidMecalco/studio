@@ -5,11 +5,13 @@ import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
 import { getJiraTickets, type JiraTicket } from '@/services/jira'; // Removed unused type imports
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ListChecks, AlertTriangle } from 'lucide-react';
+import { ListChecks, AlertTriangle, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsFilterBar, type MyTicketsFilters } from '@/components/tickets/my-tickets-filter-bar';
 import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
+import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
+import { Button } from '@/components/ui/button';
 
 export default function MyTicketsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -85,6 +87,7 @@ export default function MyTicketsPage() {
             <Skeleton className="h-8 w-48 mb-1" />
             <Skeleton className="h-4 w-72" />
           </div>
+          { canViewPage && <Skeleton className="h-10 w-40" /> }
         </div>
         <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
         <Card className="bg-card shadow-lg rounded-xl">
@@ -123,6 +126,16 @@ export default function MyTicketsPage() {
             View and track your submitted tickets.
           </p>
         </div>
+        {user?.role === 'client' && (
+          <CreateTicketDialog
+            triggerButton={
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create New Ticket
+              </Button>
+            }
+          />
+        )}
       </div>
 
       <MyTicketsFilterBar filters={filters} onFiltersChange={setFilters} />
@@ -145,3 +158,4 @@ export default function MyTicketsPage() {
     </div>
   );
 }
+

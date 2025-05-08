@@ -101,7 +101,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       priority: undefined,
       requestingUserId: user?.username || "",
       requestingUserEmail: user?.email || "",
-      provider: undefined,
+      provider: undefined, 
       branch: undefined,
     },
   });
@@ -114,17 +114,17 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
         priority: undefined,
         requestingUserId: user.username,
         requestingUserEmail: user.email, // Set email for notifications
-        provider: undefined, 
+        provider: isAdminOrSuperUser ? undefined : user.company, // Pre-fill provider for client
         branch: undefined,
       });
     }
-    if (isOpen && (user?.role === 'admin' || user?.role === 'superuser')) { 
+    if (isOpen && isAdminOrSuperUser) { 
         getOrganizations().then(setOrganizations).catch(err => {
             console.error("Failed to fetch organizations for ticket dialog", err);
             toast({title: "Error", description: "Could not load organizations.", variant: "destructive"});
         });
     }
-  }, [user, form, isOpen, toast]);
+  }, [user, form, isOpen, toast, isAdminOrSuperUser]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -164,13 +164,13 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     }
     setIsSubmitting(true);
 
-    const attachmentNames = (user.role === 'admin' || user.role === 'superuser') ? selectedFiles.map(file => file.name) : [];
+    const attachmentNames = selectedFiles.map(file => file.name);
     
     let providerForAction: JiraTicketProvider | undefined = undefined;
     if (user.role === 'client') {
-        providerForAction = user.company;
-    } else if (user.role === 'admin' || user.role === 'superuser') {
-        providerForAction = values.provider; 
+        providerForAction = user.company; // Client's company is their provider
+    } else if (isAdminOrSuperUser) {
+        providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider; 
     }
 
     const ticketDataForAction = {
@@ -178,10 +178,10 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       description: values.description!,
       priority: values.priority!,
       requestingUserId: user.username!,
-      requestingUserEmail: user.email, // Pass user's email for notification
+      requestingUserEmail: user.email,
       provider: providerForAction, 
-      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined, 
-      attachmentNames: (user.role === 'admin' || user.role === 'superuser') ? attachmentNames : [],
+      branch: isAdminOrSuperUser ? (values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch) : undefined, 
+      attachmentNames: attachmentNames,
     };
 
     const result = await createJiraTicketAction(ticketDataForAction);
@@ -206,27 +206,28 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
   
   if (!user) return null; 
 
-  const defaultTrigger = (
+  const defaultFabTrigger = (
      <Button
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl"
         size="icon"
         aria-label="Crear nuevo ticket"
-        onClick={() => setIsOpen(true)} 
       >
         <Plus className="h-7 w-7" />
       </Button>
   );
-  
-  const canDisplayTrigger = user.role === 'admin' || user.role === 'superuser';
-
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        {canDisplayTrigger && (
+        {triggerButton ? ( // If a trigger is explicitly passed (e.g. from AppShell FAB or MyTicketsPage button), use it
             <DialogTrigger asChild>
-                {triggerButton || defaultTrigger}
+                {triggerButton}
             </DialogTrigger>
-        )}
+        ) : isAdminOrSuperUser ? ( // Otherwise, if no trigger is passed AND user is admin/superuser, render the default FAB
+            <DialogTrigger asChild>
+                {defaultFabTrigger}
+            </DialogTrigger>
+        ) : null /* Clients or other roles without a passed trigger don't get a default trigger from here */
+        }
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Ticket</DialogTitle>
@@ -263,7 +264,6 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                 </FormItem>
               )}
             />
-            {/* Hidden field for email, could be displayed if needed */}
             <FormField
                 control={form.control}
                 name="requestingUserEmail"
@@ -273,7 +273,6 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                     </FormItem>
                 )}
             />
-
 
             <FormField
               control={form.control}
@@ -318,7 +317,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
               )}
             />
 
-            {(user.role === 'admin' || user.role === 'superuser') && (
+            {isAdminOrSuperUser && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -382,43 +381,44 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                     )}
                   />
                 </div>
-              
-                <FormItem>
-                  <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            id="attachments"
-                            type="file"
-                            multiple
-                            onChange={handleFileChange}
-                            className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                            accept={ALLOWED_MIME_TYPES.join(',')}
-                            disabled={selectedFiles.length >= 5}
-                        />
-                         <FileUp className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  </FormControl>
-                   {selectedFiles.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-sm font-medium">Archivos seleccionados:</p>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground">
-                        {selectedFiles.map(file => (
-                          <li key={file.name} className="flex justify-between items-center">
-                            <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file.name)} className="text-destructive">X</Button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                   {selectedFiles.length >= 5 && (
-                    <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
-                  )}
-                  <FormMessage />
-                </FormItem>
               </>
             )}
+              
+            {/* Attachment field for all roles that can create tickets */}
+            <FormItem>
+              <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
+              <FormControl>
+                <div className="flex items-center gap-2">
+                    <Input
+                        id="attachments"
+                        type="file"
+                        multiple
+                        onChange={handleFileChange}
+                        className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                        accept={ALLOWED_MIME_TYPES.join(',')}
+                        disabled={selectedFiles.length >= 5}
+                    />
+                      <FileUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </FormControl>
+                {selectedFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm font-medium">Archivos seleccionados:</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {selectedFiles.map(file => (
+                      <li key={file.name} className="flex justify-between items-center">
+                        <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file.name)} className="text-destructive">X</Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+                {selectedFiles.length >= 5 && (
+                <p className="text-xs text-destructive mt-1">Ha alcanzado el límite de 5 archivos.</p>
+              )}
+              <FormMessage />
+            </FormItem>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { form.reset(); setSelectedFiles([]); setIsOpen(false); }} disabled={isSubmitting}>
@@ -435,3 +435,4 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     </Dialog>
   );
 }
+

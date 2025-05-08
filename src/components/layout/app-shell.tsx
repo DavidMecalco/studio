@@ -30,9 +30,8 @@ export function AppShell({ children }: AppShellProps) {
     ? document.cookie.includes("sidebar_state=true")
     : true;
 
-  // Determine if the create ticket FAB should be shown
-  // Show for admin and superuser, not for client (client will have button on My Tickets page)
-  const showCreateTicketFab = user && (user.role === 'admin' || user.role === 'superuser');
+  // Show FAB for all authenticated user roles (client, admin, superuser)
+  const showCreateTicketFab = !!user;
 
 
   return (
@@ -87,3 +86,4 @@ export function AppShell({ children }: AppShellProps) {
     </SidebarProvider>
   );
 }
+
