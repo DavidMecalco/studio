@@ -8,10 +8,9 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'; // Removed Label
 import { useToast } from '@/hooks/use-toast';
-import { getOrganizations, createOrUpdateOrganization as createOrUpdateOrgService, type Organization } from '@/services/users';
+import { getOrganizations, type Organization } from '@/services/users'; // Removed createOrUpdateOrganization from here
 import { createOrUpdateOrganizationAction } from '@/app/actions/user-actions';
 import { useAuth } from '@/context/auth-context';
 import { Building, AlertTriangle, Loader2, Edit, Trash2, PlusCircle, Github } from 'lucide-react';
@@ -41,7 +40,7 @@ const organizationFormSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "ID can only contain lowercase letters, numbers, and hyphens."),
   name: z.string().min(1, "Organization name is required.").max(100),
   githubRepository: z.string().optional()
-    .refine(val => !val || /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(val), {
+    .refine(val => !val || /^[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+$/.test(val), { // Fixed regex to allow hyphens in repo name
       message: "Must be in format 'owner/repo_name' or empty.",
     }),
 });
@@ -51,7 +50,7 @@ type OrganizationFormValues = z.infer<typeof organizationFormSchema>;
 export default function OrganizationManagementPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
@@ -70,33 +69,33 @@ export default function OrganizationManagementPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !currentUser) { // Ensure currentUser is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
-        const fetchedOrganizations = await getOrganizations();
+        const fetchedOrganizations = await getOrganizations(); // Uses efficient local storage first
         setOrganizations(fetchedOrganizations);
       } catch (error) {
         console.error("Error fetching organization data:", error);
         toast({ title: "Error", description: "Failed to load organization data.", variant: "destructive" });
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && currentUser) { // Trigger fetch when auth is done and currentUser is present
       fetchData();
     } else if (!authLoading) {
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-  }, [authLoading, canViewPage, toast]);
+  }, [authLoading, canViewPage, currentUser, toast]);
 
   const handleCreateOrUpdateOrg = async (values: OrganizationFormValues) => {
     setIsSubmitting(true);
     const orgData: Organization = {
       id: values.id,
       name: values.name,
-      githubRepository: values.githubRepository || undefined, // Store as undefined if empty
+      githubRepository: values.githubRepository || undefined, 
     };
 
     const result = await createOrUpdateOrganizationAction(orgData);
@@ -106,7 +105,7 @@ export default function OrganizationManagementPage() {
         title: editingOrg ? "Organization Updated" : "Organization Created",
         description: `Organization ${values.name} has been successfully ${editingOrg ? 'updated' : 'created'}.`,
       });
-      setOrganizations(await getOrganizations()); // Refresh organization list
+      setOrganizations(await getOrganizations()); 
       setIsFormOpen(false);
       setEditingOrg(null);
       form.reset();
@@ -141,15 +140,13 @@ export default function OrganizationManagementPage() {
   };
 
   const handleDeleteOrg = async (orgId: string) => {
-    // Actual deletion would require a backend service
     toast({
       title: "Deletion Simulated",
       description: `Organization ${orgId} would be deleted. (Actual deletion not implemented in mock service)`,
     });
-    // setOrganizations(organizations.filter(o => o.id !== orgId));
   };
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-1/3" /> <Skeleton className="h-4 w-2/3" />
@@ -159,7 +156,7 @@ export default function OrganizationManagementPage() {
     );
   }
 
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="space-y-8 text-center py-10">
         <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
@@ -255,7 +252,7 @@ export default function OrganizationManagementPage() {
           <CardDescription>List of all organizations registered in the system.</CardDescription>
         </CardHeader>
         <CardContent>
-            {isLoading ? <Skeleton className="h-40 w-full" /> : organizations.length === 0 ? <p>No organizations found.</p> : (
+            {isPageLoading ? <Skeleton className="h-40 w-full" /> : organizations.length === 0 ? <p>No organizations found.</p> : (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -283,7 +280,6 @@ export default function OrganizationManagementPage() {
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                {/* Prevent deletion of core orgs like 'tla', 'fema' for demo stability */}
                                 <Button variant="ghost" size="icon" disabled={['tla', 'fema', 'system-corp', 'maximo-corp'].includes(org.id)} title="Delete Organization">
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>

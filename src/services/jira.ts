@@ -8,7 +8,7 @@ export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuel
  * Represents the possible providers for a Jira ticket.
  * These can also represent client company names for repository mapping.
  */
-export type JiraTicketProvider = string; // Changed from 'TLA' | 'FEMA' to string
+export type JiraTicketProvider = string; 
 
 /**
  * Represents the possible branches for a Jira ticket.
@@ -26,181 +26,152 @@ export type JiraTicketPriority = 'Alta' | 'Media' | 'Baja';
 export interface JiraTicketHistoryEntry {
   id: string;
   timestamp: string;
-  userId: string; // User who performed the action
-  action: string; // e.g., "Created", "Status Changed", "Comment Added", "Commit Added", "File Restored"
+  userId: string; 
+  action: string; 
   fromStatus?: JiraTicketStatus;
   toStatus?: JiraTicketStatus;
   comment?: string;
-  commitSha?: string; // Link to associated commit
-  deploymentId?: string; // Link to associated deployment
-  details?: string; // General details about the action
-  fileName?: string; // For file-related actions like restoration
-  restoredVersionId?: string; // For file restoration
+  commitSha?: string; 
+  deploymentId?: string; 
+  details?: string; 
+  fileName?: string; 
+  restoredVersionId?: string; 
 }
 
 /**
  * Represents a Jira ticket.
  */
 export interface JiraTicket {
-  /**
-   * The ID of the Jira ticket.
-   */
   id: string;
-  /**
-   * The title of the Jira ticket.
-   */
   title: string;
-  /**
-   * The description of the Jira ticket.
-   */
   description: string;
-  /**
-   * The status of the Jira ticket.
-   */
   status: JiraTicketStatus;
-  /**
-   * The ID of the user assigned to the ticket, if any.
-   */
   assigneeId?: string;
-  /**
-   * The date the ticket was last updated.
-   */
   lastUpdated?: string;
-  /**
-   * The provider associated with the ticket (e.g., TLA, FEMA).
-   * For client-created tickets, this might reflect their company.
-   */
   provider?: JiraTicketProvider;
-  /**
-   * The branch associated with the ticket (e.g., DEV, QA, PROD).
-   */
   branch?: JiraTicketBranch;
-  /**
-   * Names of attachments for the ticket.
-   */
   attachmentNames?: string[];
-  /**
-   * The priority of the Jira ticket.
-   */
   priority: JiraTicketPriority;
-  /**
-   * The ID (username for mock) of the user who requested/created the ticket.
-   */
   requestingUserId: string; 
-  /**
-   * The GitLab repository associated with the ticket.
-   */
   gitlabRepository?: string;
-  /**
-   * History of changes and actions on the ticket.
-   */
   history: JiraTicketHistoryEntry[];
 }
 
-// Mock data store
-let mockJiraTickets: JiraTicket[] = [
-  {
-    id: 'MAX-123',
-    title: 'Implement feature X',
-    description: 'Details about feature X implementation, including backend and frontend changes.',
-    status: 'En Progreso',
-    assigneeId: 'admin', // Default assignee for an admin/technician user
-    lastUpdated: '2024-07-28T10:00:00Z',
-    provider: 'TLA',
-    branch: 'DEV',
-    priority: 'Media',
-    requestingUserId: 'client-tla1', 
-    gitlabRepository: 'maximo-tla',
-    attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
-    history: [
-      { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
-      { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso' },
-      { id: 'hist-comment-1', timestamp: '2024-07-28T10:05:00Z', userId: 'admin', action: 'Comment Added', comment: 'Starting development now. Will update with progress.', details: 'Comment added by admin' },
-    ],
-  },
-  {
-    id: 'MAX-456',
-    title: 'Fix bug Y in login module',
-    description: 'Users are unable to login with valid credentials. Issue seems to be related to token validation.',
-    status: 'Resuelto',
-    assigneeId: 'admin',
-    lastUpdated: '2024-07-27T15:30:00Z',
-    provider: 'FEMA',
-    branch: 'QA',
-    priority: 'Alta',
-    requestingUserId: 'client-fema1',
-    gitlabRepository: 'maximo-fema',
-    attachmentNames: ['debug_log.txt', 'screenshot_error.png'],
-    history: [
-      { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
-      { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto' },
-      { id: 'hist-comment-2', timestamp: '2024-07-27T15:35:00Z', userId: 'client-fema1', action: 'Comment Added', comment: 'Thanks for fixing this so quickly!', details: 'Comment added by client-fema1' },
-    ],
-  },
-  {
-    id: 'MAX-789',
-    title: 'Setup new CI/CD pipeline',
-    description: 'Configure Jenkins for automated builds and deployments to staging environment.',
-    status: 'Abierto',
-    lastUpdated: '2024-07-29T09:00:00Z',
-    provider: 'TLA',
-    branch: 'PROD',
-    priority: 'Alta',
-    requestingUserId: 'client-tla2',
-    gitlabRepository: 'maximo-tla',
-    attachmentNames: ['requirements_cicd.docx'],
-    history: [
-      { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'client-tla2', action: 'Created', details: 'Ticket Creado' },
-    ],
-  },
-  {
-    id: 'MAX-101',
-    title: 'Update documentation for API v2',
-    description: 'Review and update all relevant sections of the API documentation to reflect v2 changes.',
-    status: 'Pendiente',
-    assigneeId: 'admin',
-    lastUpdated: '2024-07-25T12:00:00Z',
-    priority: 'Baja',
-    requestingUserId: 'client-tla1', 
-    provider: 'TLA', 
-    gitlabRepository: 'maximo-tla',
-    history: [
-      { id: 'hist-6', timestamp: '2024-07-25T12:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
-    ],
-  },
-  {
-    id: 'MAX-202',
-    title: 'Perform security audit on user module',
-    description: 'Conduct a thorough security audit focusing on authentication and authorization mechanisms.',
-    status: 'En espera del visto bueno',
-    assigneeId: 'another-admin', // Different admin for variety
-    lastUpdated: '2024-07-26T11:00:00Z',
-    priority: 'Media',
-    requestingUserId: 'client-generic1',
-    gitlabRepository: 'maximo-generic',
-    history: [
-        { id: 'hist-7', timestamp: '2024-07-26T10:00:00Z', userId: 'client-generic1', action: 'Created', details: 'Ticket Creado' },
-        { id: 'hist-8', timestamp: '2024-07-26T11:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'En espera del visto bueno', details: 'Estado cambiado a En espera del visto bueno' },
-    ],
-  },
-  {
-    id: 'MAX-303',
-    title: 'Refactor reporting service',
-    description: 'Improve performance and maintainability of the current reporting service.',
-    status: 'Cerrado',
-    assigneeId: 'admin',
-    lastUpdated: '2024-07-20T17:00:00Z',
-    priority: 'Baja',
-    requestingUserId: 'client-fema1', 
-    provider: 'FEMA', 
-    gitlabRepository: 'maximo-fema',
-    attachmentNames: ['old_report_design.rptdesign', 'new_report_design.rptdesign'],
-    history: [
-      { id: 'hist-9', timestamp: '2024-07-20T16:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
-      { id: 'hist-10', timestamp: '2024-07-20T17:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Cerrado', details: 'Ticket cerrado.' },
-    ],
-  },
-];
+// Mock data store - initialize once
+let mockJiraTickets: JiraTicket[] = [];
+let mockJiraTicketsInitialized = false;
+
+function initializeMockJiraTickets() {
+    if (mockJiraTicketsInitialized) return;
+
+    mockJiraTickets = [
+      {
+        id: 'MAX-123',
+        title: 'Implement feature X',
+        description: 'Details about feature X implementation, including backend and frontend changes.',
+        status: 'En Progreso',
+        assigneeId: 'admin', 
+        lastUpdated: '2024-07-28T10:00:00Z',
+        provider: 'TLA',
+        branch: 'DEV',
+        priority: 'Media',
+        requestingUserId: 'client-tla1', 
+        gitlabRepository: 'maximo-tla',
+        attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
+        history: [
+          { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso' },
+          { id: 'hist-comment-1', timestamp: '2024-07-28T10:05:00Z', userId: 'admin', action: 'Comment Added', comment: 'Starting development now. Will update with progress.', details: 'Comment added by admin' },
+        ],
+      },
+      {
+        id: 'MAX-456',
+        title: 'Fix bug Y in login module',
+        description: 'Users are unable to login with valid credentials. Issue seems to be related to token validation.',
+        status: 'Resuelto',
+        assigneeId: 'admin',
+        lastUpdated: '2024-07-27T15:30:00Z',
+        provider: 'FEMA',
+        branch: 'QA',
+        priority: 'Alta',
+        requestingUserId: 'client-fema1',
+        gitlabRepository: 'maximo-fema',
+        attachmentNames: ['debug_log.txt', 'screenshot_error.png'],
+        history: [
+          { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto' },
+          { id: 'hist-comment-2', timestamp: '2024-07-27T15:35:00Z', userId: 'client-fema1', action: 'Comment Added', comment: 'Thanks for fixing this so quickly!', details: 'Comment added by client-fema1' },
+        ],
+      },
+      {
+        id: 'MAX-789',
+        title: 'Setup new CI/CD pipeline',
+        description: 'Configure Jenkins for automated builds and deployments to staging environment.',
+        status: 'Abierto',
+        lastUpdated: '2024-07-29T09:00:00Z',
+        provider: 'TLA',
+        branch: 'PROD',
+        priority: 'Alta',
+        requestingUserId: 'client-tla2',
+        gitlabRepository: 'maximo-tla',
+        attachmentNames: ['requirements_cicd.docx'],
+        history: [
+          { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'client-tla2', action: 'Created', details: 'Ticket Creado' },
+        ],
+      },
+      {
+        id: 'MAX-101',
+        title: 'Update documentation for API v2',
+        description: 'Review and update all relevant sections of the API documentation to reflect v2 changes.',
+        status: 'Pendiente',
+        assigneeId: 'admin',
+        lastUpdated: '2024-07-25T12:00:00Z',
+        priority: 'Baja',
+        requestingUserId: 'client-tla1', 
+        provider: 'TLA', 
+        gitlabRepository: 'maximo-tla',
+        history: [
+          { id: 'hist-6', timestamp: '2024-07-25T12:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
+        ],
+      },
+      {
+        id: 'MAX-202',
+        title: 'Perform security audit on user module',
+        description: 'Conduct a thorough security audit focusing on authentication and authorization mechanisms.',
+        status: 'En espera del visto bueno',
+        assigneeId: 'another-admin', 
+        lastUpdated: '2024-07-26T11:00:00Z',
+        priority: 'Media',
+        requestingUserId: 'client-generic1',
+        gitlabRepository: 'maximo-generic',
+        history: [
+            { id: 'hist-7', timestamp: '2024-07-26T10:00:00Z', userId: 'client-generic1', action: 'Created', details: 'Ticket Creado' },
+            { id: 'hist-8', timestamp: '2024-07-26T11:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'En espera del visto bueno', details: 'Estado cambiado a En espera del visto bueno' },
+        ],
+      },
+      {
+        id: 'MAX-303',
+        title: 'Refactor reporting service',
+        description: 'Improve performance and maintainability of the current reporting service.',
+        status: 'Cerrado',
+        assigneeId: 'admin',
+        lastUpdated: '2024-07-20T17:00:00Z',
+        priority: 'Baja',
+        requestingUserId: 'client-fema1', 
+        provider: 'FEMA', 
+        gitlabRepository: 'maximo-fema',
+        attachmentNames: ['old_report_design.rptdesign', 'new_report_design.rptdesign'],
+        history: [
+          { id: 'hist-9', timestamp: '2024-07-20T16:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-10', timestamp: '2024-07-20T17:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Cerrado', details: 'Ticket cerrado.' },
+        ],
+      },
+    ];
+    mockJiraTicketsInitialized = true;
+}
+
+initializeMockJiraTickets();
+
 
 /**
  * Asynchronously retrieves Jira tickets.
@@ -209,12 +180,12 @@ let mockJiraTickets: JiraTicket[] = [
  * @returns A promise that resolves to an array of JiraTicket objects.
  */
 export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
   let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); 
   if (requestingUserId) {
     tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
   }
-  return tickets.sort((a, b) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
+  return tickets.sort((a: JiraTicket, b: JiraTicket) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
 }
 
 /**
@@ -223,7 +194,7 @@ export async function getJiraTickets(requestingUserId?: string): Promise<JiraTic
  * @returns A promise that resolves to a JiraTicket object or null if not found.
  */
 export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 20)); // Reduced delay
   const ticket = mockJiraTickets.find((ticket) => ticket.id === ticketId);
   return ticket ? JSON.parse(JSON.stringify(ticket)) : null;
 }
@@ -241,11 +212,11 @@ export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null
 export async function updateJiraTicket(
   ticketId: string,
   newStatus?: JiraTicketStatus,
-  newAssigneeId?: string, // undefined means don't change, "" means unassign
-  userIdPerformingAction: string = "system", // Default to system if not specified
+  newAssigneeId?: string, 
+  userIdPerformingAction: string = "system", 
   comment?: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) {
     return null;
@@ -274,9 +245,8 @@ export async function updateJiraTicket(
   }
   
   const actualNewAssigneeId = newAssigneeId === "" ? undefined : newAssigneeId;
-  if (newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { // Check if assignee actually changes
+  if (newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { 
     updatedTicketDetails.assigneeId = actualNewAssigneeId;
-    // Could create another history entry or combine
     const assigneeChangeDetails = actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado';
     if (historyEntry) {
       historyEntry.details += `; ${assigneeChangeDetails}`;
@@ -292,7 +262,7 @@ export async function updateJiraTicket(
         details: assigneeChangeDetails,
       };
     }
-  } else if (comment && !historyEntry) { // If only a comment is provided
+  } else if (comment && !historyEntry) { 
      historyEntry = {
         id: `hist-comment-${Date.now()}`,
         timestamp: new Date().toISOString(),
@@ -303,7 +273,6 @@ export async function updateJiraTicket(
       };
   }
   
-  // Only update if there are changes
   if (Object.keys(updatedTicketDetails).length > 0 || historyEntry?.action === 'Comment Added' || historyEntry?.action === 'Ticket Reabierto') {
     updatedTicketDetails.lastUpdated = new Date().toISOString();
   }
@@ -312,7 +281,7 @@ export async function updateJiraTicket(
   const updatedTicket = {
     ...currentTicket,
     ...updatedTicketDetails,
-    history: [...currentTicket.history], // Copy existing history
+    history: [...currentTicket.history], 
   };
 
   if (historyEntry) {
@@ -340,7 +309,7 @@ export async function addCommitToTicketHistory(
   commitMessage: string,
   branch: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -356,15 +325,13 @@ export async function addCommitToTicketHistory(
   mockJiraTickets[ticketIndex].history.push(historyEntry);
   mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
   
-  // If ticket status was 'Abierto' or 'Pendiente', move to 'En Progreso'
-  // Avoid changing status if it's already Resolved, Closed, or En espera del visto bueno
   if (['Abierto', 'Pendiente'].includes(mockJiraTickets[ticketIndex].status)) {
      const oldStatus = mockJiraTickets[ticketIndex].status;
      mockJiraTickets[ticketIndex].status = 'En Progreso';
      const statusChangeEntry: JiraTicketHistoryEntry = {
         id: `hist-status-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        userId: userIdPerformingAction, // or 'system'
+        userId: userIdPerformingAction, 
         action: 'Status Changed',
         fromStatus: oldStatus,
         toStatus: 'En Progreso',
@@ -399,18 +366,16 @@ export interface CreateJiraTicketData {
  * @returns A promise that resolves to the created JiraTicket object.
  */
 export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket> {
-  await new Promise(resolve => setTimeout(resolve, 600));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
   
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
 
-  // Determine GitLab repository based on provider name (case-insensitive for safety)
   let gitlabRepository = 'maximo-generic'; 
   if (ticketData.provider?.toLowerCase() === 'tla') {
     gitlabRepository = 'maximo-tla';
   } else if (ticketData.provider?.toLowerCase() === 'fema') {
     gitlabRepository = 'maximo-fema';
   } else if (ticketData.provider) {
-    // For other providers, create a generic repo name
     gitlabRepository = `maximo-${ticketData.provider.toLowerCase().replace(/[^a-z0-9]/gi, '')}`;
   }
 
@@ -421,7 +386,7 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
     userId: ticketData.requestingUserId,
     action: 'Created',
     details: 'Ticket Creado',
-    toStatus: 'Abierto', // Ticket starts as 'Abierto'
+    toStatus: 'Abierto', 
   };
 
   const newTicket: JiraTicket = {
@@ -435,7 +400,7 @@ export async function createJiraTicket(ticketData: CreateJiraTicketData): Promis
     provider: ticketData.provider,
     branch: ticketData.branch, 
     attachmentNames: ticketData.attachmentNames || [], 
-    assigneeId: ticketData.assigneeId, // Could be pre-assigned by admin during creation
+    assigneeId: ticketData.assigneeId, 
     lastUpdated: new Date().toISOString(),
     history: [initialHistoryEntry],
   };
@@ -460,7 +425,7 @@ export async function addDeploymentToTicketHistory(
   environment: string,
   result: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -481,11 +446,11 @@ export async function addDeploymentToTicketHistory(
 
 // Function to get all history entries from all tickets for audit log
 export async function getAllTicketHistories(): Promise<JiraTicketHistoryEntry[]> {
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
     const allHistories: JiraTicketHistoryEntry[] = [];
     mockJiraTickets.forEach(ticket => {
         ticket.history.forEach(entry => {
-            allHistories.push({ ...entry, ticketId: ticket.id } as JiraTicketHistoryEntry & {ticketId: string}); // Add ticketId for context
+            allHistories.push({ ...entry, ticketId: ticket.id } as JiraTicketHistoryEntry & {ticketId: string}); 
         });
     });
     return JSON.parse(JSON.stringify(allHistories.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())));
@@ -508,7 +473,7 @@ export async function addRestorationToTicketHistory(
   restoredVersionId: string,
   commitSha?: string,
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -547,7 +512,7 @@ export async function addCommentToTicket(
   userIdPerformingAction: string,
   commentText: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 200)); // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 

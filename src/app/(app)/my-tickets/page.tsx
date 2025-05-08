@@ -3,22 +3,22 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getJiraTickets, type JiraTicket, type JiraTicketStatus, type JiraTicketPriority } from '@/services/jira';
+import { getJiraTickets, type JiraTicket } from '@/services/jira'; // Removed unused type imports
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ListChecks, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsFilterBar, type MyTicketsFilters } from '@/components/tickets/my-tickets-filter-bar';
-import { format, parseISO, isWithinInterval, subDays } from 'date-fns';
+import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
 
 export default function MyTicketsPage() {
   const { user, loading: authLoading } = useAuth();
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
 
   const [filters, setFilters] = useState<MyTicketsFilters>({
-    dateFrom: '', //format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    dateTo: '', //format(new Date(), 'yyyy-MM-dd'),
+    dateFrom: '', 
+    dateTo: '', 
     status: 'all',
     priority: 'all',
     searchTerm: '',
@@ -27,30 +27,32 @@ export default function MyTicketsPage() {
   const canViewPage = user?.role === 'client';
 
   const fetchUserTickets = async () => {
-      if (!user || !canViewPage) return;
-      setIsLoading(true);
+      if (!user || !canViewPage) { // Ensure user and permissions are valid
+          setIsPageLoading(false);
+          return;
+      }
+      setIsPageLoading(true);
       try {
-          const userTickets = await getJiraTickets(user.id);
+          const userTickets = await getJiraTickets(user.id); // Uses efficient local storage first
           setTickets(userTickets);
       } catch (error) {
           console.error("Failed to fetch tickets:", error);
-          // Optionally show a toast message here
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
   };
   
   useEffect(() => {
-    if (canViewPage && user) {
+    if (!authLoading && user && canViewPage) { // Trigger fetch when auth is done, user is present, and has permission
       fetchUserTickets();
-    } else if (!authLoading && !canViewPage) {
-      setIsLoading(false); 
+    } else if (!authLoading) { 
+      setIsPageLoading(false); 
     }
   }, [user, authLoading, canViewPage]);
 
   const filteredTickets = useMemo(() => {
     if (!tickets) return [];
     return tickets.filter(ticket => {
-      const ticketDate = ticket.lastUpdated ? parseISO(ticket.lastUpdated) : parseISO(ticket.history[0].timestamp);
+      const ticketDate = ticket.lastUpdated ? parseISO(ticket.lastUpdated) : (ticket.history.length > 0 ? parseISO(ticket.history[0].timestamp) : new Date(0));
       
       if (filters.dateFrom && filters.dateTo) {
         const dateFrom = parseISO(filters.dateFrom);
@@ -75,7 +77,7 @@ export default function MyTicketsPage() {
   }, [tickets, filters]);
 
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -84,9 +86,7 @@ export default function MyTicketsPage() {
             <Skeleton className="h-4 w-72" />
           </div>
         </div>
-        {/* Filter bar skeleton */}
-        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
-        {/* Ticket list skeleton */}
+        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
         <Card className="bg-card shadow-lg rounded-xl">
           <CardHeader>
             <Skeleton className="h-6 w-1/2" />
@@ -94,7 +94,7 @@ export default function MyTicketsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              {[...Array(3)].map((_, i) => <Skeleton key={`list-skel-mytickets-${i}`} className="h-10 w-full" />)}
             </div>
           </CardContent>
         </Card>
@@ -102,7 +102,7 @@ export default function MyTicketsPage() {
     );
   }
 
-  if (!canViewPage && !authLoading) { 
+  if (!canViewPage && !authLoading) { // Check after auth completes
      return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
             <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
@@ -137,8 +137,8 @@ export default function MyTicketsPage() {
             tickets={filteredTickets} 
             title="" 
             showRequestingUser={false} 
-            onTicketActionSuccess={fetchUserTickets} // Callback to refresh list
-            isClientView={true} // Indicate this is the client's view for reopen button
+            onTicketActionSuccess={fetchUserTickets} 
+            isClientView={true} 
           />
         </CardContent>
       </Card>

@@ -1,5 +1,5 @@
 
-"use client"; // Make this a client component for auth check
+"use client"; 
 
 import { MaximoUploaderForm } from '@/components/maximo/maximo-uploader-form';
 import { FileManager } from '@/components/files/file-manager';
@@ -13,7 +13,8 @@ export default function MaximoManagementPage() {
   const { user, loading: authLoading } = useAuth();
   const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
 
-  if (authLoading) {
+  // Show skeleton if auth is loading OR if page content is loading and user has permission
+  if (authLoading || (!authLoading && canViewPage && !user)) { // Simpler loading condition, adjust if page has its own data fetching state
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-2">
@@ -34,7 +35,7 @@ export default function MaximoManagementPage() {
     );
   }
 
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -43,26 +44,31 @@ export default function MaximoManagementPage() {
       </div>
     );
   }
+  
+  // If user is loaded and has permission, render the page content
+  if (canViewPage && user) {
+      return (
+        <div className="space-y-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                <Server className="h-8 w-8 text-primary" /> Maximo Management
+              </h1>
+              <p className="text-muted-foreground">
+                Upload configurations and manage files for Maximo.
+              </p>
+            </div>
+          </div>
 
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Server className="h-8 w-8 text-primary" /> Maximo Management
-          </h1>
-          <p className="text-muted-foreground">
-            Upload configurations and manage files for Maximo.
-          </p>
+          <div className="grid gap-8 lg:grid-cols-1"> 
+            <MaximoUploaderForm />
+            <Separator />
+            <FileManager />
+          </div>
         </div>
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-1"> {/* Changed to single column for better focus */}
-        <MaximoUploaderForm />
-        <Separator />
-        <FileManager />
-      </div>
-    </div>
-  );
+      );
+  }
+  
+  // Fallback, should ideally not be reached if logic above is correct
+  return null; 
 }
-

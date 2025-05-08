@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { DeploymentForm } from '@/components/deployments/deployment-form';
 import { DeploymentList } from '@/components/deployments/deployment-list';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type User as ServiceUser } from '@/services/users';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Changed User to UserDoc
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -16,38 +16,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function DeploymentsPage() {
   const { user, loading: authLoading } = useAuth();
   const [deploymentLogs, setDeploymentLogs] = useState<DeploymentLogEntry[]>([]);
-  const [users, setUsers] = useState<ServiceUser[]>([]);
+  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]); // Renamed users to serviceUsers
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
 
   const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !user) { // Ensure user is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
-        const [logs, serviceUsers, jiraTickets] = await Promise.all([
+        const [logs, fetchedServiceUsers, jiraTickets] = await Promise.all([
           getDeploymentLogs(),
           getUsers(),
-          getJiraTickets() // Fetch all tickets for linking
+          getJiraTickets() 
         ]);
         setDeploymentLogs(logs);
-        setUsers(serviceUsers);
+        setServiceUsers(fetchedServiceUsers);
         setTickets(jiraTickets);
       } catch (error) {
         console.error("Error fetching deployment data:", error);
-        // Handle error display if necessary
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
       fetchData();
     } else if (!authLoading) {
-        setIsLoading(false);
+        setIsPageLoading(false);
     }
   }, [user, authLoading, canViewPage]);
   
@@ -55,7 +54,7 @@ export default function DeploymentsPage() {
     setDeploymentLogs(prevLogs => [newLog, ...prevLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
   };
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-2">
@@ -76,7 +75,7 @@ export default function DeploymentsPage() {
     );
   }
 
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -100,7 +99,7 @@ export default function DeploymentsPage() {
       </div>
 
       <DeploymentForm 
-        users={users} 
+        users={serviceUsers} 
         tickets={tickets} 
         onDeploymentCreated={handleDeploymentCreated} 
       />
@@ -113,10 +112,9 @@ export default function DeploymentsPage() {
           <CardDescription>Browse all recorded deployments.</CardDescription>
         </CardHeader>
         <CardContent>
-          <DeploymentList deploymentLogs={deploymentLogs} users={users} />
+          <DeploymentList deploymentLogs={deploymentLogs} users={serviceUsers} />
         </CardContent>
       </Card>
     </div>
   );
 }
-

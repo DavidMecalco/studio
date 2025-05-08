@@ -1,3 +1,4 @@
+
 /**
  * Represents a GitHub commit.
  */
@@ -49,54 +50,64 @@ const getRandomPastDateISO = () => {
   return now.toISOString();
 };
 
+// Store mock data globally within this module so it's generated once
+let mockCommits: GitHubCommit[] = [];
+let mockCommitsInitialized = false;
 
-const mockCommits: GitHubCommit[] = [
-  {
-    sha: 'a1b2c3d4e5f6',
-    message: 'Feat: Implement user authentication module',
-    author: 'Alice Wonderland',
-    url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6',
-    date: getRandomPastDateISO(),
-    filesChanged: ['auth.py', 'user_model.py'],
-  },
-  {
-    sha: 'f6e5d4c3b2a1',
-    message: 'Fix: Resolve issue in payment processing',
-    author: 'Bob The Builder',
-    url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1',
-    date: getRandomPastDateISO(),
-    filesChanged: ['payment.js', 'checkout.xml'],
-  },
-  {
-    sha: 'c7g8h9i0j1k2',
-    message: 'Chore: Update dependencies and configuration',
-    author: 'Charlie Brown',
-    url: 'https://github.com/example/repo/commit/c7g8h9i0j1k2',
-    date: getRandomPastDateISO(),
-  },
-  {
-    sha: 'l3m4n5o6p7q8',
-    message: 'Docs: Add API documentation for new endpoints',
-    author: 'Diana Prince',
-    url: 'https://github.com/example/repo/commit/l3m4n5o6p7q8',
-    date: getRandomPastDateISO(),
-  },
-  {
-    sha: 'r9s0t1u2v3w4',
-    message: 'Refactor: Optimize database query performance',
-    author: 'Edward Scissorhands',
-    url: 'https://github.com/example/repo/commit/r9s0t1u2v3w4',
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-    filesChanged: ['query_optimizer.sql'],
-  },
-  {
-    sha: 'x5y6z7a8b9c0',
-    message: 'Style: Improve UI consistency across pages',
-    author: 'Fiona Gallagher',
-    url: 'https://github.com/example/repo/commit/x5y6z7a8b9c0',
-    date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-  }
-];
+function initializeMockCommits() {
+  if (mockCommitsInitialized) return;
+
+  mockCommits = [
+    {
+      sha: 'a1b2c3d4e5f6',
+      message: 'Feat: Implement user authentication module',
+      author: 'Alice Wonderland',
+      url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6',
+      date: getRandomPastDateISO(),
+      filesChanged: ['auth.py', 'user_model.py'],
+    },
+    {
+      sha: 'f6e5d4c3b2a1',
+      message: 'Fix: Resolve issue in payment processing',
+      author: 'Bob The Builder',
+      url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1',
+      date: getRandomPastDateISO(),
+      filesChanged: ['payment.js', 'checkout.xml'],
+    },
+    {
+      sha: 'c7g8h9i0j1k2',
+      message: 'Chore: Update dependencies and configuration',
+      author: 'Charlie Brown',
+      url: 'https://github.com/example/repo/commit/c7g8h9i0j1k2',
+      date: getRandomPastDateISO(),
+    },
+    {
+      sha: 'l3m4n5o6p7q8',
+      message: 'Docs: Add API documentation for new endpoints',
+      author: 'Diana Prince',
+      url: 'https://github.com/example/repo/commit/l3m4n5o6p7q8',
+      date: getRandomPastDateISO(),
+    },
+    {
+      sha: 'r9s0t1u2v3w4',
+      message: 'Refactor: Optimize database query performance',
+      author: 'Edward Scissorhands',
+      url: 'https://github.com/example/repo/commit/r9s0t1u2v3w4',
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+      filesChanged: ['query_optimizer.sql'],
+    },
+    {
+      sha: 'x5y6z7a8b9c0',
+      message: 'Style: Improve UI consistency across pages',
+      author: 'Fiona Gallagher',
+      url: 'https://github.com/example/repo/commit/x5y6z7a8b9c0',
+      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+    }
+  ];
+  mockCommitsInitialized = true;
+}
+
+initializeMockCommits();
 
 
 /**
@@ -107,17 +118,14 @@ const mockCommits: GitHubCommit[] = [
  * @returns A promise that resolves to an array of GitHubCommit objects.
  */
 export async function getGitHubCommits(ticketId: string): Promise<GitHubCommit[]> {
-  await new Promise(resolve => setTimeout(resolve, 400)); // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 50)); // Minimal delay
 
   if (ticketId === "ALL_PROJECTS") {
-    // Filter out commits that don't match the expected pattern for ticket-specific commits
     const generalCommits = mockCommits.filter(commit => !commit.message.startsWith("MAX-") && !commit.message.startsWith("MAS-"));
     return JSON.parse(JSON.stringify(generalCommits.length > 0 ? generalCommits : mockCommits));
   }
 
-  // Mock specific commits for a ticketId (those that start with the ticketId in their message)
   const ticketSpecificCommits = mockCommits.filter(commit => commit.message.startsWith(ticketId));
-  
   return JSON.parse(JSON.stringify(ticketSpecificCommits));
 }
 
@@ -136,15 +144,13 @@ export async function createGitHubCommit(
     message: string, 
     author: string, 
     fileNames?: string[],
-    branch: string = 'dev' // Default branch
+    branch: string = 'dev' 
 ): Promise<GitHubCommit> {
-    await new Promise(resolve => setTimeout(resolve, 700)); // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 100)); 
 
-    const newSha = Math.random().toString(36).substring(2, 12); // Generate a random SHA
+    const newSha = Math.random().toString(36).substring(2, 12); 
     const fullMessage = `${ticketId}: ${message}`;
     
-    // Find the repository URL based on the ticket prefix or other logic if needed
-    // For simplicity, let's assume a base URL.
     const repoName = ticketId.startsWith('MAX-TLA') || ticketId.includes('-TLA') ? 'maximo-tla' : 
                      ticketId.startsWith('MAX-FEMA') || ticketId.includes('-FEMA') ? 'maximo-fema' : 'example/repo';
 
@@ -152,12 +158,12 @@ export async function createGitHubCommit(
         sha: newSha,
         message: fullMessage,
         author: author,
-        url: `https://github.com/${repoName}/commit/${newSha}`, // Mock URL
+        url: `https://github.com/${repoName}/commit/${newSha}`, 
         date: new Date().toISOString(),
         filesChanged: fileNames,
     };
 
-    mockCommits.unshift(newCommit); // Add to the beginning of the array
+    mockCommits.unshift(newCommit); 
     console.log(`Simulated commit to ${branch} branch:`, newCommit);
     return JSON.parse(JSON.stringify(newCommit));
 }
@@ -165,28 +171,28 @@ export async function createGitHubCommit(
 
 /**
  * Simulates fetching version history for a file.
- * In a real scenario, this would query GitLab/GitHub for commits affecting this file.
  * @param fileName The name of the file.
  * @returns A promise that resolves to an array of FileVersion objects.
  */
 export async function getFileVersions(fileName: string): Promise<FileVersion[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    // Find all commits that mention this file (simplified simulation)
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     const relevantCommits = mockCommits.filter(
       commit => commit.filesChanged?.includes(fileName) || commit.message.includes(fileName)
     );
 
     if (relevantCommits.length === 0) {
-        // If no specific commits, return some generic versions for demo
+        // Return some generic versions if no specific commits are found
+        const baseTimestamp = Date.now();
         return [
-            { id: 'v3.0', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-abc123', author: 'Admin User', message: `Update ${fileName}`, fileName },
-            { id: 'v2.1', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-def456', author: 'Dev Team', message: `Refactor ${fileName}`, fileName },
-            { id: 'v1.0', timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-ghi789', author: 'Initial Committer', message: `Initial version of ${fileName}`, fileName },
+            { id: 'v3.0-' + fileName.substring(0,3), timestamp: new Date(baseTimestamp - 1 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-abc123', author: 'Admin User', message: `Update ${fileName}`, fileName },
+            { id: 'v2.1-' + fileName.substring(0,3), timestamp: new Date(baseTimestamp - 3 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-def456', author: 'Dev Team', message: `Refactor ${fileName}`, fileName },
+            { id: 'v1.0-' + fileName.substring(0,3), timestamp: new Date(baseTimestamp - 7 * 24 * 60 * 60 * 1000).toISOString(), commitSha: 'sha-ghi789', author: 'Initial Committer', message: `Initial version of ${fileName}`, fileName },
         ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
 
     return relevantCommits.map(commit => ({
-        id: commit.sha.substring(0, 7), // Use short SHA as version ID
+        id: commit.sha.substring(0, 7), 
         timestamp: commit.date,
         commitSha: commit.sha,
         author: commit.author,

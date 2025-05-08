@@ -1,5 +1,5 @@
 
-"use client"; // Make this a client component for auth check
+"use client"; 
 
 import { useEffect, useState } from 'react';
 import { CommitList } from '@/components/github/commit-list';
@@ -13,34 +13,33 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function GitHubPage() {
   const { user, loading: authLoading } = useAuth();
   const [gitHubCommits, setGitHubCommits] = useState<GitHubCommit[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
 
   const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !user) { // Ensure user is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
-        const commits = await getGitHubCommits("ALL_PROJECTS");
+        const commits = await getGitHubCommits("ALL_PROJECTS"); // This should be efficient now
         setGitHubCommits(commits);
       } catch (error) {
         console.error("Error fetching GitHub commits:", error);
-        // Optionally, show a toast or error message
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-     if (canViewPage) {
+     if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
       fetchData();
     } else if (!authLoading) {
-        setIsLoading(false);
+        setIsPageLoading(false);
     }
   }, [user, authLoading, canViewPage]);
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-2">
@@ -60,7 +59,7 @@ export default function GitHubPage() {
     );
   }
 
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -95,4 +94,3 @@ export default function GitHubPage() {
     </div>
   );
 }
-

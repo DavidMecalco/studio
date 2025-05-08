@@ -3,21 +3,21 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getJiraTickets, type JiraTicket, type JiraTicketStatus, type JiraTicketPriority } from '@/services/jira';
+import { getJiraTickets, type JiraTicket } from '@/services/jira'; // Removed unused type imports
 import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Ticket, Users, AlertTriangle } from 'lucide-react';
+import { Ticket, AlertTriangle } from 'lucide-react'; // Removed unused Users icon
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminTicketFilterBar, type AdminTicketFilters } from '@/components/tickets/admin-ticket-filter-bar';
-import { format, parseISO, isWithinInterval, subDays } from 'date-fns';
+import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
 
 export default function JiraPage() {
   const { user, loading: authLoading } = useAuth();
   const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
   const [usersForFilter, setUsersForFilter] = useState<ServiceUser[]>([]);
   const [organizationsForFilter, setOrganizationsForFilter] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
 
   const [filters, setFilters] = useState<AdminTicketFilters>({
     dateFrom: '', 
@@ -33,11 +33,11 @@ export default function JiraPage() {
 
   useEffect(() => {
     async function fetchPageData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !user) { // Ensure user is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
         const [tickets, fetchedUsers, fetchedOrgs] = await Promise.all([
             getJiraTickets(),
@@ -49,14 +49,13 @@ export default function JiraPage() {
         setOrganizationsForFilter(fetchedOrgs);
       } catch (error) {
         console.error("Error fetching data for Jira page:", error);
-        // Optionally show a toast message for error
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
       fetchPageData();
     } else if (!authLoading) {
-      setIsLoading(false); 
+      setIsPageLoading(false); 
     }
   }, [user, authLoading, canViewPage]);
 
@@ -98,7 +97,7 @@ export default function JiraPage() {
   }, [allTickets, filters]);
 
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -123,7 +122,7 @@ export default function JiraPage() {
     );
   }
   
-  if (!canViewPage && !authLoading) { 
+  if (!canViewPage && !authLoading) { // Check after auth completes
      return (
         <div className="space-y-8 text-center py-10">
             <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
@@ -150,7 +149,7 @@ export default function JiraPage() {
         filters={filters}
         onFiltersChange={setFilters}
         users={usersForFilter}
-        organizations={organizationsForFilter.map(org => org.name)} // Pass organization names
+        organizations={organizationsForFilter.map(org => org.name)} 
       />
 
       <Card className="bg-card shadow-lg rounded-xl">
@@ -174,4 +173,3 @@ export default function JiraPage() {
     </div>
   );
 }
-

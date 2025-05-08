@@ -11,7 +11,7 @@ import { KpiCard } from '@/components/dashboard/kpi-card';
 import { TicketManagementCard } from '@/components/dashboard/ticket-management-card';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
-import { getUsers, type User as ServiceUser } from '@/services/users';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Updated User to UserDoc
 import { subWeeks, isAfter } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,21 +29,23 @@ interface DashboardData {
 
 async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client' | 'superuser'): Promise<DashboardData | null> {
   try {
+    // Ensure user dependent data is fetched conditionally or handled if user is not yet available.
+    // For now, this structure assumes userId and userRole are available when called.
     const [allJiraTicketsFromService, githubCommits, users] = await Promise.all([
       getJiraTickets(), 
-      getGitHubCommits("ALL_PROJECTS"),
-      getUsers(),
+      getGitHubCommits("ALL_PROJECTS"), // This should be efficient now
+      getUsers(), // This should be efficient now
     ]);
 
     let dashboardResult: DashboardData = {
-        jiraTickets: [], // Will be populated based on role
+        jiraTickets: [], 
         githubCommits,
         users,
     };
 
     if (userRole === 'admin' || userRole === 'superuser') {
       dashboardResult.allJiraTickets = allJiraTicketsFromService;
-      dashboardResult.jiraTickets = allJiraTicketsFromService; // Admin/Superuser sees all tickets in management card
+      dashboardResult.jiraTickets = allJiraTicketsFromService;
       dashboardResult.closedTicketsCount = allJiraTicketsFromService.filter(
         ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
       ).length;
@@ -56,7 +58,7 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
       ).length;
     } else if (userRole === 'client' && userId) {
       const clientTickets = allJiraTicketsFromService.filter(ticket => ticket.requestingUserId === userId);
-      dashboardResult.jiraTickets = clientTickets; // Client sees their tickets
+      dashboardResult.jiraTickets = clientTickets;
       dashboardResult.myActiveTicketsCount = clientTickets.filter(
           ticket => ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto'
       ).length;
@@ -73,21 +75,23 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
 export default function DashboardOverviewPage() {
   const { user, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed to avoid conflict
 
   useEffect(() => {
     if (!authLoading && user) {
-      setIsLoading(true);
+      setIsPageLoading(true);
       fetchDashboardData(user.id, user.role).then(data => {
         setDashboardData(data);
-        setIsLoading(false);
+        setIsPageLoading(false);
       });
     } else if (!authLoading && !user) {
-        setIsLoading(false); // No user, stop loading
+        // No user, stop loading, page will likely redirect or show access denied via layout
+        setIsPageLoading(false); 
     }
   }, [user, authLoading]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || isPageLoading) {
+    const skeletonNavCardsCount = user?.role === 'client' ? 1 : (user?.role === 'superuser' ? 4 : 3);
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -97,10 +101,10 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => <KpiCardSkeleton key={i}/>)}
+          {[...Array(3)].map((_, i) => <KpiCardSkeleton key={`kpi-skel-${i}`}/>)}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(user?.role === 'client' ? 1 : (user?.role === 'superuser' ? 4 : 3))].map((_, i) => <NavCardSkeleton key={i}/>)}
+            {[...Array(skeletonNavCardsCount)].map((_, i) => <NavCardSkeleton key={`nav-skel-${i}`}/>)}
         </div>
         {(user?.role === 'admin' || user?.role === 'superuser') && <TicketManagementCardSkeleton />}
       </div>
@@ -108,7 +112,9 @@ export default function DashboardOverviewPage() {
   }
   
   if (!dashboardData) {
-    return <p>Error loading dashboard data. Please try again later.</p>;
+    // This state can occur if fetching failed or if user is null after loading.
+    // The AuthenticatedAppLayout should handle redirection for !user, so this might be for fetch errors.
+    return <p className="text-center text-muted-foreground">Error loading dashboard data. Please try again later.</p>;
   }
 
   const { 
@@ -284,26 +290,6 @@ export default function DashboardOverviewPage() {
                         </Button>
                     </CardContent>
                 </Card>
-                {/* Placeholder for future User Management card for SuperUser */}
-                {/* <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-xl gap-2">
-                        <Users className="h-6 w-6 text-accent" />
-                        User Management
-                        </CardTitle>
-                        <CardDescription>Manage client and technician accounts.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                        Create, edit, and manage user accounts and permissions.
-                        </p>
-                        <Button asChild variant="secondary" disabled> 
-                        <Link href="#"> 
-                            Manage Users (Soon) <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                        </Button>
-                    </CardContent>
-                </Card> */}
                 </>
             )}
           </>
@@ -315,7 +301,6 @@ export default function DashboardOverviewPage() {
         <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
       )}
       
-      {/* Image Card Section - can be kept or removed based on preference */}
       <Card className="bg-card shadow-lg rounded-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="relative h-64 w-full">
@@ -391,4 +376,3 @@ const TicketManagementCardSkeleton = () => (
         </CardContent>
     </Card>
 );
-

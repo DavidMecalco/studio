@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getAllTicketHistories, type JiraTicketHistoryEntry } from '@/services/jira';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type User as ServiceUser } from '@/services/users';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Changed to UserDoc
 import { AuditLogList } from '@/components/audit/audit-log-list';
 import { AuditLogFilters, type AuditFilters } from '@/components/audit/audit-log-filters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,8 +27,8 @@ export default function AuditLogPage() {
   const { user, loading: authLoading } = useAuth();
   const [allHistory, setAllHistory] = useState<JiraTicketHistoryEntry[]>([]);
   const [allDeployments, setAllDeployments] = useState<DeploymentLogEntry[]>([]);
-  const [users, setUsers] = useState<ServiceUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [serviceUsers, setServiceUsers] = useState<ServiceUser[]>([]); // Renamed users to serviceUsers to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
 
   const [filters, setFilters] = useState<AuditFilters>({
     dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -42,34 +42,34 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     async function fetchData() {
-       if (authLoading || !canViewPage) {
-        setIsLoading(false);
+       if (authLoading || !canViewPage || !user) { // Ensure user is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
-        const [ticketHistories, deploymentLogs, serviceUsers] = await Promise.all([
+        const [ticketHistories, deploymentLogs, fetchedServiceUsers] = await Promise.all([
           getAllTicketHistories(),
           getDeploymentLogs(),
           getUsers(),
         ]);
         setAllHistory(ticketHistories);
         setAllDeployments(deploymentLogs);
-        setUsers(serviceUsers);
+        setServiceUsers(fetchedServiceUsers);
       } catch (error) {
         console.error("Error fetching audit data:", error);
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
         fetchData();
     } else if (!authLoading) {
-        setIsLoading(false);
+        setIsPageLoading(false);
     }
   }, [user, authLoading, canViewPage]);
 
   const combinedAndFilteredAuditLog = useMemo(() => {
-    if (isLoading || !canViewPage) return [];
+    if (isPageLoading || !canViewPage) return [];
 
     const transformedDeployments: CombinedAuditEntry[] = allDeployments.map(dep => ({
       id: dep.id,
@@ -92,7 +92,6 @@ export default function AuditLogPage() {
     
     let combinedLog = [...transformedTicketHistory, ...transformedDeployments];
 
-    // Apply filters
     const dateFrom = filters.dateFrom ? parseISO(filters.dateFrom) : null;
     const dateTo = filters.dateTo ? parseISO(filters.dateTo) : null;
     const dateInterval = dateFrom && dateTo ? { start: dateFrom, end: dateTo } : null;
@@ -129,10 +128,10 @@ export default function AuditLogPage() {
     });
 
     return combinedLog.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [isLoading, allHistory, allDeployments, filters, canViewPage]);
+  }, [isPageLoading, allHistory, allDeployments, filters, canViewPage]);
 
 
-  if (authLoading || (isLoading && combinedAndFilteredAuditLog.length === 0 && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
         <div className="space-y-8">
              <div className="flex items-center gap-2">
@@ -147,14 +146,14 @@ export default function AuditLogPage() {
             <Card>
                 <CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader>
                 <CardContent className="space-y-3">
-                    {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                    {[...Array(5)].map((_, i) => <Skeleton key={`audit-skel-${i}`} className="h-12 w-full" />)}
                 </CardContent>
             </Card>
         </div>
     );
   }
   
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -180,8 +179,8 @@ export default function AuditLogPage() {
       <AuditLogFilters 
         filters={filters}
         onFiltersChange={setFilters}
-        users={users}
-        isLoading={isLoading}
+        users={serviceUsers}
+        isLoading={isPageLoading}
       />
 
       <Card className="shadow-lg rounded-xl">
@@ -196,4 +195,3 @@ export default function AuditLogPage() {
     </div>
   );
 }
-

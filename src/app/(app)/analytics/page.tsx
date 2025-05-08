@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { KpiCard } from '@/components/dashboard/kpi-card'; // Re-use for consistency
+import { KpiCard } from '@/components/dashboard/kpi-card'; 
 import { AnalyticsFilterBar, type AnalyticsFilters } from '@/components/analytics/analytics-filter-bar';
 import { TicketsByStatusChart } from '@/components/analytics/charts/tickets-by-status-chart';
 import { CommitsOverTimeChart } from '@/components/analytics/charts/commits-over-time-chart';
@@ -13,10 +13,10 @@ import { TicketsByPriorityChart } from '@/components/analytics/charts/tickets-by
 import { TechnicianActivityChart } from '@/components/analytics/charts/technician-activity-chart';
 import { ComponentTypeFrequencyChart } from '@/components/analytics/charts/component-type-frequency-chart';
 
-import { getJiraTickets, type JiraTicket, type JiraTicketProvider } from '@/services/jira';
+import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getDeploymentLogs, type DeploymentLogEntry } from '@/services/deployment';
-import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users'; // Updated to UserDoc
+import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LineChart as AnalyticsIcon, Download, AlertCircle, CheckCircle2, ClipboardList, GitMerge, Users, ServerIcon, PieChart, Ticket } from 'lucide-react';
@@ -36,14 +36,14 @@ interface AnalyticsData {
   ticketsByPriority: { name: string; value: number }[];
   technicianActivity: { name: string; ticketsResolved: number; commitsMade: number }[];
   componentFrequency: { name: string; value: number }[];
-  clients: string[]; // Changed from JiraTicketProvider[] to string[]
-  environments: string[]; // For filter
+  clients: string[]; 
+  environments: string[]; 
 }
 
 export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed to avoid conflict
   const [allServiceUsers, setAllServiceUsers] = useState<ServiceUser[]>([]);
   const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
   const [allCommits, setAllCommits] = useState<GitHubCommit[]>([]);
@@ -64,11 +64,11 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !user) { // Ensure user is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
         const [tickets, commits, deployments, serviceUsers, fetchedOrganizations] = await Promise.all([
           getJiraTickets(),
@@ -86,17 +86,17 @@ export default function AnalyticsPage() {
         console.error("Error fetching analytics data:", error);
         toast({ title: "Error", description: "Failed to load analytics data.", variant: "destructive" });
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
         fetchData();
-    } else if (!authLoading) { // If auth is done and user still cannot view
-        setIsLoading(false);
+    } else if (!authLoading) { 
+        setIsPageLoading(false);
     }
-  }, [authLoading, canViewPage, toast]);
+  }, [authLoading, canViewPage, user, toast]);
 
   const processedData = useMemo((): AnalyticsData | null => {
-    if (isLoading || allTickets.length === 0 || !canViewPage || organizations.length === 0) return null;
+    if (isPageLoading || allTickets.length === 0 || !canViewPage || organizations.length === 0) return null;
 
     const dateFrom = filters.dateFrom ? parseISO(filters.dateFrom) : null;
     const dateTo = filters.dateTo ? parseISO(filters.dateTo) : null;
@@ -104,20 +104,18 @@ export default function AnalyticsPage() {
     const dateInterval = dateFrom && dateTo ? { start: dateFrom, end: dateTo } : null;
 
     const filteredTickets = allTickets.filter(t => {
-      const ticketDate = t.lastUpdated ? parseISO(t.lastUpdated) : parseISO(t.history[0].timestamp);
+      const ticketDate = t.lastUpdated ? parseISO(t.lastUpdated) : (t.history.length > 0 ? parseISO(t.history[0].timestamp) : new Date(0));
       if (dateInterval && !isWithinInterval(ticketDate, dateInterval)) return false;
       if (filters.selectedUserId !== 'all' && t.assigneeId !== filters.selectedUserId) return false;
       if (filters.selectedStatus !== 'all' && t.status !== filters.selectedStatus) return false;
       if (filters.selectedClient !== 'all' && t.provider !== filters.selectedClient) return false;
-      // Environment filter applies to deployments, not directly to tickets here
       return true;
     });
 
     const filteredCommits = allCommits.filter(c => {
       const commitDate = parseISO(c.date);
       if (dateInterval && !isWithinInterval(commitDate, dateInterval)) return false;
-      if (filters.selectedUserId !== 'all' && c.author !== allServiceUsers.find(u => u.id === filters.selectedUserId)?.name) return false; // Map ID to name
-       // Client/status/env don't directly apply to commits without linking through tickets
+      if (filters.selectedUserId !== 'all' && c.author !== allServiceUsers.find(u => u.id === filters.selectedUserId)?.name) return false;
       return true;
     });
     
@@ -126,7 +124,6 @@ export default function AnalyticsPage() {
       if (dateInterval && !isWithinInterval(deploymentDate, dateInterval)) return false;
       if (filters.selectedUserId !== 'all' && d.userId !== filters.selectedUserId) return false;
       if (filters.selectedEnvironment !== 'all' && d.environment !== filters.selectedEnvironment) return false;
-      // Client filter might apply if deployments are linked to client-specific tickets/projects
       if (filters.selectedClient !== 'all') {
         const clientTickets = allTickets.filter(t => t.provider === filters.selectedClient).map(t => t.id);
         if (!d.ticketIds?.some(tid => clientTickets.includes(tid))) return false;
@@ -172,16 +169,14 @@ export default function AnalyticsPage() {
         }
     });
     filteredCommits.forEach(c => {
-        // Assuming commit.author is the user's *name*. We need to map it back to ID or use name directly.
-        // For simplicity, if selectedUserId is 'all', we group by author name. If specific user, only their commits.
-        const authorKey = allServiceUsers.find(u => u.name === c.author)?.id || c.author; // Try to map to ID
+        const authorKey = allServiceUsers.find(u => u.name === c.author)?.id || c.author;
         const activity = techActivityMap.get(authorKey);
         if (activity) activity.commitsMade += 1;
         else if (filters.selectedUserId === 'all') techActivityMap.set(authorKey, { ticketsResolved: 0, commitsMade: 1});
     });
      const technicianActivity = Array.from(techActivityMap.entries())
         .map(([userId, data]) => ({
-            name: allServiceUsers.find(u => u.id === userId)?.name || userId, // Display name
+            name: allServiceUsers.find(u => u.id === userId)?.name || userId, 
             ...data
         }))
         .filter(item => item.ticketsResolved > 0 || item.commitsMade > 0);
@@ -214,12 +209,12 @@ export default function AnalyticsPage() {
       clients: clientNamesForFilter,
       environments: ['DEV', 'QA', 'PROD', 'Staging', 'Other']
     };
-  }, [isLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage, organizations]);
+  }, [isPageLoading, allTickets, allCommits, allDeployments, allServiceUsers, filters, canViewPage, organizations]);
 
-  const handleExport = (format: 'pdf' | 'json') => {
+  const handleExport = (formatType: 'pdf' | 'json') => { // Renamed variable to avoid conflict
     toast({
-        title: `Export ${format.toUpperCase()} (Simulated)`,
-        description: `Simulating export of analytics data as ${format.toUpperCase()}. This feature is under development.`,
+        title: `Export ${formatType.toUpperCase()} (Simulated)`,
+        description: `Simulating export of analytics data as ${formatType.toUpperCase()}. This feature is under development.`,
     });
   };
   const handleAlertCheck = () => {
@@ -230,18 +225,18 @@ export default function AnalyticsPage() {
     });
   };
 
-  if (authLoading) {
+  if (authLoading) { // Initial auth check loading
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-1/3" /> <Skeleton className="h-4 w-2/3" />
         <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{[...Array(3)].map((_, i) => <Skeleton key={`auth-kpi-skel-${i}`} className="h-24 w-full" />)}</div>
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">{[...Array(2)].map((_, i) => <Skeleton key={`auth-chart-skel-${i}`} className="h-64 w-full" />)}</div>
       </div>
     );
   }
   
-  if (!canViewPage && !authLoading) { // Check after auth loading is complete
+  if (!canViewPage && !authLoading) { 
      return (
         <div className="space-y-8 text-center py-10">
             <AnalyticsIcon className="h-16 w-16 mx-auto text-destructive" />
@@ -251,7 +246,7 @@ export default function AnalyticsPage() {
      );
   }
 
-  if (isLoading || !processedData) { // This covers initial loading for authorized users
+  if (isPageLoading || !processedData) { 
      return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
@@ -266,7 +261,7 @@ export default function AnalyticsPage() {
             isLoading={true}
         />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {[...Array(5)].map((_, i) => <KpiCardSkeleton key={`kpi-skel-${i}`} />)}
+            {[...Array(5)].map((_, i) => <KpiCardSkeleton key={`kpi-skel-load-${i}`} />)}
         </div>
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
             <ChartSkeleton title="Tickets by Status" />
@@ -308,12 +303,11 @@ export default function AnalyticsPage() {
         filters={filters} 
         onFiltersChange={setFilters} 
         users={allServiceUsers}
-        clients={clients} // Pass dynamic client names
+        clients={clients} 
         environments={environments}
-        isLoading={isLoading}
+        isLoading={isPageLoading}
       />
 
-      {/* KPI Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard title="Total Tickets" value={totalTickets} icon={<Ticket className="h-5 w-5 text-accent" />} description="Tickets within selected period." />
         <KpiCard title="Tickets In Progress" value={ticketsInProgress} icon={<ClipboardList className="h-5 w-5 text-yellow-500" />} />
@@ -322,7 +316,6 @@ export default function AnalyticsPage() {
         <KpiCard title="Total Deployments" value={totalDeployments} icon={<ServerIcon className="h-5 w-5 text-purple-500" />} />
       </div>
 
-      {/* Charts Section */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <TicketsByStatusChart data={ticketsByStatus} />
         <CommitsOverTimeChart data={commitsOverTime} />

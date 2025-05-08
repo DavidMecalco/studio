@@ -1,20 +1,20 @@
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react'; // Removed ReactNode import
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// import { Label } from '@/components/ui/label'; // Label is implicitly used by FormLabel
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { getUsers, type UserDoc, getOrganizations, type Organization } from '@/services/users';
-import { createOrUpdateUserAction } from '@/app/actions/user-actions'; // Import the server action
-import type { User as AuthUserType } from '@/context/auth-context'; // For payload type
+import { createOrUpdateUserAction } from '@/app/actions/user-actions'; 
+import type { User as AuthUserType } from '@/context/auth-context'; 
 import { useAuth } from '@/context/auth-context';
 import { Users as UsersIcon, AlertTriangle, Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,11 +39,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const userFormSchema = z.object({
-  id: z.string().optional(), // For editing existing users, this will be the username (document ID)
+  id: z.string().optional(), 
   username: z.string().min(3, "Username must be at least 3 characters.").max(50),
   name: z.string().min(1, "Name is required.").max(100),
   role: z.enum(['client', 'admin', 'superuser'], { required_error: "Role is required." }),
-  company: z.string().optional(), // Company name as string
+  company: z.string().optional(), 
   phone: z.string().optional(),
   position: z.string().optional(),
 });
@@ -53,9 +53,9 @@ type UserFormValues = z.infer<typeof userFormSchema>;
 export default function UserManagementPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [users, setUsers] = useState<UserDoc[]>([]);
+  const [serviceUsers, setServiceUsers] = useState<UserDoc[]>([]); // Renamed users to serviceUsers
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [editingUser, setEditingUser] = useState<UserDoc | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -76,35 +76,35 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (authLoading || !canViewPage) {
-        setIsLoading(false);
+      if (authLoading || !canViewPage || !currentUser) { // Ensure currentUser is available
+        setIsPageLoading(false);
         return;
       }
-      setIsLoading(true);
+      setIsPageLoading(true);
       try {
-        const [fetchedUsers, fetchedOrganizations] = await Promise.all([getUsers(), getOrganizations()]);
-        setUsers(fetchedUsers);
+        const [fetchedUsers, fetchedOrganizations] = await Promise.all([getUsers(), getOrganizations()]); // Uses efficient local storage first
+        setServiceUsers(fetchedUsers);
         setOrganizations(fetchedOrganizations);
       } catch (error) {
         console.error("Error fetching user management data:", error);
         toast({ title: "Error", description: "Failed to load user data.", variant: "destructive" });
       }
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-    if (canViewPage) {
+    if (canViewPage && !authLoading && currentUser) { // Trigger fetch when auth is done and currentUser is present
       fetchData();
     } else if (!authLoading) {
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
-  }, [authLoading, canViewPage, toast]);
+  }, [authLoading, canViewPage, currentUser, toast]);
 
   const handleCreateOrUpdateUser = async (values: UserFormValues) => {
     setIsSubmitting(true);
     
     const payloadForAction: AuthUserType = {
-      id: values.id || values.username, // This 'id' is the username, for AuthUserType and Firestore doc ID
+      id: values.id || values.username, 
       username: values.username,
-      name: values.name, // 'name' is now part of AuthUserType
+      name: values.name, 
       role: values.role,
       company: values.company,
       phone: values.phone,
@@ -118,7 +118,7 @@ export default function UserManagementPage() {
         title: editingUser ? "User Updated" : "User Created",
         description: `User ${values.username} has been successfully ${editingUser ? 'updated' : 'created'}.`,
       });
-      setUsers(await getUsers()); // Refresh user list
+      setServiceUsers(await getUsers()); 
       setIsFormOpen(false);
       setEditingUser(null);
       form.reset();
@@ -135,7 +135,7 @@ export default function UserManagementPage() {
   const openEditForm = (userToEdit: UserDoc) => {
     setEditingUser(userToEdit);
     form.reset({
-      id: userToEdit.id, // This is the username (document ID)
+      id: userToEdit.id, 
       username: userToEdit.username,
       name: userToEdit.name,
       role: userToEdit.role,
@@ -161,19 +161,15 @@ export default function UserManagementPage() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    // In a real app, this would call a deleteUserFromFirestore function
-    // For now, we'll just filter the local state and show a toast.
-    // Deleting requires backend logic not implemented here.
     toast({
       title: "Deletion Simulated",
       description: `User ${userId} would be deleted. (Actual deletion not implemented in mock service)`,
       variant: "default",
     });
-    // setUsers(users.filter(u => u.id !== userId));
   };
 
 
-  if (authLoading || (isLoading && canViewPage)) {
+  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-1/3" /> <Skeleton className="h-4 w-2/3" />
@@ -183,7 +179,7 @@ export default function UserManagementPage() {
     );
   }
 
-  if (!canViewPage) {
+  if (!canViewPage && !authLoading) { // Check after auth completes
     return (
       <div className="space-y-8 text-center py-10">
         <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
@@ -331,7 +327,7 @@ export default function UserManagementPage() {
           <CardDescription>List of all users currently in the system.</CardDescription>
         </CardHeader>
         <CardContent>
-            {isLoading ? <Skeleton className="h-40 w-full" /> : users.length === 0 ? <p>No users found.</p> : (
+            {isPageLoading ? <Skeleton className="h-40 w-full" /> : serviceUsers.length === 0 ? <p>No users found.</p> : (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -343,7 +339,7 @@ export default function UserManagementPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((userEntry) => (
+                        {serviceUsers.map((userEntry) => (
                         <TableRow key={userEntry.id}>
                             <TableCell className="font-medium">{userEntry.username}</TableCell>
                             <TableCell>{userEntry.name}</TableCell>
@@ -388,4 +384,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
