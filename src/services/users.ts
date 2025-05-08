@@ -61,24 +61,43 @@ const orgsToSeed: Organization[] = [
 
 export async function ensureMockDataSeeded(): Promise<void> {
   if (typeof window === 'undefined') {
+    // For server-side (e.g. during build or server actions without full client env)
+    // We cannot rely on localStorage.
+    // If Firestore is not properly configured, service calls will gracefully degrade or log errors.
+    if (!isFirebaseProperlyConfigured) {
+        console.warn("Mock data seeding: Firebase not properly configured for server-side context. Operations will rely on direct Firebase access if available, or fail if not.");
+    }
+    // No actual seeding to localStorage can happen here.
     return;
   }
+
+  // Client-side seeding logic
   if (localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V5) === 'true' && isFirebaseProperlyConfigured && db) {
     try {
         if (usersCollectionRef) {
             const adminDoc = await getDoc(doc(usersCollectionRef, 'admin'));
-            if (adminDoc.exists()) { // If admin exists in Firestore, assume it's seeded
-              // Check organizations too
+            if (adminDoc.exists()) { 
               if (organizationsCollectionRef) {
                 const tlaOrgDoc = await getDoc(doc(organizationsCollectionRef, 'tla'));
                 if (tlaOrgDoc.exists()) {
-                  return;
+                  return; // Both users and orgs seem seeded in Firestore
                 }
+              } else if (!organizationsCollectionRef) { // Orgs collection doesn't exist, but users do
+                 return; // Still consider users seeded
               }
             }
+        } else if (!usersCollectionRef && organizationsCollectionRef) { // Users collection doesn't exist, but orgs do
+            const tlaOrgDoc = await getDoc(doc(organizationsCollectionRef, 'tla'));
+            if (tlaOrgDoc.exists()) return; // Consider orgs seeded
+        } else if (!usersCollectionRef && !organizationsCollectionRef && isFirebaseProperlyConfigured){
+            // Firestore is configured but collections don't exist, implies not seeded yet.
+        } else if (!isFirebaseProperlyConfigured) {
+             // If Firebase is not configured, the localStorage flag is the source of truth
+             return;
         }
     } catch (e) {
-        // If Firestore check fails (e.g. offline), still rely on localStorage flag
+        console.warn("Error checking Firestore seed status (client might be offline or other Firestore issue). Relying on localStorage flag if set.", e);
+        if (localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V5) === 'true') return;
     }
   }
 
@@ -89,38 +108,43 @@ export async function ensureMockDataSeeded(): Promise<void> {
   localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
   console.log("Mock data (v5) seeded to localStorage.");
 
-  if (isFirebaseProperlyConfigured && db && navigator.onLine && usersCollectionRef && organizationsCollectionRef) {
+  if (isFirebaseProperlyConfigured && db && navigator.onLine && (usersCollectionRef || organizationsCollectionRef)) {
     try {
       const batch = writeBatch(db);
       let firestoreNeedsSeeding = false;
 
-      // Check users
-      const adminUserDocSnap = await getDoc(doc(usersCollectionRef, "admin"));
-      if (!adminUserDocSnap.exists()) {
-        firestoreNeedsSeeding = true;
-        console.log("Preparing to seed users to Firestore (v5)...");
-        for (const userData of usersToSeed) {
-          const { id, ...dataToSeed } = userData; // Exclude id from data if it's the doc key
-          batch.set(doc(usersCollectionRef, id), dataToSeed);
+      // Check and seed users
+      if (usersCollectionRef) {
+        const adminUserDocSnap = await getDoc(doc(usersCollectionRef, "admin"));
+        if (!adminUserDocSnap.exists()) {
+          firestoreNeedsSeeding = true;
+          console.log("Preparing to seed users to Firestore (v5)...");
+          for (const userData of usersToSeed) {
+            const { id, ...dataToSeed } = userData; 
+            batch.set(doc(usersCollectionRef, id), dataToSeed);
+          }
         }
       }
 
-      // Check organizations
-      const tlaOrgDocSnap = await getDoc(doc(organizationsCollectionRef, "tla"));
-      if (!tlaOrgDocSnap.exists()) {
-        firestoreNeedsSeeding = true;
-        console.log("Preparing to seed organizations to Firestore (v5)...");
-        for (const orgData of orgsToSeed) {
-           const { id, ...dataToSeed } = orgData; // Exclude id from data if it's the doc key
-          batch.set(doc(organizationsCollectionRef, id), dataToSeed);
+      // Check and seed organizations
+      if (organizationsCollectionRef) {
+        const tlaOrgDocSnap = await getDoc(doc(organizationsCollectionRef, "tla"));
+        if (!tlaOrgDocSnap.exists()) {
+          firestoreNeedsSeeding = true;
+          console.log("Preparing to seed organizations to Firestore (v5)...");
+          for (const orgData of orgsToSeed) {
+             const { id, ...dataToSeed } = orgData; 
+            batch.set(doc(organizationsCollectionRef, id), dataToSeed);
+          }
         }
       }
+      
 
       if (firestoreNeedsSeeding) {
         await batch.commit();
         console.log("Initial data (v5) committed to Firestore.");
       } else {
-        console.log("Firestore already contains key mock data (v5). Skipping Firestore seed.");
+        console.log("Firestore already contains key mock data (v5) or collections not available. Skipping Firestore seed part if applicable.");
       }
     } catch (error) {
       console.warn("Error during Firestore seeding (v5) (client might be offline or other Firestore issue): ", error);
@@ -130,8 +154,10 @@ export async function ensureMockDataSeeded(): Promise<void> {
     if (!isFirebaseProperlyConfigured) reason += "Firebase not properly configured. ";
     if (!db) reason += "Firestore db instance is null. ";
     if (typeof navigator !== 'undefined' && !navigator.onLine) reason += "Client is offline. ";
-    if (!usersCollectionRef) reason += "Users collection reference is null. ";
-    if (!organizationsCollectionRef) reason += "Organizations collection reference is null. ";
+    if (!usersCollectionRef && !organizationsCollectionRef) reason += "Users and Organizations collection references are null. ";
+    else if (!usersCollectionRef) reason += "Users collection reference is null. ";
+    else if (!organizationsCollectionRef) reason += "Organizations collection reference is null. ";
+    
     console.log(`Skipping Firestore seeding operations (v5). ${reason}Will rely on localStorage.`);
   }
 
@@ -142,7 +168,8 @@ export async function ensureMockDataSeeded(): Promise<void> {
 
 export async function getUsers(): Promise<UserDoc[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20));
+  // Short delay to simulate network latency, if desired for testing UX
+  // await new Promise(resolve => setTimeout(resolve, 20)); 
 
   if (isFirebaseProperlyConfigured && db && usersCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -179,7 +206,7 @@ export async function getUsers(): Promise<UserDoc[]> {
 
 export async function getUserById(userId: string): Promise<UserDoc | undefined> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  // await new Promise(resolve => setTimeout(resolve, 10));
 
   if (isFirebaseProperlyConfigured && db && usersCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -188,7 +215,7 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
       const docSnap = await getDoc(userDocRef);
       if (docSnap.exists()) {
         const userData = { id: docSnap.id, ...docSnap.data() } as UserDoc;
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') { // Update localStorage cache
             const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
             let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
             const userIndex = users.findIndex(u => u.id === userId);
@@ -202,6 +229,7 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
     }
   }
   
+  // Fallback to localStorage
   if (typeof window !== 'undefined') {
     const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
     if (storedUsers) {
@@ -229,31 +257,36 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
   }
   
   if (!isFirebaseProperlyConfigured || !db || !usersCollectionRef) {
-    console.error(`Cannot create/update user ${userData.username}: Firebase not properly configured or db/usersCollectionRef is null. Attempting localStorage update only.`);
+    const errorMessage = `Cannot create/update user ${userData.username}: Firebase not properly configured or db/usersCollectionRef is null.`;
     if (typeof window !== 'undefined') {
-        try {
-            const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-            let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-            const userIndex = users.findIndex(u => u.id === userData.id);
-            const userToStore: UserDoc = { ...userData, password: userData.password! }; 
-            if (userIndex > -1) users[userIndex] = userToStore; else users.push(userToStore);
-            localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
-            console.log(`User ${userToStore.username} (email: ${userToStore.email}) created/updated in localStorage only.`);
-            return true;
-        } catch (e) {
-            console.error("Error updating localStorage for user:", e);
-            return false;
-        }
+      console.warn(`${errorMessage} Attempting localStorage update only.`);
+      try {
+          const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
+          let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
+          const userIndex = users.findIndex(u => u.id === userData.id);
+          const userToStore: UserDoc = { ...userData, password: userData.password! }; 
+          if (userIndex > -1) users[userIndex] = userToStore; else users.push(userToStore);
+          localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+          console.log(`User ${userToStore.username} (email: ${userToStore.email}) created/updated in localStorage only.`);
+          return true;
+      } catch (e) {
+          console.error("Error updating localStorage for user:", e);
+          return false;
+      }
+    } else {
+      console.error(`${errorMessage} Not in browser environment, cannot use localStorage fallback for server action.`);
+      return false;
     }
-    return false; 
   }
 
   try {
     const userDocRef = doc(usersCollectionRef, userData.id);
-    const { id, ...dataForFirestore } = userData;
+    // Do not spread userData.id into Firestore document data if ID is the doc key
+    const { id, ...dataForFirestore } = userData; 
     await setDoc(userDocRef, dataForFirestore, { merge: true });
     console.log(`User ${userData.username} (email: ${userData.email}) created/updated in Firestore.`);
     
+    // Update localStorage cache after successful Firestore operation
     if (typeof window !== 'undefined') {
         const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
         let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
@@ -272,7 +305,7 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
 
 export async function getOrganizations(): Promise<Organization[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20));
+  // await new Promise(resolve => setTimeout(resolve, 20));
 
   if (isFirebaseProperlyConfigured && db && organizationsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -314,8 +347,9 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
   }
 
   if (!isFirebaseProperlyConfigured || !db || !organizationsCollectionRef) {
-    console.error(`Cannot create/update organization ${orgData.name}: Firebase not properly configured or db/organizationsCollectionRef is null. Attempting localStorage update only.`);
-     if (typeof window !== 'undefined') {
+    const errorMessage = `Cannot create/update organization ${orgData.name}: Firebase not properly configured or db/organizationsCollectionRef is null.`;
+    if (typeof window !== 'undefined') { // Server actions run on the server
+       console.warn(`${errorMessage} Attempting localStorage update only.`);
         try {
             const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
             let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
@@ -328,17 +362,19 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
             console.error("Error updating localStorage for organization:", e);
             return false;
         }
+    } else {
+        console.error(`${errorMessage} Not in browser environment, cannot use localStorage fallback for server action.`);
+        return false; 
     }
-    return false;
   }
 
   try {
     const orgDocRef = doc(organizationsCollectionRef, orgData.id);
-    const { id, ...dataForFirestore } = orgData;
+    const { id, ...dataForFirestore } = orgData; // Exclude id from data if it's the doc key
     await setDoc(orgDocRef, dataForFirestore, { merge: true });
     console.log(`Organization ${orgData.name} created/updated in Firestore.`);
     
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') { // Update localStorage cache
         const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
         let organizations: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
         const orgIndex = organizations.findIndex(o => o.id === orgData.id);
@@ -348,7 +384,7 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
     return true;
   } catch (error) {
     console.error("Error creating/updating organization in Firestore: ", error);
-    // Fallback to localStorage if Firestore operation fails
+    // Fallback to localStorage if Firestore operation fails (client-side only)
     if (typeof window !== 'undefined') {
         try {
             const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
@@ -357,19 +393,19 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
             if (orgIndex > -1) organizations[orgIndex] = orgData; else organizations.push(orgData);
             localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations));
             console.warn(`Organization ${orgData.name} created/updated in localStorage only due to Firestore error.`);
-            return true; // Indicate success to the action if localStorage works
+            return true; 
         } catch (e) {
             console.error("Error updating localStorage for organization after Firestore failure:", e);
-            return false; // Both Firestore and localStorage failed
+            return false; 
         }
     }
-    return false; // Firestore failed and not in browser context
+    return false; 
   }
 }
 
 export async function getOrganizationById(orgId: string): Promise<Organization | undefined> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  // await new Promise(resolve => setTimeout(resolve, 10));
 
   if (isFirebaseProperlyConfigured && db && organizationsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -378,7 +414,7 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
       const docSnap = await getDoc(orgDocRef);
       if (docSnap.exists()) {
          const orgData = { id: docSnap.id, ...docSnap.data() } as Organization;
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') { // Update localStorage cache
             const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
             let orgs: Organization[] = storedOrgs ? JSON.parse(storedOrgs) : [];
             const orgIndex = orgs.findIndex(o => o.id === orgId);
@@ -392,6 +428,7 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
     }
   }
 
+  // Fallback to localStorage
   if (typeof window !== 'undefined') {
     const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
     if (storedOrgs) {
@@ -410,3 +447,4 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
   console.warn(`Organization ${orgId} not found in Firestore or localStorage.`);
   return undefined;
 }
+

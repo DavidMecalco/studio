@@ -3,7 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  createUserInFirestoreService, // Corrected: import the function with its actual exported name
+  createUserInFirestoreService, 
   createOrUpdateOrganization as createOrUpdateOrganizationService,
   type UserDoc,
   type Organization,
@@ -11,7 +11,7 @@ import {
   getOrganizationById
 } from "@/services/users";
 import type { User as AuthUserType } from "@/context/auth-context";
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
 interface CreateUserResult {
   success: boolean;
@@ -33,7 +33,7 @@ export async function createOrUpdateUserAction(
 
   try {
     const isEditing = !!userData.id;
-    const success = await createUserInFirestoreService(userData); // This call is correct with the corrected import
+    const success = await createUserInFirestoreService(userData); 
     if (success) {
       revalidatePath("/(app)/user-management", "page");
 
@@ -44,8 +44,8 @@ export async function createOrUpdateUserAction(
 
       // Notify the superuser who performed the action, only if Firebase is configured
       if (isFirebaseProperlyConfigured) {
-        const superUser = await getUserById('superuser'); // Assuming 'superuser' is the ID of the superuser
-        if (superUser?.email && superUser.email !== userData.email) { // Don't notify superuser if they are editing their own account
+        const superUser = await getUserById('superuser'); 
+        if (superUser?.email && superUser.email !== userData.email) { 
           const notificationMessage = `User account for ${userData.email} has been ${actionText}. Details: Username: ${userData.username}, Role: ${userData.role}.`;
           console.log(`Simulated Email Notification to Super User (${superUser.email}): ${notificationMessage}`);
         }
@@ -53,9 +53,10 @@ export async function createOrUpdateUserAction(
         console.log("Skipped superuser notification for user action as Firebase is not properly configured.");
       }
 
-      return { success: true };
+      // Assuming UserDoc is compatible or can be mapped from AuthUserType if needed for return
+      return { success: true, user: userData as UserDoc };
     } else {
-      return { success: false, error: "Failed to create or update user in Firestore." };
+      return { success: false, error: "Failed to create or update user. Check server logs for details (e.g., Firebase configuration or Firestore access issues)." };
     }
   } catch (error) {
     console.error("Error in createOrUpdateUserAction:", error);
@@ -104,7 +105,7 @@ export async function createOrUpdateOrganizationAction(
 
       return { success: true, organization: orgData };
     } else {
-      return { success: false, error: "Failed to create or update organization in Firestore." };
+      return { success: false, error: "Failed to create or update organization. Check server logs for details (e.g., Firebase configuration or Firestore access issues)." };
     }
   } catch (error) {
     console.error("Error in createOrUpdateOrganizationAction:", error);
