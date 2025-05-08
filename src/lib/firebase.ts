@@ -13,29 +13,27 @@ const firebaseConfig = {
 };
 
 let isFirebaseProperlyConfigured = true;
-
-// Check if the project ID is configured, as this is a common cause for "projects//" errors.
-if (!firebaseConfig.projectId) {
-  isFirebaseProperlyConfigured = false;
-  const warningMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly. The application will fall back to using localStorage for mock data if available.";
-  console.warn(warningMessage); // Changed from console.error
-  // In a client-side environment, throwing an error here might be too disruptive.
-  // For a server-side context or build process, an error throw is appropriate.
-  // Since this runs in both contexts in Next.js, logging an error is a safer default.
-}
-
-
-// Initialize Firebase
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 
-// Only attempt to initialize Firebase if the project ID is set
-if (isFirebaseProperlyConfigured) {
-  if (!getApps().length) {
-    try {
+if (!firebaseConfig.projectId) {
+  isFirebaseProperlyConfigured = false;
+  const warningMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly. The application will fall back to using localStorage for mock data if available (client-side only).";
+  console.warn(warningMessage);
+} else {
+  try {
+    if (!getApps().length) {
       app = initializeApp(firebaseConfig);
+      console.log("Firebase app initialized.");
+    } else {
+      app = getApp();
+      console.log("Existing Firebase app retrieved.");
+    }
+
+    if (app) {
       db = getFirestore(app);
-      if (typeof window !== 'undefined') { // IndexedDB persistence only works in the browser
+      console.log("Firestore instance obtained.");
+      if (typeof window !== 'undefined' && db) { // IndexedDB persistence only works in the browser
         enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
           .then(() => {
             console.log("Firestore offline persistence enabled.");
@@ -46,37 +44,33 @@ if (isFirebaseProperlyConfigured) {
             } else if (err.code === 'unimplemented') {
               console.warn('Firestore offline persistence failed (unimplemented). The browser may not support IndexedDB for offline persistence.');
             } else {
-              console.error('Firestore offline persistence failed: ', err);
+              console.error('Firestore offline persistence error: ', err);
             }
           });
       }
-    } catch (initError) {
-        console.error("Firebase initialization failed:", initError);
-        isFirebaseProperlyConfigured = false; // Set to false if init itself fails
-        app = null;
-        db = null;
+    } else {
+      // This case should ideally not be reached if initializeApp/getApp behaves as expected
+      isFirebaseProperlyConfigured = false;
+      console.error("Firebase app is null after initialization/retrieval attempt.");
     }
-  } else {
-    try {
-        app = getApp();
-        db = getFirestore(app); // Ensure db is initialized for existing app instance
-    } catch (getError) {
-        console.error("Failed to get existing Firebase app or Firestore instance:", getError);
-        isFirebaseProperlyConfigured = false; // Set to false if getting existing instance fails
-        app = null;
-        db = null;
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+    isFirebaseProperlyConfigured = false;
+    app = null;
+    db = null;
+  }
+}
+
+if (!db) {
+    // If db is still null here, it means getFirestore failed or app was null
+    if(isFirebaseProperlyConfigured){ // Only set to false if it wasn't already false due to projectId
+        console.error("Firestore instance (db) is null. Firebase might not be properly configured or getFirestore failed.");
+        isFirebaseProperlyConfigured = false;
     }
-  }
-} else {
-  // This message is already covered by the console.warn above if projectId is missing.
-  // If isFirebaseProperlyConfigured is false due to other reasons (like initError), this might be relevant.
-  if (firebaseConfig.projectId) { // Only log this if projectId was present but init failed.
-      console.warn("Firebase was not initialized despite Project ID being present. App will rely on localStorage for mock data if available.");
-  }
-  // app and db remain null
 }
 
 
 // const auth: Auth | null = app ? getAuth(app) : null; // Uncomment if Firebase Auth is used
 
 export { app, db, isFirebaseProperlyConfigured /*, auth */ };
+

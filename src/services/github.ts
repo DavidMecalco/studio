@@ -37,8 +37,12 @@ const TLA_GITLAB_API_KEY = 'glpat-m5wMBM1TQ3PSKXoRpPay';
 // --- End of Warning ---
 
 let commitsCollectionRef: CollectionReference<DocumentData> | null = null;
-if (isFirebaseProperlyConfigured && db) {
+if (db) { // Only initialize if db is available
   commitsCollectionRef = collection(db, 'github_commits');
+} else {
+  if (isFirebaseProperlyConfigured) {
+      console.warn("GitHubService: Firestore db instance is null. commitsCollectionRef will not be initialized. Operations will rely on localStorage (client-side) or fail (server-side).");
+  }
 }
 
 const MOCK_GITHUB_SEEDED_FLAG_V6 = 'mock_github_seeded_v6'; // Updated version
@@ -86,32 +90,41 @@ const commitsToSeed: GitHubCommit[] = [
 ];
 
 async function ensureGitHubMockDataSeeded(): Promise<void> {
-  if (typeof window === 'undefined') return;
-   if (localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V6) === 'true' && isFirebaseProperlyConfigured && db && commitsCollectionRef) {
-    try {
-        const firstCommit = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
-        if (firstCommit.exists()) return;
-    } catch(e) {/* ignore, proceed to seed */}
+  if (typeof window === 'undefined') {
+     if (!isFirebaseProperlyConfigured) {
+         console.warn("GitHub mock data seeding (server-side): Firebase not properly configured. Cannot seed to Firestore.");
+    }
+    return;
   }
 
-  console.log("Attempting to seed GitHub mock data (v6)...");
-  localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commitsToSeed));
-  console.log("GitHub mock data (v6) seeded to localStorage.");
+  const isSeededInLocalStorage = localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V6) === 'true';
+
+   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && commitsCollectionRef) {
+    try {
+        const firstCommit = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
+        if (firstCommit.exists()) return; // Already seeded in Firestore
+    } catch(e) {
+        console.warn("Error checking Firestore seed status for GitHub commits. Will proceed with localStorage check and potential re-seed.", e);
+    }
+  }
+
+  if (!isSeededInLocalStorage) {
+    console.log("Attempting to seed GitHub mock data (v6) to localStorage...");
+    localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commitsToSeed));
+    localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V6, 'true');
+    console.log("GitHub mock data (v6) seeded to localStorage. Seeding flag set.");
+  }
+  
 
   if (isFirebaseProperlyConfigured && db && navigator.onLine && commitsCollectionRef) {
     try {
-      const batch = writeBatch(db);
-      let firestoreNeedsSeeding = false;
       const firstCommitSnap = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
-
       if (!firstCommitSnap.exists()) {
-        firestoreNeedsSeeding = true;
+        const batch = writeBatch(db);
         console.log("Preparing to seed GitHub commits to Firestore (v6)...");
         for (const commitData of commitsToSeed) {
           batch.set(doc(commitsCollectionRef, commitData.sha), commitData);
         }
-      }
-      if (firestoreNeedsSeeding) {
         await batch.commit();
         console.log("Initial GitHub commits (v6) committed to Firestore.");
       } else {
@@ -120,16 +133,19 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
     } catch (error) {
       console.warn("Error during Firestore GitHub seeding (v6): ", error);
     }
-  } else {
-     console.log("Skipping Firestore GitHub seeding (v6). Firebase not configured, offline, or collection ref missing.");
+  } else if (typeof window !== 'undefined'){
+    let reason = "";
+    if (!isFirebaseProperlyConfigured) reason += "Firebase not properly configured. ";
+    else if (!db) reason += "Firestore db instance is null. ";
+    else if (!commitsCollectionRef) reason += "commitsCollectionRef is null. ";
+    else if (!navigator.onLine) reason += "Client is offline. ";
+    console.log(`Skipping Firestore GitHub seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
   }
-  localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V6, 'true');
 }
 
 
 export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<GitHubCommit[]> {
   await ensureGitHubMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20));
 
   // Simulate API key usage for TLA
   if (ticketIdOrProjectId === 'maximo-tla') {
@@ -144,18 +160,10 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       if (ticketIdOrProjectId === "ALL_PROJECTS") {
         q = query(commitsCollectionRef, orderBy("date", "desc"), limit(50)); 
       } else {
-        // Check if it's a repo name directly or a ticket ID
-        if (ticketIdOrProjectId.includes('-')) { // Heuristic for ticket ID
+        if (ticketIdOrProjectId.includes('-')) { 
              q = query(commitsCollectionRef, where("ticketId", "==", ticketIdOrProjectId), orderBy("date", "desc"));
-        } else { // Assume it's a project/repo name for direct filtering if applicable
-            // This part is tricky as commits are not directly tied to a project name but via ticket.
-            // For simplicity, this mock won't directly filter by generic project name from here unless it's a special case like 'maximo-tla'
-            // The current mock data links commits via ticketId, which then links to a provider/repo.
-            // A more robust solution would involve joining or multiple queries if commits were stored per project.
-            // For now, if it's 'maximo-tla', we've already logged key usage. The query below will fetch relevant TLA commits via ticketId.
-            // If it's another repo name not matching 'maximo-tla', this will likely return few/no results directly from Firestore based on current data structure.
-            // The localStorage fallback handles broader matching.
-            q = query(commitsCollectionRef, where("ticketId", "==", `dummy-value-for-repo-${ticketIdOrProjectId}`), orderBy("date", "desc")); // Fallback for other repo names
+        } else { 
+            q = query(commitsCollectionRef, where("ticketId", "==", `dummy-value-for-repo-${ticketIdOrProjectId}`), orderBy("date", "desc"));
         }
       }
       const querySnapshot = await getDocs(q);
@@ -163,15 +171,20 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       querySnapshot.forEach((docSnap) => {
         commits.push(docSnap.data() as GitHubCommit);
       });
-       if (typeof window !== 'undefined' && ticketIdOrProjectId === "ALL_PROJECTS") {
-        localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commits));
+       if (typeof window !== 'undefined') { // Update cache on client
+        localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(
+            ticketIdOrProjectId === "ALL_PROJECTS" ? 
+            commits : 
+            (JSON.parse(localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY) || '[]') as GitHubCommit[]).filter(c => c.ticketId !== ticketIdOrProjectId && !c.message.includes(ticketIdOrProjectId) && !c.branch?.includes(ticketIdOrProjectId)).concat(commits)
+        ));
       }
       return commits;
     } catch (error) {
-      console.error(`Error fetching GitHub commits for ${ticketIdOrProjectId} from Firestore, falling back to localStorage: `, error);
+      console.error(`Error fetching GitHub commits for ${ticketIdOrProjectId} from Firestore. Falling back to localStorage (client-side).`, error);
     }
   }
 
+  // Fallback for client-side or if Firestore failed
   if (typeof window !== 'undefined') {
     const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
     if (storedCommits) {
@@ -180,20 +193,20 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
         let commits: GitHubCommit[] = JSON.parse(storedCommits);
         if (ticketIdOrProjectId !== "ALL_PROJECTS") {
           commits = commits.filter(commit => commit.ticketId === ticketIdOrProjectId || commit.message.includes(ticketIdOrProjectId) || commit.branch?.includes(ticketIdOrProjectId));
-           // If ticketIdOrProjectId is 'maximo-tla', this won't filter correctly by repo name alone using current data.
-           // The earlier logging for 'maximo-tla' already handles the API key simulation.
         }
         return commits.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } catch (e) {
         console.error("Error parsing GitHub commits from localStorage.", e);
-        return [];
       }
     }
+    console.warn(`No GitHub commits found in localStorage cache for ${ticketIdOrProjectId}.`);
+    return [];
   }
-  console.warn(`No GitHub commits found for ${ticketIdOrProjectId} in Firestore or localStorage.`);
+  console.warn(`No GitHub commits found. (Server-side context and Firestore is unavailable/not configured for ${ticketIdOrProjectId}).`);
   return [];
 }
 
+// This function is primarily called by server actions.
 export async function createGitHubCommit(
     ticketId: string,
     message: string,
@@ -202,36 +215,16 @@ export async function createGitHubCommit(
     filesChanged: string[] = []
 ): Promise<GitHubCommit | null> {
   
-  // Simplified repo name logic, assuming ticket provider can be parsed from ID or message.
-  let repoName = 'example/repo'; // default
-  // This logic assumes ticket ID or provider information can determine the repo.
-  // The TLA check is based on 'maximo-tla' for consistency with org data.
+  let repoName = 'example/repo'; 
   if(ticketId.toUpperCase().startsWith('MAS-TLA') || ticketId.toUpperCase().includes('TLA')) repoName = 'maximo-tla';
   else if(ticketId.toUpperCase().startsWith('MAS-FEMA') || ticketId.toUpperCase().includes('FEMA')) repoName = 'maximo-fema';
   
-  // Simulate API key usage for TLA
   if (repoName === 'maximo-tla') {
-    console.log(`SIMULATING: If this were a real GitLab API call for TLA (repo: ${repoName}) to create a commit, the TLA GitLab API Key would be used: ${TLA_GITLAB_API_KEY.substring(0, 10)}... (This is for testing purposes only and not a secure practice).`);
+    console.log(`SIMULATING: If this were a real GitLab API call for TLA (repo: ${repoName}) to create a commit, the TLA GitLab API Key would be used: ${TLA_GITLAB_API_KEY.substring(0, 10)}...`);
   }
   
   if (!isFirebaseProperlyConfigured || !db || !commitsCollectionRef) {
-    console.error("Cannot create GitHub commit: Firebase not properly configured or db/commitsCollectionRef is null.");
-    // Fallback to in-memory/localStorage for mock if necessary
-    if (typeof window !== 'undefined') {
-        const newSha = Math.random().toString(36).substring(2, 12);
-        const fullMessage = `${ticketId}: ${message}`;
-        const newCommit: GitHubCommit = {
-            sha: newSha, message: fullMessage, author,
-            url: `https://github.com/${repoName}/commit/${newSha}`, // Stays GitHub URL for mock consistency
-            date: new Date().toISOString(), filesChanged, ticketId, branch,
-        };
-        const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
-        let commits: GitHubCommit[] = storedCommits ? JSON.parse(storedCommits) : [];
-        commits.unshift(newCommit);
-        localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commits));
-        console.warn(`GitHub commit ${newSha} created in localStorage only (Firestore unavailable).`);
-        return newCommit;
-    }
+    console.error("GitHubService (createGitHubCommit): Cannot create GitHub commit. Firebase not properly configured, db instance null, or commitsCollectionRef null.");
     return null;
   }
 
@@ -241,7 +234,7 @@ export async function createGitHubCommit(
     
     const newCommit: GitHubCommit = {
         sha: newSha, message: fullMessage, author,
-        url: `https://github.com/${repoName}/commit/${newSha}`, // Stays GitHub URL for mock consistency
+        url: `https://github.com/${repoName}/commit/${newSha}`, 
         date: new Date().toISOString(), filesChanged, ticketId, branch,
     };
 
@@ -249,11 +242,13 @@ export async function createGitHubCommit(
     await setDoc(commitDocRef, newCommit);
     console.log(`GitHub commit ${newSha} created in Firestore.`);
 
+    // If on client, update localStorage cache
     if (typeof window !== 'undefined') {
         const storedCommits = localStorage.getItem(LOCAL_STORAGE_GITHUB_KEY);
         let commits: GitHubCommit[] = storedCommits ? JSON.parse(storedCommits) : [];
         commits.unshift(newCommit);
         localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commits));
+        console.log("Local GitHub commit cache updated after Firestore create (createGitHubCommit).");
     }
     return newCommit;
   } catch (error) {
@@ -265,7 +260,6 @@ export async function createGitHubCommit(
 
 export async function getFileVersions(fileName: string): Promise<FileVersion[]> {
     await ensureGitHubMockDataSeeded();
-    await new Promise(resolve => setTimeout(resolve, 50));
 
     let relevantCommits: GitHubCommit[] = [];
     if (isFirebaseProperlyConfigured && db && commitsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
@@ -274,7 +268,7 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
             const querySnapshot = await getDocs(q);
             querySnapshot.forEach(docSnap => relevantCommits.push(docSnap.data() as GitHubCommit));
         } catch (error) {
-            console.error(`Error fetching versions for ${fileName} from Firestore:`, error);
+            console.error(`Error fetching versions for ${fileName} from Firestore. Falling back to localStorage (client-side).`, error);
         }
     }
 
@@ -285,7 +279,7 @@ export async function getFileVersions(fileName: string): Promise<FileVersion[]> 
                 const allCommits: GitHubCommit[] = JSON.parse(storedCommits);
                 relevantCommits = allCommits.filter(
                     commit => commit.filesChanged?.includes(fileName) || commit.message.includes(fileName)
-                );
+                ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             } catch (e) { console.error("Error parsing localStorage commits for file versions:", e); }
         }
     }
