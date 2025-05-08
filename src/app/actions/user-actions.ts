@@ -10,6 +10,7 @@ import {
   getUserById
 } from "@/services/users";
 import type { User as AuthUserType } from "@/context/auth-context"; 
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
 
 interface CreateUserResult {
   success: boolean;
@@ -30,22 +31,25 @@ export async function createOrUpdateUserAction(
   }
 
   try {
-    const isEditing = !!userData.id; // If ID exists, we are editing
+    const isEditing = !!userData.id; 
     const success = await createUserInFirestoreService(userData);
     if (success) {
       revalidatePath("/(app)/user-management", "page");
       
-      // Simulate Email Notification
-      const superUser = await getUserById('superuser'); // Assuming 'superuser' is the ID of the superuser
       const actionText = isEditing ? 'updated' : 'created';
-      const notificationMessage = `User account for ${userData.email} has been ${actionText}. Details: Username: ${userData.username}, Role: ${userData.role}.`;
       
       // Notify the created/updated user
       console.log(`Simulated Email Notification to ${userData.email}: Your account has been ${actionText}. Username: ${userData.username}, Role: ${userData.role}. Login with the provided password.`);
       
-      // Notify the superuser who performed the action
-      if (superUser?.email && superUser.email !== userData.email) { // Don't notify superuser if they are editing their own account
+      // Notify the superuser who performed the action, only if Firebase is configured
+      if (isFirebaseProperlyConfigured) {
+        const superUser = await getUserById('superuser'); // Assuming 'superuser' is the ID of the superuser
+        if (superUser?.email && superUser.email !== userData.email) { // Don't notify superuser if they are editing their own account
+          const notificationMessage = `User account for ${userData.email} has been ${actionText}. Details: Username: ${userData.username}, Role: ${userData.role}.`;
           console.log(`Simulated Email Notification to Super User (${superUser.email}): ${notificationMessage}`);
+        }
+      } else {
+        console.log("Skipped superuser notification for user action as Firebase is not properly configured.");
       }
 
       return { success: true }; 
@@ -79,17 +83,22 @@ export async function createOrUpdateOrganizationAction(
   }
 
   try {
-    const isEditing = !!(await getOrganizationById(orgData.id)); // Check if org exists before update
+    const existingOrg = await getOrganizationById(orgData.id);
+    const isEditing = !!existingOrg; 
     const success = await createOrUpdateOrganizationService(orgData);
     if (success) {
       revalidatePath("/(app)/organization-management", "page");
       
-      // Simulate Email Notification
-      const superUser = await getUserById('superuser'); 
       const actionText = isEditing ? 'updated' : 'created';
       const notificationMessage = `Organization '${orgData.name}' (ID: ${orgData.id}) has been ${actionText}.`;
-       if (superUser?.email) {
-          console.log(`Simulated Email Notification to Super User (${superUser.email}): ${notificationMessage}`);
+
+      if (isFirebaseProperlyConfigured) {
+        const superUser = await getUserById('superuser'); 
+        if (superUser?.email) {
+            console.log(`Simulated Email Notification to Super User (${superUser.email}): ${notificationMessage}`);
+        }
+      } else {
+         console.log("Skipped superuser notification for organization action as Firebase is not properly configured.");
       }
       
       return { success: true, organization: orgData };

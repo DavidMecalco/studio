@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { addDeploymentToTicketHistory } from "@/services/jira";
 import type { DeploymentLogEntry, CreateDeploymentLogData as ServiceCreateData } from "@/services/deployment";
 import { createDeploymentLog as createDeploymentLogService } from "@/services/deployment";
-import { getUserById } from "@/services/users"; // To get user email for notifications
+import { getUserById } from "@/services/users"; 
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
 
 interface CreateDeploymentResult {
   success: boolean;
@@ -56,21 +57,26 @@ export async function createDeploymentLogAction(
     revalidatePath("/(app)/dashboard", "page");
 
     // Simulate Email Notification
-    const deployingUser = await getUserById(newLog.userId);
-    const notificationRecipients = new Set<string>();
-    if(deployingUser?.email) notificationRecipients.add(deployingUser.email);
-    // Add other relevant parties, e.g., superuser, project leads
-    const superUser = await getUserById('superuser');
-    if(superUser?.email) notificationRecipients.add(superUser.email);
+    if (isFirebaseProperlyConfigured) {
+      const deployingUser = await getUserById(newLog.userId);
+      const notificationRecipients = new Set<string>();
+      if(deployingUser?.email) notificationRecipients.add(deployingUser.email);
+      
+      const superUser = await getUserById('superuser');
+      if(superUser?.email) notificationRecipients.add(superUser.email);
 
-    const filesDeployedString = newLog.filesDeployed.map(f => f.name).join(', ');
-    let notificationMessage = `Deployment Logged: ID ${newLog.id} to ${newLog.environment} by ${deployingUser?.name || newLog.userId}. Status: ${newLog.status}. Files: ${filesDeployedString}.`;
-    if (newLog.message) notificationMessage += ` Message: ${newLog.message}.`;
-    if (newLog.ticketIds && newLog.ticketIds.length > 0) notificationMessage += ` Associated Tickets: ${newLog.ticketIds.join(', ')}.`;
+      const filesDeployedString = newLog.filesDeployed.map(f => f.name).join(', ');
+      let notificationMessage = `Deployment Logged: ID ${newLog.id} to ${newLog.environment} by ${deployingUser?.name || newLog.userId}. Status: ${newLog.status}. Files: ${filesDeployedString}.`;
+      if (newLog.message) notificationMessage += ` Message: ${newLog.message}.`;
+      if (newLog.ticketIds && newLog.ticketIds.length > 0) notificationMessage += ` Associated Tickets: ${newLog.ticketIds.join(', ')}.`;
 
-    notificationRecipients.forEach(email => {
-        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-    });
+      notificationRecipients.forEach(email => {
+          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+      });
+    } else {
+      console.log("Skipped deployment email notification as Firebase is not properly configured.");
+    }
+
 
     return { success: true, log: newLog };
 

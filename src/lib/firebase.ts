@@ -12,49 +12,68 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+let isFirebaseProperlyConfigured = true;
+
 // Check if the project ID is configured, as this is a common cause for "projects//" errors.
 if (!firebaseConfig.projectId) {
+  isFirebaseProperlyConfigured = false;
   const errorMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly.";
   console.error(errorMessage);
   // In a client-side environment, throwing an error here might be too disruptive.
   // For a server-side context or build process, an error throw is appropriate.
   // Since this runs in both contexts in Next.js, logging an error is a safer default.
-  // If this is critical for app functionality, an error should be thrown.
-  // For now, we'll log and allow initialization to proceed, which will likely fail later with the Firebase error.
-  // A more robust solution in a real app might involve conditional logic or a dedicated config validation step.
 }
 
 
 // Initialize Firebase
-let app: FirebaseApp;
-let db: Firestore;
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
 
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  if (typeof window !== 'undefined') { // IndexedDB persistence only works in the browser
-    enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
-      .then(() => {
-        console.log("Firestore offline persistence enabled.");
-      })
-      .catch((err) => {
-        if (err.code === 'failed-precondition') {
-          // Multiple tabs open, persistence can only be enabled in one tab at a time.
-          console.warn('Firestore offline persistence failed (failed-precondition). This can happen if multiple tabs are open or due to other browser restrictions. The app will continue to function but may rely more on network connectivity for Firestore data.');
-        } else if (err.code === 'unimplemented') {
-          // The current browser does not support all of the features required to enable persistence
-          console.warn('Firestore offline persistence failed (unimplemented). The browser may not support IndexedDB for offline persistence.');
-        } else {
-          console.error('Firestore offline persistence failed: ', err);
-        }
-      });
+// Only attempt to initialize Firebase if the project ID is set
+if (isFirebaseProperlyConfigured) {
+  if (!getApps().length) {
+    try {
+      app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      if (typeof window !== 'undefined') { // IndexedDB persistence only works in the browser
+        enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+          .then(() => {
+            console.log("Firestore offline persistence enabled.");
+          })
+          .catch((err) => {
+            if (err.code === 'failed-precondition') {
+              console.warn('Firestore offline persistence failed (failed-precondition). This can happen if multiple tabs are open or due to other browser restrictions. The app will continue to function but may rely more on network connectivity for Firestore data.');
+            } else if (err.code === 'unimplemented') {
+              console.warn('Firestore offline persistence failed (unimplemented). The browser may not support IndexedDB for offline persistence.');
+            } else {
+              console.error('Firestore offline persistence failed: ', err);
+            }
+          });
+      }
+    } catch (initError) {
+        console.error("Firebase initialization failed:", initError);
+        isFirebaseProperlyConfigured = false; // Set to false if init itself fails
+        app = null;
+        db = null;
+    }
+  } else {
+    try {
+        app = getApp();
+        db = getFirestore(app); // Ensure db is initialized for existing app instance
+    } catch (getError) {
+        console.error("Failed to get existing Firebase app or Firestore instance:", getError);
+        isFirebaseProperlyConfigured = false; // Set to false if getting existing instance fails
+        app = null;
+        db = null;
+    }
   }
 } else {
-  app = getApp();
-  db = getFirestore(app); // Ensure db is initialized for existing app instance
+  console.warn("Firebase was not initialized due to missing Project ID. App will rely on localStorage for mock data if available.");
+  // app and db remain null
 }
 
-// const auth: Auth = getAuth(app); // Uncomment if Firebase Auth is used
 
-export { app, db /*, auth */ };
+// const auth: Auth | null = app ? getAuth(app) : null; // Uncomment if Firebase Auth is used
+
+export { app, db, isFirebaseProperlyConfigured /*, auth */ };
 

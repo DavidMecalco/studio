@@ -2,9 +2,10 @@
 "use server";
 
 import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
-import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; // Renamed to avoid conflict
+import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; 
 import { revalidatePath } from "next/cache";
-import { getUserById } from "@/services/users"; // To get user email for notifications
+import { getUserById } from "@/services/users"; 
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
 
 interface UpdateJiraTicketResult {
   success: boolean;
@@ -47,27 +48,31 @@ export async function updateJiraTicketAction(
       revalidatePath("/(app)/my-tickets", "page");
 
       // Simulate Email Notification
-      const performingUser = await getUserById(userIdPerformingAction);
-      const requester = await getUserById(updatedTicket.requestingUserId);
-      const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
+      if (isFirebaseProperlyConfigured) {
+        const performingUser = await getUserById(userIdPerformingAction);
+        const requester = await getUserById(updatedTicket.requestingUserId);
+        const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
 
-      const notificationRecipients = new Set<string>();
-      if (performingUser?.email) notificationRecipients.add(performingUser.email);
-      if (requester?.email) notificationRecipients.add(requester.email);
-      if (assignee?.email) notificationRecipients.add(assignee.email);
-      // In a real app, also notify superusers/admins based on roles or subscriptions
-      const superUser = await getUserById('superuser'); // Example: notify superuser
-      if(superUser?.email) notificationRecipients.add(superUser.email);
+        const notificationRecipients = new Set<string>();
+        if (performingUser?.email) notificationRecipients.add(performingUser.email);
+        if (requester?.email) notificationRecipients.add(requester.email);
+        if (assignee?.email) notificationRecipients.add(assignee.email);
+        
+        const superUser = await getUserById('superuser'); 
+        if(superUser?.email) notificationRecipients.add(superUser.email);
 
 
-      let notificationMessage = `Ticket ${ticketId} updated by ${performingUser?.name || userIdPerformingAction}.`;
-      if (newStatus) notificationMessage += ` New status: ${newStatus}.`;
-      if (newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${newAssigneeId || 'Unassigned'}.`;
-      if (comment) notificationMessage += ` Comment: "${comment}".`;
-      
-      notificationRecipients.forEach(email => {
-          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-      });
+        let notificationMessage = `Ticket ${ticketId} updated by ${performingUser?.name || userIdPerformingAction}.`;
+        if (newStatus) notificationMessage += ` New status: ${newStatus}.`;
+        if (newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${newAssigneeId || 'Unassigned'}.`;
+        if (comment) notificationMessage += ` Comment: "${comment}".`;
+        
+        notificationRecipients.forEach(email => {
+            console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+        });
+      } else {
+        console.log("Skipped Jira ticket update email notification as Firebase is not properly configured.");
+      }
       
       return { success: true, ticket: updatedTicket };
     } else {
@@ -91,7 +96,7 @@ export interface CreateTicketActionFormValues {
   description: string;
   priority: JiraTicketPriority;
   requestingUserId: string; 
-  requestingUserEmail?: string; // For notifications
+  requestingUserEmail?: string; 
   provider?: JiraTicketProvider; 
   branch?: JiraTicketBranch;
   attachmentNames?: string[];
@@ -128,16 +133,21 @@ export async function createJiraTicketAction(
       revalidatePath("/(app)/my-tickets", "page");
 
       // Simulate Email Notification
-      const notificationRecipients = new Set<string>();
-      if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
-      // In a real app, notify admins/superusers based on roles or project settings
-      const superUser = await getUserById('superuser'); // Example: notify superuser
-      if (superUser?.email) notificationRecipients.add(superUser.email);
-      
-      const notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
-       notificationRecipients.forEach(email => {
-          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-      });
+      if (isFirebaseProperlyConfigured) {
+        const notificationRecipients = new Set<string>();
+        if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
+        
+        const superUser = await getUserById('superuser'); 
+        if (superUser?.email) notificationRecipients.add(superUser.email);
+        
+        const notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
+        notificationRecipients.forEach(email => {
+            console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+        });
+      } else {
+        console.log("Skipped Jira ticket creation email notification as Firebase is not properly configured.");
+      }
+
 
       return { success: true, ticket: newTicket };
     } else {
@@ -179,21 +189,25 @@ export async function addCommentToTicketAction(
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
 
       // Simulate Email Notification for comment
-      const performingUser = await getUserById(userIdPerformingAction);
-      const requester = await getUserById(updatedTicket.requestingUserId);
-      const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
+      if (isFirebaseProperlyConfigured) {
+        const performingUser = await getUserById(userIdPerformingAction);
+        const requester = await getUserById(updatedTicket.requestingUserId);
+        const assignee = updatedTicket.assigneeId ? await getUserById(updatedTicket.assigneeId) : null;
 
-      const notificationRecipients = new Set<string>();
-      if (performingUser?.email && performingUser.email !== requester?.email) notificationRecipients.add(performingUser.email); // Don't notify self if requester
-      if (requester?.email) notificationRecipients.add(requester.email);
-      if (assignee?.email && assignee.email !== performingUser?.email) notificationRecipients.add(assignee.email);
-      const superUser = await getUserById('superuser');
-      if(superUser?.email) notificationRecipients.add(superUser.email);
-      
-      const notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
-       notificationRecipients.forEach(email => {
-          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-      });
+        const notificationRecipients = new Set<string>();
+        if (performingUser?.email && performingUser.email !== requester?.email) notificationRecipients.add(performingUser.email); 
+        if (requester?.email) notificationRecipients.add(requester.email);
+        if (assignee?.email && assignee.email !== performingUser?.email) notificationRecipients.add(assignee.email);
+        const superUser = await getUserById('superuser');
+        if(superUser?.email) notificationRecipients.add(superUser.email);
+        
+        const notificationMessage = `New comment on Ticket ${ticketId} by ${performingUser?.name || userIdPerformingAction}: "${commentText}"`;
+        notificationRecipients.forEach(email => {
+            console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+        });
+      } else {
+        console.log("Skipped Jira comment email notification as Firebase is not properly configured.");
+      }
 
       return { success: true, ticket: updatedTicket };
     } else {

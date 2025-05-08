@@ -3,7 +3,9 @@
 
 import { revalidatePath } from "next/cache";
 import { addRestorationToTicketHistory, getJiraTicket } from "@/services/jira";
-import { getUserById } from "@/services/users"; // To get user email for notifications
+import { getUserById } from "@/services/users"; 
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
+
 
 interface RestoreFileVersionResult {
   success: boolean;
@@ -55,30 +57,34 @@ export async function restoreFileVersionAction(
     revalidatePath("/(app)/dashboard", "page"); 
 
     // Simulate Email Notification
-    const performingUser = await getUserById(userIdPerformingAction);
-    const notificationRecipients = new Set<string>();
-    if(performingUser?.email) notificationRecipients.add(performingUser.email);
-    
-    let ticketRequesterEmail: string | undefined;
-    if (ticketId) {
-        const ticket = await getJiraTicket(ticketId);
-        if (ticket) {
-            const requester = await getUserById(ticket.requestingUserId);
-            if(requester?.email) ticketRequesterEmail = requester.email;
-        }
+    if (isFirebaseProperlyConfigured) {
+      const performingUser = await getUserById(userIdPerformingAction);
+      const notificationRecipients = new Set<string>();
+      if(performingUser?.email) notificationRecipients.add(performingUser.email);
+      
+      let ticketRequesterEmail: string | undefined;
+      if (ticketId) {
+          const ticket = await getJiraTicket(ticketId);
+          if (ticket) {
+              const requester = await getUserById(ticket.requestingUserId);
+              if(requester?.email) ticketRequesterEmail = requester.email;
+          }
+      }
+      if(ticketRequesterEmail && ticketRequesterEmail !== performingUser?.email) notificationRecipients.add(ticketRequesterEmail);
+      
+      const superUser = await getUserById('superuser');
+      if(superUser?.email) notificationRecipients.add(superUser.email);
+
+      let notificationMessage = `File '${fileName}' restored to version '${versionIdToRestore}' by ${performingUser?.name || userIdPerformingAction}.`;
+      if (commitSha) notificationMessage += ` (Commit: ${commitSha.substring(0,7)})`;
+      if (ticketId) notificationMessage += ` Related to Ticket: ${ticketId}.`;
+
+      notificationRecipients.forEach(email => {
+          console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+      });
+    } else {
+      console.log("Skipped file restoration email notification as Firebase is not properly configured.");
     }
-    if(ticketRequesterEmail && ticketRequesterEmail !== performingUser?.email) notificationRecipients.add(ticketRequesterEmail);
-    
-    const superUser = await getUserById('superuser');
-    if(superUser?.email) notificationRecipients.add(superUser.email);
-
-    let notificationMessage = `File '${fileName}' restored to version '${versionIdToRestore}' by ${performingUser?.name || userIdPerformingAction}.`;
-    if (commitSha) notificationMessage += ` (Commit: ${commitSha.substring(0,7)})`;
-    if (ticketId) notificationMessage += ` Related to Ticket: ${ticketId}.`;
-
-    notificationRecipients.forEach(email => {
-        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
-    });
 
     return { success: true };
 
