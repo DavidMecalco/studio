@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +34,7 @@ const adminTicketActionSchema = z.object({
     message: "Invalid priority selected.",
   }),
   newAssigneeId: z.string().optional(), // Allows "all", specific ID, or UNASSIGNED_VALUE
-  comment: z.string().max(500, "Comment must be 500 characters or less.").optional(),
+  // Comment field removed
 });
 
 type AdminTicketActionFormValues = z.infer<typeof adminTicketActionSchema>;
@@ -56,7 +55,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       newStatus: ticket.status,
       newPriority: ticket.priority,
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
-      comment: "",
+      // comment: "", // Default value for comment removed
     },
   });
 
@@ -65,7 +64,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       newStatus: ticket.status,
       newPriority: ticket.priority,
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
-      comment: "",
+      // comment: "", // Reset for comment removed
     });
   }, [ticket, form]);
 
@@ -79,7 +78,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       newStatus?: JiraTicketStatus;
       newAssigneeId?: string;
       newPriority?: JiraTicketPriority;
-      comment?: string;
+      comment?: string; // Keep comment in updates object if other logic might add it
     } = {};
 
     let changed = false;
@@ -92,20 +91,16 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       changed = true;
     }
     const assigneeToSubmit = values.newAssigneeId === UNASSIGNED_VALUE ? "" : values.newAssigneeId;
-    if (assigneeToSubmit !== (ticket.assigneeId || "")) { // Compare with empty string if ticket.assigneeId is undefined
+    if (assigneeToSubmit !== (ticket.assigneeId || "")) { 
         updates.newAssigneeId = assigneeToSubmit;
         changed = true;
     }
-    if (values.comment && values.comment.trim() !== "") {
-      updates.comment = values.comment.trim();
-      changed = true; // Adding a comment is also an update
-    }
+    // Comment logic removed from here
     
     if (!changed) {
         toast({ title: "No Changes", description: "No changes detected to update.", variant: "default"});
         return;
     }
-
 
     const result = await updateJiraTicketAction(ticket.id, currentUser.id, updates);
 
@@ -133,7 +128,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
           <Edit className="h-5 w-5 text-primary" /> Manage Ticket
         </CardTitle>
         <CardDescription>
-          Update status, priority, assignee, or add an internal comment.
+          Update status, priority, or assignee.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -196,24 +191,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="comment"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Internal Comment (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Add a comment about this update..."
-                      className="min-h-[80px] resize-y"
-                      {...field}
-                      disabled={form.formState.isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Comment FormField removed */}
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Update Ticket
