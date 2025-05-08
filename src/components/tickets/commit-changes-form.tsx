@@ -15,10 +15,16 @@ import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { GitCommit, Loader2 } from "lucide-react";
 import type { JiraTicketStatus } from "@/services/jira";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"; // Added Form imports
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Added Select imports
+
+const availableBranches = ["dev", "main", "staging", "qa", "fix/current-issue", "feat/new-feature"] as const;
 
 const commitFormSchema = z.object({
   commitMessage: z.string().min(5, "El mensaje de commit debe tener al menos 5 caracteres."),
-  branch: z.string().min(1, "La rama es obligatoria.").default("dev"), // Default to dev branch
+  branch: z.enum(availableBranches, {
+    required_error: "La rama es obligatoria."
+  }).default("dev"),
 });
 
 type CommitFormValues = z.infer<typeof commitFormSchema>;
@@ -51,12 +57,10 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
 
     const newStatusForTicket: JiraTicketStatus = "En Progreso";
 
-    // fileNames are no longer passed to createCommitAndPushAction
     const result = await createCommitAndPushAction(
       ticketId,
       values.commitMessage,
       user.username,
-      // fileNames, // Removed
       values.branch,
       newStatusForTicket
     );
@@ -88,42 +92,63 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <Label htmlFor="commitMessage">Mensaje de Commit (Ej: feat(script) Validación de fechas WO)</Label>
-            <Textarea
-              id="commitMessage"
-              placeholder="Describa los cambios realizados..."
-              className="min-h-[100px] mt-1"
-              {...form.register("commitMessage")}
-              disabled={isSubmitting}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="commitMessage"
+              render={({ field }) => (
+                <FormItem>
+                  <Label htmlFor="commitMessage">Mensaje de Commit (Ej: feat(script) Validación de fechas WO)</Label>
+                  <FormControl>
+                    <Textarea
+                      id="commitMessage"
+                      placeholder="Describa los cambios realizados..."
+                      className="min-h-[100px] mt-1"
+                      {...field}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {form.formState.errors.commitMessage && (
-              <p className="text-sm text-destructive mt-1">{form.formState.errors.commitMessage.message}</p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="branch">Rama (Branch)</Label>
-            <Input
-              id="branch"
-              placeholder="dev"
-              className="mt-1"
-              {...form.register("branch")}
-              disabled={isSubmitting}
+            <FormField
+              control={form.control}
+              name="branch"
+              render={({ field }) => (
+                <FormItem>
+                  <Label htmlFor="branch">Rama (Branch)</Label>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger id="branch">
+                        <SelectValue placeholder="Seleccione una rama" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableBranches.map((branchName) => (
+                        <SelectItem key={branchName} value={branchName}>
+                          {branchName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-             {form.formState.errors.branch && (
-              <p className="text-sm text-destructive mt-1">{form.formState.errors.branch.message}</p>
-            )}
-          </div>
-          
-          {/* File input section removed as per user request */}
-
-          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCommit className="mr-2 h-4 w-4" />}
-            {isSubmitting ? "Realizando Commit..." : "Commit y Push a Branch"}
-          </Button>
-        </form>
+            
+            <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCommit className="mr-2 h-4 w-4" />}
+              {isSubmitting ? "Realizando Commit..." : "Commit y Push a Branch"}
+            </Button>
+          </form>
+        </Form>
       </CardContent>
       <CardFooter>
         <p className="text-xs text-muted-foreground">
@@ -133,3 +158,4 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
     </Card>
   );
 }
+
