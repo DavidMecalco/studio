@@ -52,54 +52,55 @@ const orgsToSeed: Organization[] = [
 ];
 
 async function ensureMockDataSeeded(): Promise<void> {
-  if (typeof window === 'undefined' || localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V3) === 'true') {
+  if (typeof window === 'undefined') { // Don't run seeding on server
+    return;
+  }
+  if (localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V3) === 'true') {
     return;
   }
 
-  console.log("Attempting to seed initial mock data to localStorage and Firestore...");
+  console.log("Attempting to seed initial mock data to localStorage and potentially Firestore...");
 
   // Always seed localStorage first if flag is not set
   localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
   localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
   console.log("Mock data seeded to localStorage.");
 
-  try {
-    // Attempt to seed Firestore. These operations might fail if offline.
-    const adminUserDoc = await getDoc(doc(db, "users", "admin"));
-    if (!adminUserDoc.exists()) {
-      for (const userData of usersToSeed) {
-        const { id, ...dataToStore } = userData;
-        await setDoc(doc(db, "users", id), dataToStore);
+  if (navigator.onLine) {
+    try {
+      // Attempt to seed Firestore. These operations might fail if offline, even if navigator.onLine is true.
+      const adminUserDoc = await getDoc(doc(db, "users", "admin"));
+      if (!adminUserDoc.exists()) {
+        for (const userData of usersToSeed) {
+          const { id, ...dataToStore } = userData;
+          await setDoc(doc(db, "users", id), dataToStore);
+        }
+        console.log("Initial users seeded to Firestore.");
+      } else {
+        console.log("Firestore 'users' collection seems to have data (admin user exists). Skipping Firestore user seed.");
       }
-      console.log("Initial users seeded to Firestore.");
-    } else {
-      console.log("Firestore 'users' collection seems to have data (admin user exists). Skipping Firestore user seed.");
-    }
 
-    const tlaOrgDoc = await getDoc(doc(db, "organizations", "tla"));
-    if (!tlaOrgDoc.exists()) {
-      for (const orgData of orgsToSeed) {
-        await setDoc(doc(db, "organizations", orgData.id), orgData);
+      const tlaOrgDoc = await getDoc(doc(db, "organizations", "tla"));
+      if (!tlaOrgDoc.exists()) {
+        for (const orgData of orgsToSeed) {
+          await setDoc(doc(db, "organizations", orgData.id), orgData);
+        }
+        console.log("Initial organizations seeded to Firestore.");
+      } else {
+        console.log("Firestore 'organizations' collection seems to have data (TLA org exists). Skipping Firestore org seed.");
       }
-      console.log("Initial organizations seeded to Firestore.");
-    } else {
-      console.log("Firestore 'organizations' collection seems to have data (TLA org exists). Skipping Firestore org seed.");
+    } catch (error) {
+      console.warn("Error during Firestore seeding (client might be offline or other Firestore issue, despite navigator.onLine suggesting online): ", error);
+      // Errors during Firestore seeding are logged but don't stop the process of setting the flag,
+      // as localStorage is already seeded.
     }
-    
-    // If Firestore operations were successful (or didn't need to run because docs existed)
-    localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
-    console.log("Mock data seeding process complete. Seeding flag set.");
-
-  } catch (error) {
-    console.error("Error during Firestore seeding (client might be offline or other Firestore issue): ", error);
-    // If Firestore seeding fails (e.g., offline), still set the flag
-    // because localStorage IS seeded. The app can run on localStorage data.
-    // Firestore might not be up-to-date with the seed data, but that's acceptable for this mock setup.
-    if (!localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V3)) {
-        localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
-        console.log("MOCK_DATA_SEEDED_FLAG_V3 set despite Firestore error, as localStorage is populated.");
-    }
+  } else {
+    console.log("Client is offline (navigator.onLine is false), skipping Firestore seeding operations. Will rely on localStorage.");
   }
+  
+  // Set the flag regardless of Firestore success, because localStorage has been seeded.
+  localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
+  console.log("Mock data seeding process complete. Seeding flag set.");
 }
 
 
@@ -118,7 +119,6 @@ export async function getUsers(): Promise<UserDoc[]> {
       return JSON.parse(storedUsers);
     } catch (e) {
       console.error("Error parsing users from localStorage, falling back to Firestore if possible.", e);
-      // Fallback to Firestore if localStorage is corrupted by removing the stored item
       localStorage.removeItem(LOCAL_STORAGE_USERS_KEY);
     }
   }
