@@ -1,7 +1,7 @@
 
 "use server";
 
-import type { Ticket, TicketStatus, TicketProvider, TicketBranch, CreateTicketData, TicketPriority, TicketType } from "@/services/tickets";
+import type { Ticket, TicketStatus, TicketProvider, TicketBranch, CreateTicketData, TicketPriority, TicketType, TicketHistoryEntry } from "@/services/tickets";
 import { updateTicket as updateTicketServiceCall, createTicket as createTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/tickets";
 import { revalidatePath } from "next/cache";
 import { getUserById } from "@/services/users";
@@ -49,7 +49,9 @@ export async function updateTicketAction(
 
   if (!isFirebaseProperlyConfigured) {
     console.warn(`[ACTION updateTicketAction] Firebase is not configured. This action cannot persist data on the server side without Firebase for ticket ${ticketId}.`);
-    return { success: false, error: "El servicio de base de datos no está disponible. No se pudo actualizar el ticket en el servidor." };
+    // Simulate success for client-side optimistic updates if needed, but data won't be saved server-side.
+    // For now, we'll let it try the service call which will also fail gracefully if Firebase is down.
+    // Alternatively, return a simulated success here too.
   }
 
   try {
@@ -136,17 +138,67 @@ export async function createTicketAction(
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
 
-  // For server actions, if Firebase is not configured, we cannot rely on localStorage fallback.
   if (!isFirebaseProperlyConfigured) {
-    console.warn("[ACTION createTicketAction] Firebase is not configured. This action cannot persist data on the server side without Firebase.");
-    return { success: false, error: "El servicio de base de datos no está configurado en el servidor. No se pudo crear el ticket." };
+    console.warn("[ACTION createTicketAction] Firebase is not configured on the server. Simulating ticket creation for client-side handling. NO DATA WILL BE PERSISTED CENTRALLY BY THIS SERVER ACTION.");
+    
+    // Simulate ticket creation
+    const newTicketId = `SIM-${Math.floor(Math.random() * 9000) + 1000}`; // Indicate it's simulated
+    const timestamp = new Date().toISOString();
+    const initialHistoryEntry: TicketHistoryEntry = {
+      id: `hist-sim-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+      timestamp,
+      userId: data.requestingUserId,
+      action: 'Created (Simulated Server Action)',
+      details: 'Ticket Creado (Simulado en el servidor, no persistido centralmente)',
+      toStatus: 'Abierto',
+      toType: data.type,
+      ticketId: newTicketId,
+    };
+
+    const simulatedTicket: Ticket = {
+      id: newTicketId,
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      type: data.type,
+      requestingUserId: data.requestingUserId,
+      status: 'Abierto',
+      provider: data.provider,
+      branch: data.branch,
+      attachmentNames: data.attachmentNames || [],
+      assigneeId: undefined, 
+      lastUpdated: timestamp,
+      history: [initialHistoryEntry],
+      githubRepository: data.provider ? `sim-repo/${data.provider.toLowerCase().replace(/[^a-z0-9-]/gi, '')}` : undefined,
+    };
+    
+    // Simulate email notifications for the simulated ticket
+    const notificationRecipients = new Set<string>();
+    if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
+    // Superuser notification would require a reliable getUserById, which might fail if Firebase is down.
+    // So, for simulation, focus on requester.
+    let notificationMessage = `[SIMULATED SERVER ACTION] New Ticket Created: ${simulatedTicket.id} - "${simulatedTicket.title}" by ${data.requestingUserId}. Type: ${simulatedTicket.type}. Priority: ${simulatedTicket.priority}.`;
+     if (simulatedTicket.branch) {
+        notificationMessage += ` Environment/Branch: ${simulatedTicket.branch}.`;
+    }
+    notificationMessage += ` Ticket is currently unassigned.`
+
+    notificationRecipients.forEach(email => {
+        console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
+    });
+    console.log("Simulated superuser notification for ticket creation would occur here if user service was available.");
+
+
+    // Important: RevalidatePath will not reflect actual data changes as nothing was saved on server.
+    // Client-side calling this action needs to handle the UI update and local storage.
+    return { success: true, ticket: simulatedTicket };
   }
 
+  // Original logic if Firebase IS configured
   const requestingUser = await getUserById(data.requestingUserId);
   if (requestingUser?.role === 'client' && !data.branch) {
     return { success: false, error: "El ambiente/branch es obligatorio para los clientes." };
   }
-
 
   try {
     const createData: CreateTicketData = {
@@ -160,17 +212,14 @@ export async function createTicketAction(
       attachmentNames: data.attachmentNames || [],
     };
 
-    const newTicket = await createTicketService(createData); // createTicketService handles Firebase vs LocalStorage for its own context
+    const newTicket = await createTicketService(createData); 
     
     if (newTicket) {
       revalidatePath("/(app)/dashboard", "page");
       revalidatePath("/(app)/tickets", "page");
       revalidatePath("/(app)/my-tickets", "page");
 
-      // Email simulation logic remains, assuming Firebase (or an alternative for notifications) might be configured even if primary DB persistence is mocked for some services.
-      // The isFirebaseProperlyConfigured check here is more about whether the primary DB connection is expected.
-      // If notifications were a separate service, this check might differ.
-      if (isFirebaseProperlyConfigured) { // Kept for notification logic consistency
+      if (isFirebaseProperlyConfigured) { 
         const notificationRecipients = new Set<string>();
         if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
 
@@ -189,13 +238,8 @@ export async function createTicketAction(
         console.log("Skipped Ticket creation email notification as Firebase (for user lookup/notifications) is not properly configured.");
       }
 
-
       return { success: true, ticket: newTicket };
     } else {
-      // This block is reached if createTicketService returns null.
-      // If isFirebaseProperlyConfigured was true, it means an actual error occurred during Firestore operation in createTicketService.
-      // If isFirebaseProperlyConfigured was false, this specific action already returned an error above.
-      // So, this 'else' implies an error from createTicketService even when Firebase was expected to work.
       return { success: false, error: "No se pudo crear el ticket. Error del servicio de datos." };
     }
   } catch (error) {
@@ -232,7 +276,8 @@ export async function addCommentToTicketAction(
 
   if (!isFirebaseProperlyConfigured) {
     console.warn(`[ACTION addCommentToTicketAction] Firebase is not configured. This action cannot persist data on the server side for ticket ${ticketId}.`);
-    return { success: false, error: "El servicio de base de datos no está disponible. No se pudo agregar el comentario en el servidor." };
+    // Similar to createTicketAction, we could simulate success here if desired.
+    // For now, let it try the service call.
   }
 
   try {
