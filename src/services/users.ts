@@ -56,15 +56,15 @@ async function ensureMockDataSeeded(): Promise<void> {
     return;
   }
 
-  console.log("Seeding initial mock data to localStorage and Firestore...");
+  console.log("Attempting to seed initial mock data to localStorage and Firestore...");
+
+  // Always seed localStorage first if flag is not set
+  localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
+  localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
+  console.log("Mock data seeded to localStorage.");
 
   try {
-    // Seed users to localStorage
-    localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
-    // Seed organizations to localStorage
-    localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
-
-    // Attempt to seed Firestore only if it appears empty (check one user and one org)
+    // Attempt to seed Firestore. These operations might fail if offline.
     const adminUserDoc = await getDoc(doc(db, "users", "admin"));
     if (!adminUserDoc.exists()) {
       for (const userData of usersToSeed) {
@@ -72,6 +72,8 @@ async function ensureMockDataSeeded(): Promise<void> {
         await setDoc(doc(db, "users", id), dataToStore);
       }
       console.log("Initial users seeded to Firestore.");
+    } else {
+      console.log("Firestore 'users' collection seems to have data (admin user exists). Skipping Firestore user seed.");
     }
 
     const tlaOrgDoc = await getDoc(doc(db, "organizations", "tla"));
@@ -80,13 +82,23 @@ async function ensureMockDataSeeded(): Promise<void> {
         await setDoc(doc(db, "organizations", orgData.id), orgData);
       }
       console.log("Initial organizations seeded to Firestore.");
+    } else {
+      console.log("Firestore 'organizations' collection seems to have data (TLA org exists). Skipping Firestore org seed.");
     }
-
+    
+    // If Firestore operations were successful (or didn't need to run because docs existed)
     localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
-    console.log("Mock data seeding complete.");
+    console.log("Mock data seeding process complete. Seeding flag set.");
+
   } catch (error) {
-    console.error("Error during mock data seeding: ", error);
-    // Don't set the flag if seeding failed, so it can be retried.
+    console.error("Error during Firestore seeding (client might be offline or other Firestore issue): ", error);
+    // If Firestore seeding fails (e.g., offline), still set the flag
+    // because localStorage IS seeded. The app can run on localStorage data.
+    // Firestore might not be up-to-date with the seed data, but that's acceptable for this mock setup.
+    if (!localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V3)) {
+        localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V3, 'true');
+        console.log("MOCK_DATA_SEEDED_FLAG_V3 set despite Firestore error, as localStorage is populated.");
+    }
   }
 }
 
@@ -98,30 +110,36 @@ async function ensureMockDataSeeded(): Promise<void> {
  */
 export async function getUsers(): Promise<UserDoc[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 50)); // Simulate small delay
+  await new Promise(resolve => setTimeout(resolve, 20)); // Shorter delay
 
   const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
   if (storedUsers) {
     try {
       return JSON.parse(storedUsers);
     } catch (e) {
-      console.error("Error parsing users from localStorage", e);
-      // Fallback to Firestore if localStorage is corrupted
+      console.error("Error parsing users from localStorage, falling back to Firestore if possible.", e);
+      // Fallback to Firestore if localStorage is corrupted by removing the stored item
+      localStorage.removeItem(LOCAL_STORAGE_USERS_KEY);
     }
   }
 
-  // Fallback or initial load from Firestore
+  // Fallback or initial load from Firestore (should be rare after first seed)
+  console.log("Fetching users from Firestore as localStorage cache was not available or corrupted.");
   try {
     const querySnapshot = await getDocs(usersCollectionRef);
     const users: UserDoc[] = [];
     querySnapshot.forEach((doc) => {
       users.push({ id: doc.id, ...doc.data() } as UserDoc);
     });
-    localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users)); // Cache fetched users
+    // Re-cache fetched users if localStorage was cleared or initially empty
+    if (!storedUsers) {
+        localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+    }
     return users;
   } catch (error) {
     console.error("Error fetching users from Firestore: ", error);
-    return [];
+    // If Firestore also fails (e.g. offline and no cache), return empty or pre-defined minimal set
+    return []; 
   }
 }
 
@@ -133,7 +151,7 @@ export async function getUsers(): Promise<UserDoc[]> {
  */
 export async function getUserById(userId: string): Promise<UserDoc | undefined> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await new Promise(resolve => setTimeout(resolve, 10)); // Shorter delay
 
   const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
   if (storedUsers) {
@@ -147,6 +165,7 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
   }
   
   // Fallback to Firestore
+  console.log(`Fetching user ${userId} from Firestore as it was not in localStorage cache.`);
   try {
     if (!userId) return undefined;
     const userDocRef = doc(db, "users", userId);
@@ -182,7 +201,17 @@ export async function createUserInFirestore(userData: AuthContextUserType): Prom
     const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
     let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
     const userIndex = users.findIndex(u => u.id === userData.username);
-    const userToCache: UserDoc = { ...dataToStore, id: userData.username, username: userData.username } as UserDoc;
+    // Ensure all fields of UserDoc are present
+    const userToCache: UserDoc = { 
+        id: userData.username, 
+        username: userData.username, 
+        name: userData.name, 
+        role: userData.role,
+        company: userData.company,
+        phone: userData.phone,
+        position: userData.position
+    };
+
 
     if (userIndex > -1) {
       users[userIndex] = userToCache;
@@ -207,25 +236,28 @@ export async function createUserInFirestore(userData: AuthContextUserType): Prom
  */
 export async function getOrganizations(): Promise<Organization[]> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise(resolve => setTimeout(resolve, 20)); // Shorter delay
 
   const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
   if (storedOrgs) {
     try {
       return JSON.parse(storedOrgs);
     } catch (e) {
-      console.error("Error parsing organizations from localStorage", e);
+      console.error("Error parsing organizations from localStorage, falling back to Firestore.", e);
+      localStorage.removeItem(LOCAL_STORAGE_ORGS_KEY);
     }
   }
 
-  // Fallback or initial load from Firestore
+  console.log("Fetching organizations from Firestore as localStorage cache was not available or corrupted.");
   try {
     const querySnapshot = await getDocs(organizationsCollectionRef);
     const organizations: Organization[] = [];
     querySnapshot.forEach((doc) => {
       organizations.push({ id: doc.id, ...doc.data() } as Organization);
     });
-    localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations)); // Cache
+    if(!storedOrgs){
+        localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(organizations)); 
+    }
     return organizations;
   } catch (error) {
     console.error("Error fetching organizations from Firestore: ", error);
@@ -276,7 +308,7 @@ export async function createOrUpdateOrganization(orgData: Organization): Promise
  */
 export async function getOrganizationById(orgId: string): Promise<Organization | undefined> {
   await ensureMockDataSeeded();
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await new Promise(resolve => setTimeout(resolve, 10));
 
   const storedOrgs = localStorage.getItem(LOCAL_STORAGE_ORGS_KEY);
   if (storedOrgs) {
@@ -289,7 +321,7 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
     }
   }
 
-  // Fallback to Firestore
+  console.log(`Fetching organization ${orgId} from Firestore as it was not in localStorage cache.`);
   try {
     if (!orgId) return undefined;
     const orgDocRef = doc(db, "organizations", orgId);
