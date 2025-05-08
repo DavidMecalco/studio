@@ -63,9 +63,16 @@ export async function updateJiraTicketAction(
 
 
         let notificationMessage = `Ticket ${ticketId} updated by ${performingUser?.name || userIdPerformingAction}.`;
-        if (newStatus) notificationMessage += ` New status: ${newStatus}.`;
+        if (newStatus) {
+            notificationMessage += ` New status: ${newStatus}.`;
+            if (newStatus === 'Reabierto' && comment) {
+                 // Comment is already included in the history, so we don't need to add it here explicitly
+            } else if (newStatus === 'Reabierto') {
+                 notificationMessage += ` Ticket has been reopened.`;
+            }
+        }
         if (newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${newAssigneeId || 'Unassigned'}.`;
-        if (comment) notificationMessage += ` Comment: "${comment}".`;
+        if (comment && newStatus !== 'Reabierto') notificationMessage += ` Comment: "${comment}".`; // Avoid duplicating comment if it was part of reopen
         
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);

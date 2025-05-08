@@ -43,7 +43,7 @@ export function TicketList({
         return;
     }
     setReopeningTicketId(ticketId);
-    const result = await updateJiraTicketAction(ticketId, user.id, 'Abierto', undefined, 'Ticket reabierto por el cliente.');
+    const result = await updateJiraTicketAction(ticketId, user.id, 'Reabierto', undefined, 'Ticket reabierto por el cliente.');
     if (result.success) {
         toast({ title: "Ticket Reabierto", description: `El ticket ${ticketId} ha sido reabierto.` });
         if (onTicketActionSuccess) {
@@ -104,6 +104,7 @@ export function TicketList({
                         ticket.status === 'Abierto' ? 'bg-blue-100 text-blue-800' :
                         ticket.status === 'En Progreso' ? 'bg-yellow-100 text-yellow-800' :
                         ticket.status === 'Pendiente' ? 'bg-orange-100 text-orange-800' :
+                        ticket.status === 'Reabierto' ? 'bg-cyan-100 text-cyan-800' : // Style for Reabierto
                         ticket.status === 'En espera del visto bueno' ? 'bg-purple-100 text-purple-800' :
                         (ticket.status === 'Resuelto' || ticket.status === 'Cerrado') ? 'bg-green-100 text-green-800' : ''
                     }

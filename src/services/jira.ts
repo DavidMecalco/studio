@@ -2,7 +2,7 @@
 /**
  * Represents the possible statuses of a Jira ticket.
  */
-export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuelto' | 'Cerrado' | 'En espera del visto bueno';
+export type JiraTicketStatus = 'Abierto' | 'Pendiente' | 'En Progreso' | 'Resuelto' | 'Cerrado' | 'En espera del visto bueno' | 'Reabierto';
 
 /**
  * Represents the possible providers for a Jira ticket.
@@ -79,7 +79,7 @@ function initializeMockJiraTickets() {
         gitlabRepository: 'maximo-tla',
         attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
         history: [
-          { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
           { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso' },
           { id: 'hist-comment-1', timestamp: '2024-07-28T10:05:00Z', userId: 'admin', action: 'Comment Added', comment: 'Starting development now. Will update with progress.', details: 'Comment added by admin' },
         ],
@@ -98,7 +98,7 @@ function initializeMockJiraTickets() {
         gitlabRepository: 'maximo-fema',
         attachmentNames: ['debug_log.txt', 'screenshot_error.png'],
         history: [
-          { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
           { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto' },
           { id: 'hist-comment-2', timestamp: '2024-07-27T15:35:00Z', userId: 'client-fema1', action: 'Comment Added', comment: 'Thanks for fixing this so quickly!', details: 'Comment added by client-fema1' },
         ],
@@ -116,7 +116,7 @@ function initializeMockJiraTickets() {
         gitlabRepository: 'maximo-tla',
         attachmentNames: ['requirements_cicd.docx'],
         history: [
-          { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'client-tla2', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'client-tla2', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
         ],
       },
       {
@@ -131,7 +131,7 @@ function initializeMockJiraTickets() {
         provider: 'TLA', 
         gitlabRepository: 'maximo-tla',
         history: [
-          { id: 'hist-6', timestamp: '2024-07-25T12:00:00Z', userId: 'client-tla1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-6', timestamp: '2024-07-25T12:00:00Z', userId: 'client-tla1', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
         ],
       },
       {
@@ -145,7 +145,7 @@ function initializeMockJiraTickets() {
         requestingUserId: 'client-generic1',
         gitlabRepository: 'maximo-generic',
         history: [
-            { id: 'hist-7', timestamp: '2024-07-26T10:00:00Z', userId: 'client-generic1', action: 'Created', details: 'Ticket Creado' },
+            { id: 'hist-7', timestamp: '2024-07-26T10:00:00Z', userId: 'client-generic1', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
             { id: 'hist-8', timestamp: '2024-07-26T11:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'En espera del visto bueno', details: 'Estado cambiado a En espera del visto bueno' },
         ],
       },
@@ -162,7 +162,7 @@ function initializeMockJiraTickets() {
         gitlabRepository: 'maximo-fema',
         attachmentNames: ['old_report_design.rptdesign', 'new_report_design.rptdesign'],
         history: [
-          { id: 'hist-9', timestamp: '2024-07-20T16:00:00Z', userId: 'client-fema1', action: 'Created', details: 'Ticket Creado' },
+          { id: 'hist-9', timestamp: '2024-07-20T16:00:00Z', userId: 'client-fema1', action: 'Created', toStatus: 'Abierto', details: 'Ticket Creado' },
           { id: 'hist-10', timestamp: '2024-07-20T17:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Cerrado', details: 'Ticket cerrado.' },
         ],
       },
@@ -228,9 +228,15 @@ export async function updateJiraTicket(
 
   if (newStatus !== undefined && newStatus !== currentTicket.status) {
     updatedTicketDetails.status = newStatus;
-    const isReopening = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && newStatus === 'Abierto';
-    const action = isReopening ? 'Ticket Reabierto' : 'Status Changed';
-    const details = isReopening ? `Ticket Reabierto por ${userIdPerformingAction}` : `Estado cambiado de ${currentTicket.status} a ${newStatus}`;
+    const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && newStatus === 'Reabierto';
+    
+    let action = 'Status Changed';
+    let details = `Estado cambiado de ${currentTicket.status} a ${newStatus}`;
+
+    if (isReopeningFromClient) {
+        action = 'Ticket Reabierto';
+        details = `Ticket Reabierto por ${userIdPerformingAction}`;
+    }
     
     historyEntry = {
       id: `hist-${Date.now()}`,
@@ -325,7 +331,7 @@ export async function addCommitToTicketHistory(
   mockJiraTickets[ticketIndex].history.push(historyEntry);
   mockJiraTickets[ticketIndex].lastUpdated = new Date().toISOString();
   
-  if (['Abierto', 'Pendiente'].includes(mockJiraTickets[ticketIndex].status)) {
+  if (['Abierto', 'Pendiente', 'Reabierto'].includes(mockJiraTickets[ticketIndex].status)) {
      const oldStatus = mockJiraTickets[ticketIndex].status;
      mockJiraTickets[ticketIndex].status = 'En Progreso';
      const statusChangeEntry: JiraTicketHistoryEntry = {

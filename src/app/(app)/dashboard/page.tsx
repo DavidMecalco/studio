@@ -1,40 +1,46 @@
 
-"use client"; // Make this a client component to use useAuth
+"use client"; 
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks, LineChart as AnalyticsIcon, Users, Settings } from 'lucide-react';
+import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks, LineChart as AnalyticsIcon, Users, Settings, PieChartIcon } from 'lucide-react';
 import Image from 'next/image';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { TicketManagementCard } from '@/components/dashboard/ticket-management-card';
 import { getJiraTickets, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
-import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Updated User to UserDoc
-import { subWeeks, isAfter } from 'date-fns';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; 
+import { subWeeks, isAfter, format, parseISO } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MyTicketsOverTimeChart } from '@/components/analytics/charts/my-tickets-over-time-chart';
 
 interface DashboardData {
-  jiraTickets: JiraTicket[]; // Tickets for TicketManagementCard / Client view
-  allJiraTickets?: JiraTicket[]; // All tickets for admin/superuser KPIs, undefined for client
+  jiraTickets: JiraTicket[]; 
+  allJiraTickets?: JiraTicket[]; 
   githubCommits: GitHubCommit[];
   users: ServiceUser[];
-  closedTicketsCount?: number; // For admin/superuser KPI
-  pendingTicketsCount?: number; // For admin/superuser KPI
-  commitsLastWeekCount?: number; // For admin/superuser KPI
-  myActiveTicketsCount?: number; // For client KPI
+  
+  // Admin/Superuser KPIs
+  closedTicketsCount?: number; 
+  pendingTicketsCount?: number; 
+  commitsLastWeekCount?: number; 
+  
+  // Client KPIs
+  myActiveTicketsCount?: number;
+  myTotalTicketsCount?: number; 
+  myClosedTicketsCount?: number; 
+  myTicketsOverTime?: { date: string; count: number }[]; 
 }
 
 async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client' | 'superuser'): Promise<DashboardData | null> {
   try {
-    // Ensure user dependent data is fetched conditionally or handled if user is not yet available.
-    // For now, this structure assumes userId and userRole are available when called.
     const [allJiraTicketsFromService, githubCommits, users] = await Promise.all([
       getJiraTickets(), 
-      getGitHubCommits("ALL_PROJECTS"), // This should be efficient now
-      getUsers(), // This should be efficient now
+      getGitHubCommits("ALL_PROJECTS"), 
+      getUsers(), 
     ]);
 
     let dashboardResult: DashboardData = {
@@ -50,7 +56,7 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
         ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
       ).length;
       dashboardResult.pendingTicketsCount = allJiraTicketsFromService.filter(
-        ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno'].includes(ticket.status)
+        ticket => ['Abierto', 'Pendiente', 'En Progreso', 'En espera del visto bueno', 'Reabierto'].includes(ticket.status)
       ).length;
       const oneWeekAgo = subWeeks(new Date(), 1);
       dashboardResult.commitsLastWeekCount = githubCommits.filter(
@@ -58,10 +64,26 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
       ).length;
     } else if (userRole === 'client' && userId) {
       const clientTickets = allJiraTicketsFromService.filter(ticket => ticket.requestingUserId === userId);
-      dashboardResult.jiraTickets = clientTickets;
+      dashboardResult.jiraTickets = clientTickets; // These are the client's tickets
       dashboardResult.myActiveTicketsCount = clientTickets.filter(
           ticket => ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto'
       ).length;
+      dashboardResult.myTotalTicketsCount = clientTickets.length;
+      dashboardResult.myClosedTicketsCount = clientTickets.filter(
+        ticket => ticket.status === 'Cerrado' || ticket.status === 'Resuelto'
+      ).length;
+
+      const ticketsByCreationDate = new Map<string, number>();
+      clientTickets.forEach(ticket => {
+        const creationEntry = ticket.history.find(h => h.action === 'Created');
+        const creationDateStr = creationEntry 
+          ? format(parseISO(creationEntry.timestamp), 'yyyy-MM-dd') 
+          : format(parseISO(ticket.history[0]?.timestamp || new Date(0).toISOString()), 'yyyy-MM-dd');
+        ticketsByCreationDate.set(creationDateStr, (ticketsByCreationDate.get(creationDateStr) || 0) + 1);
+      });
+      dashboardResult.myTicketsOverTime = Array.from(ticketsByCreationDate.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     
     return dashboardResult;
@@ -75,7 +97,7 @@ async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client'
 export default function DashboardOverviewPage() {
   const { user, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -85,13 +107,15 @@ export default function DashboardOverviewPage() {
         setIsPageLoading(false);
       });
     } else if (!authLoading && !user) {
-        // No user, stop loading, page will likely redirect or show access denied via layout
         setIsPageLoading(false); 
     }
   }, [user, authLoading]);
 
   if (authLoading || isPageLoading) {
-    const skeletonNavCardsCount = user?.role === 'client' ? 1 : (user?.role === 'superuser' ? 4 : 3);
+    const isAdminOrSuperUser = user?.role === 'admin' || user?.role === 'superuser';
+    const isClientUser = user?.role === 'client';
+    const skeletonNavCardsCount = isClientUser ? 1 : (isAdminOrSuperUser ? (user.role === 'superuser' ? 4 : 3) : 0);
+    
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -106,14 +130,13 @@ export default function DashboardOverviewPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(skeletonNavCardsCount)].map((_, i) => <NavCardSkeleton key={`nav-skel-${i}`}/>)}
         </div>
-        {(user?.role === 'admin' || user?.role === 'superuser') && <TicketManagementCardSkeleton />}
+        {isAdminOrSuperUser && <TicketManagementCardSkeleton />}
+        {isClientUser && <ChartSkeleton />}
       </div>
     );
   }
   
   if (!dashboardData) {
-    // This state can occur if fetching failed or if user is null after loading.
-    // The AuthenticatedAppLayout should handle redirection for !user, so this might be for fetch errors.
     return <p className="text-center text-muted-foreground">Error loading dashboard data. Please try again later.</p>;
   }
 
@@ -123,7 +146,10 @@ export default function DashboardOverviewPage() {
     closedTicketsCount, 
     pendingTicketsCount, 
     commitsLastWeekCount,
-    myActiveTicketsCount
+    myActiveTicketsCount,
+    myTotalTicketsCount,
+    myClosedTicketsCount,
+    myTicketsOverTime
   } = dashboardData;
 
   const isAdmin = user?.role === 'admin';
@@ -173,14 +199,30 @@ export default function DashboardOverviewPage() {
             />
           </>
         )}
-        {isClient && typeof myActiveTicketsCount !== 'undefined' && (
-           <KpiCard
-            title="Mis Tickets Activos"
-            value={myActiveTicketsCount}
-            icon={<Ticket className="h-5 w-5 text-accent" />}
-            description="Tickets que ha enviado y están activos."
-            className="shadow-lg rounded-xl"
-          />
+        {isClient && (
+          <>
+            <KpiCard
+              title="Mis Tickets Totales"
+              value={myTotalTicketsCount ?? 0}
+              icon={<Ticket className="h-5 w-5 text-accent" />}
+              description="Total de tickets que ha enviado."
+              className="shadow-lg rounded-xl"
+            />
+            <KpiCard
+              title="Mis Tickets Activos"
+              value={myActiveTicketsCount ?? 0}
+              icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
+              description="Tickets abiertos, en progreso o pendientes."
+              className="shadow-lg rounded-xl"
+            />
+            <KpiCard
+              title="Mis Tickets Cerrados"
+              value={myClosedTicketsCount ?? 0}
+              icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+              description="Tickets que han sido resueltos o cerrados."
+              className="shadow-lg rounded-xl"
+            />
+          </>
         )}
       </div>
 
@@ -301,6 +343,11 @@ export default function DashboardOverviewPage() {
         <TicketManagementCard tickets={jiraTickets} users={users} defaultIcon={<Briefcase className="h-6 w-6 text-primary" />} />
       )}
       
+      {/* Client-specific Chart */}
+      {isClient && myTicketsOverTime && (
+        <MyTicketsOverTimeChart data={myTicketsOverTime} />
+      )}
+
       <Card className="bg-card shadow-lg rounded-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="relative h-64 w-full">
@@ -373,6 +420,18 @@ const TicketManagementCardSkeleton = () => (
                 <Skeleton className="h-10 w-full" />
             </div>
             <Skeleton className="h-10 w-1/3" />
+        </CardContent>
+    </Card>
+);
+
+const ChartSkeleton = () => (
+    <Card>
+        <CardHeader>
+            <Skeleton className="h-6 w-1/2 mb-1" />
+            <Skeleton className="h-4 w-3/4" />
+        </CardHeader>
+        <CardContent>
+            <Skeleton className="h-60 w-full" />
         </CardContent>
     </Card>
 );
