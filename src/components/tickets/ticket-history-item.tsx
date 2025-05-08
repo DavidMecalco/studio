@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { JiraTicketHistoryEntry } from '@/services/jira';
 import { format, parseISO } from 'date-fns';
-import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers, RefreshCcw, FileText } from 'lucide-react';
+import { User, Edit3, GitCommit, ArrowRight, MessageSquare, Layers, RefreshCcw, FileText, AlertCircle } from 'lucide-react'; // Added AlertCircle for priority
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
@@ -14,10 +15,13 @@ interface TicketHistoryItemProps {
 const getIconForAction = (action: string) => {
   if (action.toLowerCase().includes('created')) return <Layers className="h-4 w-4 text-primary" />;
   if (action.toLowerCase().includes('status changed')) return <Edit3 className="h-4 w-4 text-yellow-500" />;
+  if (action.toLowerCase().includes('assignee changed')) return <User className="h-4 w-4 text-blue-400" />;
+  if (action.toLowerCase().includes('priority changed')) return <AlertCircle className="h-4 w-4 text-orange-500" />;
   if (action.toLowerCase().includes('commit added')) return <GitCommit className="h-4 w-4 text-blue-500" />;
   if (action.toLowerCase().includes('comment added')) return <MessageSquare className="h-4 w-4 text-green-500" />;
   if (action.toLowerCase().includes('deployment')) return <Layers className="h-4 w-4 text-purple-500" />; 
   if (action.toLowerCase().includes('file restored')) return <RefreshCcw className="h-4 w-4 text-indigo-500" />;
+  if (action.toLowerCase().includes('attachments added')) return <FileText className="h-4 w-4 text-teal-500" />;
   return <Edit3 className="h-4 w-4 text-muted-foreground" />;
 };
 
@@ -59,6 +63,21 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
             <Badge>{entry.toStatus}</Badge>
           </div>
         )}
+
+        {entry.fromPriority && entry.toPriority && (
+          <div className="text-sm text-muted-foreground flex items-center gap-1">
+            Prioridad: <Badge variant="secondary">{entry.fromPriority}</Badge>
+            <ArrowRight className="h-3 w-3" />
+            <Badge 
+                variant={entry.toPriority === 'Alta' ? 'destructive' : entry.toPriority === 'Media' ? 'secondary' : 'outline'}
+                className={
+                    entry.toPriority === 'Alta' ? 'bg-red-100 text-red-800 border-red-300' :
+                    entry.toPriority === 'Media' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                    'bg-gray-100 text-gray-800 border-gray-300'
+                }
+            >{entry.toPriority}</Badge>
+          </div>
+        )}
         
         {entry.comment && (
           <div className={`text-sm pl-2 ${isComment ? 'bg-muted/50 p-3 rounded-md border' : 'italic text-muted-foreground border-l-2 border-border'}`}>
@@ -85,6 +104,11 @@ export function TicketHistoryItem({ entry, isLastItem }: TicketHistoryItemProps)
             <span>{entry.fileName} restored to version {entry.restoredVersionId}</span>
             {entry.commitSha && <span className="font-mono text-xs">(commit: {entry.commitSha.substring(0,7)})</span>}
           </p>
+        )}
+        {entry.action.toLowerCase().includes('attachments added') && entry.attachedFileNames && (
+            <p className="text-sm text-muted-foreground">
+                Archivos adjuntos: {entry.attachedFileNames.join(', ')}
+            </p>
         )}
       </div>
     </li>

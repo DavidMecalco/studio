@@ -30,6 +30,8 @@ export interface JiraTicketHistoryEntry {
   action: string; 
   fromStatus?: JiraTicketStatus;
   toStatus?: JiraTicketStatus;
+  fromPriority?: JiraTicketPriority; // Added for priority change logging
+  toPriority?: JiraTicketPriority;   // Added for priority change logging
   comment?: string;
   commitSha?: string; 
   deploymentId?: string; 
@@ -181,12 +183,12 @@ initializeMockJiraTickets();
  * @returns A promise that resolves to an array of JiraTicket objects.
  */
 export async function getJiraTickets(requestingUserId?: string): Promise<JiraTicket[]> {
-  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
   let tickets = JSON.parse(JSON.stringify(mockJiraTickets)); 
   if (requestingUserId) {
     tickets = tickets.filter((ticket: JiraTicket) => ticket.requestingUserId === requestingUserId);
   }
-  return tickets.sort((a: JiraTicket, b: JiraTicket) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
+  return tickets.sort((a: JiraTicket, b: JiraTicket) => new Date(b.lastUpdated || b.history[0]?.timestamp || 0).getTime() - new Date(a.lastUpdated || a.history[0]?.timestamp || 0).getTime());
 }
 
 /**
@@ -195,108 +197,113 @@ export async function getJiraTickets(requestingUserId?: string): Promise<JiraTic
  * @returns A promise that resolves to a JiraTicket object or null if not found.
  */
 export async function getJiraTicket(ticketId: string): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 20)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 10)); 
   const ticket = mockJiraTickets.find((ticket) => ticket.id === ticketId);
   return ticket ? JSON.parse(JSON.stringify(ticket)) : null;
 }
 
+interface TicketUpdatePayload {
+    newStatus?: JiraTicketStatus;
+    newAssigneeId?: string; // Use string, empty string for unassign
+    newPriority?: JiraTicketPriority;
+    comment?: string;
+}
+
 /**
- * Asynchronously updates a Jira ticket's status and/or assignee.
- * Adds a history entry for the change.
+ * Asynchronously updates a Jira ticket's status, assignee, and/or priority.
+ * Adds history entries for the changes.
  * @param ticketId The ID of the ticket to update.
- * @param newStatus The new status for the ticket. If undefined, status is not changed.
- * @param newAssigneeId The ID of the new assignee. If undefined, assignee is not changed. If an empty string, ticket is unassigned.
  * @param userIdPerformingAction The ID of the user performing the update.
- * @param comment Optional comment for the history entry.
+ * @param updates An object containing the fields to update (newStatus, newAssigneeId, newPriority, comment).
  * @returns A promise that resolves to the updated JiraTicket object or null if not found.
  */
 export async function updateJiraTicket(
   ticketId: string,
-  newStatus?: JiraTicketStatus,
-  newAssigneeId?: string, 
-  userIdPerformingAction: string = "system", 
-  comment?: string
+  userIdPerformingAction: string,
+  updates: TicketUpdatePayload
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 50));
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) {
     return null;
   }
   
   const currentTicket = mockJiraTickets[ticketIndex];
-  const updatedTicketDetails: Partial<JiraTicket> = {};
-  let historyEntry: JiraTicketHistoryEntry | null = null;
+  const updatedTicketFields: Partial<JiraTicket> = {};
+  const historyEntriesToAdd: JiraTicketHistoryEntry[] = [];
+  const timestamp = new Date().toISOString();
 
-  if (newStatus !== undefined && newStatus !== currentTicket.status) {
-    updatedTicketDetails.status = newStatus;
-    const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && newStatus === 'Reabierto';
-    
+  // Handle Status Change
+  if (updates.newStatus !== undefined && updates.newStatus !== currentTicket.status) {
+    updatedTicketFields.status = updates.newStatus;
+    const isReopeningFromClient = (currentTicket.status === 'Cerrado' || currentTicket.status === 'Resuelto') && updates.newStatus === 'Reabierto';
     let action = 'Status Changed';
-    let details = `Estado cambiado de ${currentTicket.status} a ${newStatus}`;
-
+    let details = `Estado cambiado de ${currentTicket.status} a ${updates.newStatus}`;
     if (isReopeningFromClient) {
         action = 'Ticket Reabierto';
         details = `Ticket Reabierto por ${userIdPerformingAction}`;
     }
-    
-    historyEntry = {
-      id: `hist-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+    historyEntriesToAdd.push({
+      id: `hist-status-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+      timestamp,
       userId: userIdPerformingAction,
-      action: action,
+      action,
       fromStatus: currentTicket.status,
-      toStatus: newStatus,
-      comment: comment, // Comment is now directly added here
-      details: details
-    };
-  }
-  
-  const actualNewAssigneeId = newAssigneeId === "" ? undefined : newAssigneeId; // Treat empty string as unassigning
-  if (newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { 
-    updatedTicketDetails.assigneeId = actualNewAssigneeId;
-    const assigneeChangeDetails = actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado';
-    if (historyEntry) {
-      historyEntry.details += `; ${assigneeChangeDetails}`;
-      if(comment && historyEntry.comment && !historyEntry.action.includes('Reabierto')) { // Don't duplicate reopen comment
-         historyEntry.comment += `; ${comment}`; // Append if comment was for status AND assignee change
-      } else if (comment && !historyEntry.action.includes('Reabierto')) {
-         historyEntry.comment = comment;
-      }
-    } else {
-      historyEntry = {
-        id: `hist-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        userId: userIdPerformingAction,
-        action: 'Assignee Changed',
-        comment: comment,
-        details: assigneeChangeDetails,
-      };
-    }
-  } else if (comment && !historyEntry) { 
-     historyEntry = {
-        id: `hist-comment-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        userId: userIdPerformingAction,
-        action: 'Comment Added',
-        comment: comment,
-        details: `Comment added by ${userIdPerformingAction}`
-      };
-  }
-  
-  if (Object.keys(updatedTicketDetails).length > 0 || (historyEntry && (historyEntry.action === 'Comment Added' || historyEntry.action === 'Ticket Reabierto' || historyEntry.action === 'Assignee Changed' ))) {
-    updatedTicketDetails.lastUpdated = new Date().toISOString();
+      toStatus: updates.newStatus,
+      comment: action === 'Ticket Reabierto' ? updates.comment : undefined, // only add comment here if it's a reopen
+      details
+    });
   }
 
+  // Handle Assignee Change
+  const actualNewAssigneeId = updates.newAssigneeId === "" ? undefined : updates.newAssigneeId;
+  if (updates.newAssigneeId !== undefined && actualNewAssigneeId !== currentTicket.assigneeId) { 
+    updatedTicketFields.assigneeId = actualNewAssigneeId;
+    historyEntriesToAdd.push({
+      id: `hist-assignee-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+      timestamp,
+      userId: userIdPerformingAction,
+      action: 'Assignee Changed',
+      details: actualNewAssigneeId ? `Asignado a ${actualNewAssigneeId}` : 'Ticket desasignado',
+    });
+  }
+  
+  // Handle Priority Change
+  if (updates.newPriority !== undefined && updates.newPriority !== currentTicket.priority) {
+    updatedTicketFields.priority = updates.newPriority;
+    historyEntriesToAdd.push({
+      id: `hist-priority-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+      timestamp,
+      userId: userIdPerformingAction,
+      action: 'Priority Changed',
+      fromPriority: currentTicket.priority,
+      toPriority: updates.newPriority,
+      details: `Prioridad cambiada de ${currentTicket.priority} a ${updates.newPriority}`
+    });
+  }
+
+  // Handle general comment if no specific action has taken it
+  const isReopenAction = historyEntriesToAdd.some(h => h.action === 'Ticket Reabierto');
+  if (updates.comment && !isReopenAction) {
+     historyEntriesToAdd.push({
+        id: `hist-comment-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
+        timestamp,
+        userId: userIdPerformingAction,
+        action: 'Comment Added',
+        comment: updates.comment,
+        details: `Comentario agregado por ${userIdPerformingAction}`
+      });
+  }
+  
+  if (Object.keys(updatedTicketFields).length > 0 || historyEntriesToAdd.length > 0) {
+    updatedTicketFields.lastUpdated = timestamp;
+  }
 
   const updatedTicket = {
     ...currentTicket,
-    ...updatedTicketDetails,
-    history: [...currentTicket.history], 
+    ...updatedTicketFields,
+    history: [...currentTicket.history, ...historyEntriesToAdd], 
   };
-
-  if (historyEntry) {
-    updatedTicket.history.push(historyEntry);
-  }
 
   mockJiraTickets[ticketIndex] = updatedTicket;
   return JSON.parse(JSON.stringify(updatedTicket));
@@ -319,7 +326,7 @@ export async function addCommitToTicketHistory(
   commitMessage: string,
   branch: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -376,7 +383,7 @@ export interface CreateJiraTicketData {
  * @returns A promise that resolves to the created JiraTicket object.
  */
 export async function createJiraTicket(ticketData: CreateJiraTicketData): Promise<JiraTicket> {
-  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 50)); 
   
   const newTicketId = `MAS-${Math.floor(Math.random() * 9000) + 1000}`; 
 
@@ -435,7 +442,7 @@ export async function addDeploymentToTicketHistory(
   environment: string,
   result: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -456,7 +463,7 @@ export async function addDeploymentToTicketHistory(
 
 // Function to get all history entries from all tickets for audit log
 export async function getAllTicketHistories(): Promise<JiraTicketHistoryEntry[]> {
-    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+    await new Promise(resolve => setTimeout(resolve, 20)); 
     const allHistories: JiraTicketHistoryEntry[] = [];
     mockJiraTickets.forEach(ticket => {
         ticket.history.forEach(entry => {
@@ -483,7 +490,7 @@ export async function addRestorationToTicketHistory(
   restoredVersionId: string,
   commitSha?: string,
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -522,7 +529,7 @@ export async function addCommentToTicket(
   userIdPerformingAction: string,
   commentText: string
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+  await new Promise(resolve => setTimeout(resolve, 20)); 
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -532,7 +539,7 @@ export async function addCommentToTicket(
     userId: userIdPerformingAction,
     action: 'Comment Added',
     comment: commentText,
-    details: `Comment added by ${userIdPerformingAction}`,
+    details: `Comentario agregado por ${userIdPerformingAction}`,
   };
 
   mockJiraTickets[ticketIndex].history.push(historyEntry);
@@ -553,7 +560,7 @@ export async function addAttachmentsToJiraTicket(
   userIdPerformingAction: string,
   attachmentNames: string[]
 ): Promise<JiraTicket | null> {
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise(resolve => setTimeout(resolve, 20));
   const ticketIndex = mockJiraTickets.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) return null;
 
@@ -580,4 +587,3 @@ export async function addAttachmentsToJiraTicket(
   mockJiraTickets[ticketIndex] = currentTicket;
   return JSON.parse(JSON.stringify(currentTicket));
 }
-

@@ -1,11 +1,11 @@
 
-
 "use client"; 
 
 import { useEffect, useState, type ChangeEvent }  from 'react';
 import { useParams } from 'next/navigation'; 
 import { getJiraTicket, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Added for admin actions
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,11 +24,13 @@ import { useToast } from '@/hooks/use-toast';
 import { addAttachmentsToTicketAction } from '@/app/actions/jira-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TicketAdminActions } from '@/components/tickets/ticket-admin-actions'; // Added
 
 
 interface TicketDetailsData {
   ticket: JiraTicket;
   commits: GitHubCommit[];
+  users: ServiceUser[]; // Added for admin actions
 }
 
 // Card for version history of files associated with the ticket
@@ -242,8 +244,12 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
     if (!ticket) {
       return null;
     }
-    const commits = await getGitHubCommits(ticket.id);
-    return { ticket, commits };
+    // Fetch commits and users in parallel
+    const [commits, users] = await Promise.all([
+        getGitHubCommits(ticket.id),
+        getUsers() // For admin actions dropdown
+    ]);
+    return { ticket, commits, users };
   } catch (error) {
     console.error("Error fetching ticket details:", error);
     return null;
@@ -304,11 +310,16 @@ export default function TicketDetailPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => <div key={i}><Skeleton className="h-4 w-1/3 mb-1" /><Skeleton className="h-5 w-2/3" /></div>)}
+              {[...Array(3)].map((_, i) => <div key={`skel-info-${i}`}><Skeleton className="h-4 w-1/3 mb-1" /><Skeleton className="h-5 w-2/3" /></div>)}
             </div>
             <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/4 mb-2" /> {/* Description heading */}
             <Skeleton className="h-16 w-full" /> {/* Description content */}
+            
+            <Skeleton className="h-px w-full my-3" /> {/* Admin actions placeholder */}
+            <Skeleton className="h-6 w-1/3 mb-2" /> 
+            <Skeleton className="h-40 w-full" /> 
+            
             <Skeleton className="h-px w-full" />
             <Skeleton className="h-6 w-1/3 mb-2" /> {/* Commits heading */}
             <Skeleton className="h-20 w-full" /> {/* Commits list placeholder */}
@@ -330,7 +341,7 @@ export default function TicketDetailPage() {
     );
   }
 
-  if (!ticketData) {
+  if (!ticketData || !ticketData.ticket) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -347,12 +358,12 @@ export default function TicketDetailPage() {
     );
   }
 
-  const { ticket, commits } = ticketData;
+  const { ticket, commits, users: allUsers } = ticketData;
   const filesForVersionHistory = ticket.attachmentNames || [];
 
   const canManageTicketCommits = user?.role === 'admin'; 
+  const canManageTicketAdminActions = user?.role === 'admin' || user?.role === 'superuser';
   const canViewVersionHistory = user?.role === 'admin' || user?.role === 'superuser';
-  // Anyone who can view the ticket and is authenticated can comment or add attachments
   const canInteractWithTicket = !!user; 
 
 
@@ -382,6 +393,7 @@ export default function TicketDetailPage() {
                     ticket.status === 'Abierto' ? 'bg-blue-100 text-blue-800' :
                     ticket.status === 'En Progreso' ? 'bg-yellow-100 text-yellow-800' :
                     ticket.status === 'Pendiente' ? 'bg-orange-100 text-orange-800' :
+                    ticket.status === 'Reabierto' ? 'bg-cyan-100 text-cyan-800' : 
                     ticket.status === 'En espera del visto bueno' ? 'bg-purple-100 text-purple-800' :
                     (ticket.status === 'Resuelto' || ticket.status === 'Cerrado') ? 'bg-green-100 text-green-800' : ''
                   }`}
@@ -438,7 +450,7 @@ export default function TicketDetailPage() {
                  {ticket.assigneeId && ( 
                      <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Assigned To</h3>
-                        <p className="text-foreground">{ticket.assigneeId}</p> 
+                        <p className="text-foreground">{allUsers.find(u => u.id === ticket.assigneeId)?.name || ticket.assigneeId}</p> 
                     </div>
                  )}
             </div>
@@ -475,6 +487,13 @@ export default function TicketDetailPage() {
               </>
             )}
             
+            {canManageTicketAdminActions && allUsers.length > 0 && (
+                <>
+                    <Separator className="my-6"/>
+                    <TicketAdminActions ticket={ticket} users={allUsers} onTicketUpdate={refreshTicketData} />
+                </>
+            )}
+
             <Separator className="my-6"/>
 
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
@@ -492,14 +511,14 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
-            {canInteractWithTicket && ticketId && ( // Allow anyone who can view to add attachments & comments
+            {canInteractWithTicket && ticketId && ( 
                 <>
                     <Separator className="my-6"/>
                     <AddAttachmentsForm ticketId={ticketId} onAttachmentsAdded={refreshTicketData} />
                 </>
             )}
 
-            {canInteractWithTicket && ( // Allow anyone who can view to add comments
+            {canInteractWithTicket && ( 
                 <>
                     <Separator className="my-6"/>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
@@ -532,5 +551,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
-

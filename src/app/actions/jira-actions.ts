@@ -14,33 +14,39 @@ interface UpdateJiraTicketResult {
 }
 
 /**
- * Server action to update a Jira ticket's status and/or assignee.
+ * Server action to update a Jira ticket's status, assignee, and/or priority.
  * @param ticketId The ID of the ticket to update.
  * @param userIdPerformingAction The ID of the user performing the action.
- * @param newStatus The new status for the ticket. If undefined, status is not changed.
- * @param newAssigneeId The ID of the new assignee. If undefined, assignee is not changed. If an empty string, ticket is unassigned.
- * @param comment Optional comment for the history log.
+ * @param updates An object containing fields to update: newStatus, newAssigneeId, newPriority, comment.
  * @returns A promise that resolves to an object indicating success or failure.
  */
 export async function updateJiraTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
-  newStatus?: JiraTicketStatus,
-  newAssigneeId?: string, 
-  comment?: string
+  updates: {
+    newStatus?: JiraTicketStatus;
+    newAssigneeId?: string; // Empty string means unassign
+    newPriority?: JiraTicketPriority;
+    comment?: string;
+  }
 ): Promise<UpdateJiraTicketResult> {
   if (!ticketId) {
     return { success: false, error: "Ticket ID is required." };
   }
-   if (!userIdPerformingAction) {
+  if (!userIdPerformingAction) {
     return { success: false, error: "User ID performing action is required." };
   }
-  if (newStatus === undefined && newAssigneeId === undefined && comment === undefined) {
-    return { success: false, error: "Either new status, new assignee ID, or a comment must be provided." };
+  if (
+    updates.newStatus === undefined &&
+    updates.newAssigneeId === undefined &&
+    updates.newPriority === undefined &&
+    updates.comment === undefined
+  ) {
+    return { success: false, error: "At least one update (status, assignee, priority, or comment) must be provided." };
   }
 
   try {
-    const updatedTicket = await updateJiraTicketServiceCall(ticketId, newStatus, newAssigneeId, userIdPerformingAction, comment);
+    const updatedTicket = await updateJiraTicketServiceCall(ticketId, userIdPerformingAction, updates);
     if (updatedTicket) {
       revalidatePath("/(app)/dashboard", "page");
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
@@ -63,16 +69,17 @@ export async function updateJiraTicketAction(
 
 
         let notificationMessage = `Ticket ${ticketId} updated by ${performingUser?.name || userIdPerformingAction}.`;
-        if (newStatus) {
-            notificationMessage += ` New status: ${newStatus}.`;
-            if (newStatus === 'Reabierto' && comment) {
+        if (updates.newStatus) {
+            notificationMessage += ` New status: ${updates.newStatus}.`;
+            if (updates.newStatus === 'Reabierto' && updates.comment) {
                  // Comment is already included in the history, so we don't need to add it here explicitly
-            } else if (newStatus === 'Reabierto') {
+            } else if (updates.newStatus === 'Reabierto') {
                  notificationMessage += ` Ticket has been reopened.`;
             }
         }
-        if (newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${newAssigneeId || 'Unassigned'}.`;
-        if (comment && newStatus !== 'Reabierto') notificationMessage += ` Comment: "${comment}".`; // Avoid duplicating comment if it was part of reopen
+        if (updates.newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${updates.newAssigneeId || 'Unassigned'}.`;
+        if (updates.newPriority) notificationMessage += ` Priority changed to ${updates.newPriority}.`;
+        if (updates.comment && updates.newStatus !== 'Reabierto') notificationMessage += ` Comment: "${updates.comment}".`; 
         
         notificationRecipients.forEach(email => {
             console.log(`Simulated Email Notification to ${email}: ${notificationMessage}`);
@@ -122,7 +129,7 @@ export async function createJiraTicketAction(
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
   // Client specific validation: branch is required
-  const requestingUser = await getUserById(data.requestingUserId); // Await the promise
+  const requestingUser = await getUserById(data.requestingUserId); 
   if (requestingUser?.role === 'client' && !data.branch) {
     return { success: false, error: "El ambiente/branch es obligatorio para los clientes." };
   }
@@ -306,4 +313,3 @@ export async function addAttachmentsToTicketAction(
     return { success: false, error: errorMessage };
   }
 }
-
