@@ -140,16 +140,11 @@ export function TicketManagementCard({ tickets: initialTickets, users, defaultIc
 
   return (
     <Card className="shadow-lg rounded-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl">
-            {defaultIcon} Gestionar Tickets
-        </CardTitle>
-        <CardDescription>Asignar tickets, y cambiar su estado.</CardDescription>
-      </CardHeader>
       <CardContent>
         {/* Content removed as per user request */}
       </CardContent>
     </Card>
   );
 }
+
 
