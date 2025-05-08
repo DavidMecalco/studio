@@ -186,30 +186,34 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
 
   if (isFirebaseProperlyConfigured && db && ticketsCollectionRef && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
-      console.log("Fetching Tickets from Firestore.");
-      let q = query(ticketsCollectionRef, orderBy("lastUpdated", "desc"));
+      console.log(`Fetching Tickets from Firestore${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
+      let q;
       if (requestingUserId) {
         q = query(ticketsCollectionRef, where("requestingUserId", "==", requestingUserId), orderBy("lastUpdated", "desc"));
+      } else {
+        q = query(ticketsCollectionRef, orderBy("lastUpdated", "desc"));
       }
       const querySnapshot = await getDocs(q);
       const tickets: Ticket[] = [];
       querySnapshot.forEach((docSnap) => {
         tickets.push(docSnap.data() as Ticket);
       });
-      if (typeof window !== 'undefined') {
-        if (!requestingUserId) localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+      // Only cache all tickets if not filtering by user
+      if (typeof window !== 'undefined' && !requestingUserId) {
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
       }
       return tickets;
     } catch (error) {
-      console.error("Error fetching Tickets from Firestore, falling back to localStorage if available: ", error);
+      console.error(`Error fetching Tickets from Firestore (user: ${requestingUserId || 'all'}), falling back to localStorage if available: `, error);
     }
   }
 
+  // Fallback to localStorage
   if (typeof window !== 'undefined') {
     const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
     if (storedTickets) {
       try {
-        console.warn("Fetching Tickets from localStorage (Firestore unavailable or offline).");
+        console.warn(`Fetching Tickets from localStorage (Firestore unavailable or offline)${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
         let tickets: Ticket[] = JSON.parse(storedTickets);
         if (requestingUserId) {
           tickets = tickets.filter(ticket => ticket.requestingUserId === requestingUserId);
@@ -221,7 +225,7 @@ export async function getTickets(requestingUserId?: string): Promise<Ticket[]> {
       }
     }
   }
-  console.warn("No Tickets found in Firestore or localStorage.");
+  console.warn(`No Tickets found in Firestore or localStorage${requestingUserId ? ` for user ${requestingUserId}` : ''}.`);
   return [];
 }
 
@@ -705,4 +709,3 @@ export async function addAttachmentsToTicket(
   console.error("Cannot add attachments: No persistent storage available.");
   return null;
 }
-

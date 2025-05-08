@@ -36,7 +36,7 @@ export default function MyTicketsPage() {
       }
       setIsPageLoading(true);
       try {
-          const userTickets = await getTickets(user.id); // Use local getTickets
+          const userTickets = await getTickets(user.id); // Use local getTickets, passing user.id
           setTickets(userTickets);
       } catch (error) {
           console.error("Failed to fetch tickets:", error);
@@ -152,7 +152,7 @@ export default function MyTicketsPage() {
             tickets={filteredTickets} 
             title="" 
             showRequestingUser={false} 
-            onTicketActionSuccess={fetchUserTickets} 
+            onTicketActionSuccess={fetchUserTickets} // Pass the fetchUserTickets to refresh list on action
             isClientView={true} 
           />
         </CardContent>
@@ -160,4 +160,3 @@ export default function MyTicketsPage() {
     </div>
   );
 }
-
