@@ -1,11 +1,12 @@
 
+
 "use server";
 
-import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority } from "@/services/jira";
+import type { JiraTicket, JiraTicketStatus, JiraTicketProvider, JiraTicketBranch, CreateJiraTicketData, JiraTicketPriority, JiraTicketType } from "@/services/jira"; // Added JiraTicketType
 import { updateJiraTicket as updateJiraTicketServiceCall, createJiraTicket as createJiraTicketService, addCommentToTicket as addCommentToTicketService } from "@/services/jira"; 
 import { revalidatePath } from "next/cache";
 import { getUserById } from "@/services/users"; 
-import { isFirebaseProperlyConfigured } from "@/lib/firebase"; // Import the flag
+import { isFirebaseProperlyConfigured } from "@/lib/firebase"; 
 
 interface UpdateJiraTicketResult {
   success: boolean;
@@ -14,10 +15,10 @@ interface UpdateJiraTicketResult {
 }
 
 /**
- * Server action to update a Jira ticket's status, assignee, and/or priority.
+ * Server action to update a Jira ticket's status, assignee, priority, and/or type.
  * @param ticketId The ID of the ticket to update.
  * @param userIdPerformingAction The ID of the user performing the action.
- * @param updates An object containing fields to update: newStatus, newAssigneeId, newPriority, comment.
+ * @param updates An object containing fields to update.
  * @returns A promise that resolves to an object indicating success or failure.
  */
 export async function updateJiraTicketAction(
@@ -25,8 +26,9 @@ export async function updateJiraTicketAction(
   userIdPerformingAction: string,
   updates: {
     newStatus?: JiraTicketStatus;
-    newAssigneeId?: string; // Empty string means unassign
+    newAssigneeId?: string; 
     newPriority?: JiraTicketPriority;
+    newType?: JiraTicketType; // Added newType
     comment?: string;
   }
 ): Promise<UpdateJiraTicketResult> {
@@ -40,9 +42,10 @@ export async function updateJiraTicketAction(
     updates.newStatus === undefined &&
     updates.newAssigneeId === undefined &&
     updates.newPriority === undefined &&
+    updates.newType === undefined && // Added newType check
     updates.comment === undefined
   ) {
-    return { success: false, error: "At least one update (status, assignee, priority, or comment) must be provided." };
+    return { success: false, error: "At least one update (status, assignee, priority, type, or comment) must be provided." };
   }
 
   try {
@@ -53,7 +56,6 @@ export async function updateJiraTicketAction(
       revalidatePath("/(app)/jira", "page");
       revalidatePath("/(app)/my-tickets", "page");
 
-      // Simulate Email Notification
       if (isFirebaseProperlyConfigured) {
         const performingUser = await getUserById(userIdPerformingAction);
         const requester = await getUserById(updatedTicket.requestingUserId);
@@ -72,13 +74,13 @@ export async function updateJiraTicketAction(
         if (updates.newStatus) {
             notificationMessage += ` New status: ${updates.newStatus}.`;
             if (updates.newStatus === 'Reabierto' && updates.comment) {
-                 // Comment is already included in the history, so we don't need to add it here explicitly
             } else if (updates.newStatus === 'Reabierto') {
                  notificationMessage += ` Ticket has been reopened.`;
             }
         }
         if (updates.newAssigneeId !== undefined) notificationMessage += ` Assignee changed to ${updates.newAssigneeId || 'Unassigned'}.`;
         if (updates.newPriority) notificationMessage += ` Priority changed to ${updates.newPriority}.`;
+        if (updates.newType) notificationMessage += ` Type changed to ${updates.newType}.`; // Added type change notification
         if (updates.comment && updates.newStatus !== 'Reabierto') notificationMessage += ` Comment: "${updates.comment}".`; 
         
         notificationRecipients.forEach(email => {
@@ -109,10 +111,11 @@ export interface CreateTicketActionFormValues {
   title: string;
   description: string;
   priority: JiraTicketPriority;
+  type: JiraTicketType; // Added type
   requestingUserId: string; 
   requestingUserEmail?: string; 
   provider?: JiraTicketProvider; 
-  branch?: JiraTicketBranch; // This will now be populated by clients too
+  branch?: JiraTicketBranch; 
   attachmentNames?: string[];
 }
 
@@ -125,10 +128,9 @@ export interface CreateTicketActionFormValues {
 export async function createJiraTicketAction(
   data: CreateTicketActionFormValues
 ): Promise<CreateJiraTicketResult> {
-  if (!data.title || !data.description || !data.priority || !data.requestingUserId) {
+  if (!data.title || !data.description || !data.priority || !data.type || !data.requestingUserId) { // Added type check
     return { success: false, error: "Todos los campos obligatorios deben ser completados." };
   }
-  // Client specific validation: branch is required
   const requestingUser = await getUserById(data.requestingUserId); 
   if (requestingUser?.role === 'client' && !data.branch) {
     return { success: false, error: "El ambiente/branch es obligatorio para los clientes." };
@@ -140,21 +142,19 @@ export async function createJiraTicketAction(
       title: data.title,
       description: data.description,
       priority: data.priority,
+      type: data.type, // Pass type
       requestingUserId: data.requestingUserId,
       provider: data.provider, 
       branch: data.branch, 
       attachmentNames: data.attachmentNames || [],
-      // assigneeId is intentionally omitted here, so it defaults to unassigned.
-      // The superuser will assign it later.
     };
 
     const newTicket = await createJiraTicketService(createData);
     if (newTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath("/(app)/jira", "page"); // For superuser/admin to see new ticket
-      revalidatePath("/(app)/my-tickets", "page"); // For client to see their new ticket
+      revalidatePath("/(app)/jira", "page"); 
+      revalidatePath("/(app)/my-tickets", "page"); 
 
-      // Simulate Email Notification
       if (isFirebaseProperlyConfigured) {
         const notificationRecipients = new Set<string>();
         if (data.requestingUserEmail) notificationRecipients.add(data.requestingUserEmail);
@@ -162,7 +162,7 @@ export async function createJiraTicketAction(
         const superUser = await getUserById('superuser'); 
         if (superUser?.email) notificationRecipients.add(superUser.email);
         
-        let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Priority: ${newTicket.priority}.`;
+        let notificationMessage = `New Ticket Created: ${newTicket.id} - "${newTicket.title}" by ${data.requestingUserId}. Type: ${newTicket.type}. Priority: ${newTicket.priority}.`; // Added type
         if (newTicket.branch) {
           notificationMessage += ` Environment/Branch: ${newTicket.branch}.`;
         }
@@ -205,7 +205,7 @@ export async function addCommentToTicketAction(
   ticketId: string,
   userIdPerformingAction: string,
   commentText: string,
-  attachmentNames?: string[] // Added attachmentNames parameter
+  attachmentNames?: string[] 
 ): Promise<AddCommentResult> {
   if (!ticketId || !userIdPerformingAction || !commentText) {
     return { success: false, error: "Ticket ID, user ID, and comment text are required." };
@@ -216,7 +216,6 @@ export async function addCommentToTicketAction(
     if (updatedTicket) {
       revalidatePath(`/(app)/jira/${ticketId}`, "page");
 
-      // Simulate Email Notification for comment
       if (isFirebaseProperlyConfigured) {
         const performingUser = await getUserById(userIdPerformingAction);
         const requester = await getUserById(updatedTicket.requestingUserId);
@@ -251,8 +250,3 @@ export async function addCommentToTicketAction(
     return { success: false, error: errorMessage };
   }
 }
-
-// Attachment-specific action removed as per previous request.
-// Functionality can be merged into addCommentToTicketAction or a dedicated form if complex upload is needed.
-// For now, comments can carry attachment names.
-

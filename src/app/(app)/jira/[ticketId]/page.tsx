@@ -1,15 +1,16 @@
 
+
 "use client"; 
 
 import { useEffect, useState, type ChangeEvent }  from 'react';
 import { useParams } from 'next/navigation'; 
 import { getJiraTicket, type JiraTicket } from '@/services/jira';
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
-import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; // Added for admin actions
+import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; 
 import { CommitList } from '@/components/github/commit-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon, FileText } from 'lucide-react'; 
+import { ArrowLeft, Ticket as TicketIcon, Github as GithubIcon, User as UserIconLucide, GitBranch, AlertTriangle, HardDriveUpload, FileClock, History, FileDiff, MessageSquare, Paperclip, UploadCloud, Loader2, XIcon, FileText, Tag } from 'lucide-react'; // Added Tag icon
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -18,12 +19,8 @@ import { useAuth } from '@/context/auth-context';
 import { CommitChangesForm } from '@/components/tickets/commit-changes-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TicketHistoryList } from '@/components/tickets/ticket-history-list';
-// import { FileVersionHistoryDialog } from '@/components/files/file-version-history-dialog'; // VersionHistoryCard was removed
 import { CommentForm } from '@/components/tickets/CommentForm';
 import { useToast } from '@/hooks/use-toast';
-// import { addAttachmentsToTicketAction } from '@/app/actions/jira-actions'; // Removed as form is removed
-// import { Input } from '@/components/ui/input'; // Removed as form is removed
-// import { Label } from '@/components/ui/label'; // Removed as form is removed
 import { TicketAdminActions } from '@/components/tickets/ticket-admin-actions'; 
 
 
@@ -33,8 +30,6 @@ interface TicketDetailsData {
   users: ServiceUser[]; 
 }
 
-// AddAttachmentsForm was removed as per user request.
-
 
 async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData | null> {
   try {
@@ -42,10 +37,9 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
     if (!ticket) {
       return null;
     }
-    // Fetch commits and users in parallel
     const [commits, users] = await Promise.all([
         getGitHubCommits(ticket.id),
-        getUsers() // For admin actions dropdown
+        getUsers() 
     ]);
     return { ticket, commits, users };
   } catch (error) {
@@ -66,7 +60,6 @@ export default function TicketDetailPage() {
 
   const refreshTicketData = () => {
     if (ticketId) {
-        // Do not set isLoading to true here to avoid full page skeleton on refresh from actions on page
         fetchTicketDetails(ticketId)
             .then(data => setTicketData(data))
             .catch(error => console.error("Failed to refresh ticket data:", error));
@@ -93,17 +86,18 @@ export default function TicketDetailPage() {
   if (authLoading || isLoading) {
     return (
       <div className="space-y-8">
-        <Skeleton className="h-8 w-32 mb-4" /> {/* Back button */}
+        <Skeleton className="h-8 w-32 mb-4" /> 
         <Card className="shadow-lg rounded-xl">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
               <div className="flex-1">
-                <Skeleton className="h-7 w-3/4 mb-1" /> {/* Title */}
-                <Skeleton className="h-4 w-1/2" /> {/* Description */}
+                <Skeleton className="h-7 w-3/4 mb-1" /> 
+                <Skeleton className="h-4 w-1/2" /> 
               </div>
               <div className="flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
-                <Skeleton className="h-7 w-24" /> {/* Status Badge */}
-                <Skeleton className="h-5 w-20" /> {/* Priority Badge */}
+                <Skeleton className="h-7 w-24" /> 
+                <Skeleton className="h-5 w-20" /> 
+                <Skeleton className="h-5 w-28" /> {/* Placeholder for type */}
               </div>
             </div>
           </CardHeader>
@@ -112,23 +106,22 @@ export default function TicketDetailPage() {
               {[...Array(3)].map((_, i) => <div key={`skel-info-${i}`}><Skeleton className="h-4 w-1/3 mb-1" /><Skeleton className="h-5 w-2/3" /></div>)}
             </div>
             <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/4 mb-2" /> {/* Description heading */}
-            <Skeleton className="h-16 w-full" /> {/* Description content */}
+            <Skeleton className="h-6 w-1/4 mb-2" /> 
+            <Skeleton className="h-16 w-full" /> 
             
-            <Skeleton className="h-px w-full my-3" /> {/* Admin actions placeholder */}
+            <Skeleton className="h-px w-full my-3" /> 
             <Skeleton className="h-6 w-1/3 mb-2" /> 
             <Skeleton className="h-40 w-full" /> 
             
             <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Commits heading */}
-            <Skeleton className="h-20 w-full" /> {/* Commits list placeholder */}
+            <Skeleton className="h-6 w-1/3 mb-2" /> 
+            <Skeleton className="h-20 w-full" /> 
              <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/3 mb-2" /> {/* History heading */}
-            <Skeleton className="h-24 w-full" /> {/* History list placeholder */}
-             {/* Attachments form placeholder removed */}
+            <Skeleton className="h-6 w-1/3 mb-2" /> 
+            <Skeleton className="h-24 w-full" /> 
              <Skeleton className="h-px w-full" />
-            <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments form heading */}
-            <Skeleton className="h-32 w-full" /> {/* Comments form placeholder */}
+            <Skeleton className="h-6 w-1/3 mb-2" /> 
+            <Skeleton className="h-32 w-full" /> 
           </CardContent>
         </Card>
       </div>
@@ -202,6 +195,9 @@ export default function TicketDetailPage() {
                 >
                     Priority: {ticket.priority}
                 </Badge>
+                <Badge variant="outline" className="text-xs px-2 py-0.5 flex items-center gap-1">
+                    <Tag className="h-3 w-3"/> Type: {ticket.type}
+                </Badge>
               </div>
             </div>
           </CardHeader>
@@ -253,8 +249,6 @@ export default function TicketDetailPage() {
             <p className="text-muted-foreground whitespace-pre-wrap mb-6">
               {ticket.description}
             </p>
-
-            {/* Attachments display section removed */}
             
             {canManageTicketAdminActions && allUsers.length > 0 && (
                 <>
@@ -280,8 +274,6 @@ export default function TicketDetailPage() {
             </h3>
             <TicketHistoryList history={ticket.history} title="" />
            
-            {/* AddAttachmentsForm removed */}
-
             {canInteractWithTicket && ticketId && ( 
                 <>
                     <Separator className="my-6"/>
@@ -308,4 +300,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-

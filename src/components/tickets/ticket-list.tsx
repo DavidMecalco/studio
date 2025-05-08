@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from 'react';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowRight, Ticket as TicketIcon, GitBranch, User, RotateCcw, Loader2 } from 'lucide-react'; 
+import { ArrowRight, Ticket as TicketIcon, GitBranch, User, RotateCcw, Loader2, Tag } from 'lucide-react'; // Added Tag icon
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -19,8 +20,8 @@ interface TicketListProps {
   maxItems?: number;
   showRequestingUser?: boolean; 
   showAssignee?: boolean; 
-  onTicketActionSuccess?: () => void; // Callback for successful actions like reopen
-  isClientView?: boolean; // To show reopen button for clients
+  onTicketActionSuccess?: () => void; 
+  isClientView?: boolean; 
 }
 
 export function TicketList({ 
@@ -43,7 +44,8 @@ export function TicketList({
         return;
     }
     setReopeningTicketId(ticketId);
-    const result = await updateJiraTicketAction(ticketId, user.id, 'Reabierto', undefined, 'Ticket reabierto por el cliente.');
+    // When reopening, we don't change the assignee or priority here, just the status and add a comment.
+    const result = await updateJiraTicketAction(ticketId, user.id, {newStatus: 'Reabierto', comment: 'Ticket reabierto por el cliente.'});
     if (result.success) {
         toast({ title: "Ticket Reabierto", description: `El ticket ${ticketId} ha sido reabierto.` });
         if (onTicketActionSuccess) {
@@ -84,6 +86,7 @@ export function TicketList({
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Title</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
               {showRequestingUser && <TableHead>Requesting User</TableHead>}
@@ -98,13 +101,19 @@ export function TicketList({
                 <TableCell className="font-medium">{ticket.id}</TableCell>
                 <TableCell>{ticket.title}</TableCell>
                 <TableCell>
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Tag className="h-3 w-3"/>
+                    {ticket.type}
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <Badge 
                     variant={ticket.status === 'Resuelto' || ticket.status === 'Cerrado' ? 'default' : 'secondary'}
                     className={
                         ticket.status === 'Abierto' ? 'bg-blue-100 text-blue-800' :
                         ticket.status === 'En Progreso' ? 'bg-yellow-100 text-yellow-800' :
                         ticket.status === 'Pendiente' ? 'bg-orange-100 text-orange-800' :
-                        ticket.status === 'Reabierto' ? 'bg-cyan-100 text-cyan-800' : // Style for Reabierto
+                        ticket.status === 'Reabierto' ? 'bg-cyan-100 text-cyan-800' : 
                         ticket.status === 'En espera del visto bueno' ? 'bg-purple-100 text-purple-800' :
                         (ticket.status === 'Resuelto' || ticket.status === 'Cerrado') ? 'bg-green-100 text-green-800' : ''
                     }

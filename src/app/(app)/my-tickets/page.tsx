@@ -1,41 +1,43 @@
 
+
 "use client"; 
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getJiraTickets, type JiraTicket } from '@/services/jira'; // Removed unused type imports
+import { getJiraTickets, type JiraTicket } from '@/services/jira'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ListChecks, AlertTriangle, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsFilterBar, type MyTicketsFilters } from '@/components/tickets/my-tickets-filter-bar';
-import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
+import { format, parseISO, isWithinInterval } from 'date-fns'; 
 import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
 import { Button } from '@/components/ui/button';
 
 export default function MyTicketsPage() {
   const { user, loading: authLoading } = useAuth();
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const [filters, setFilters] = useState<MyTicketsFilters>({
     dateFrom: '', 
     dateTo: '', 
     status: 'all',
     priority: 'all',
+    type: 'all', // Added type filter
     searchTerm: '',
   });
 
   const canViewPage = user?.role === 'client';
 
   const fetchUserTickets = async () => {
-      if (!user || !canViewPage) { // Ensure user and permissions are valid
+      if (!user || !canViewPage) { 
           setIsPageLoading(false);
           return;
       }
       setIsPageLoading(true);
       try {
-          const userTickets = await getJiraTickets(user.id); // Uses efficient local storage first
+          const userTickets = await getJiraTickets(user.id); 
           setTickets(userTickets);
       } catch (error) {
           console.error("Failed to fetch tickets:", error);
@@ -44,7 +46,7 @@ export default function MyTicketsPage() {
   };
   
   useEffect(() => {
-    if (!authLoading && user && canViewPage) { // Trigger fetch when auth is done, user is present, and has permission
+    if (!authLoading && user && canViewPage) { 
       fetchUserTickets();
     } else if (!authLoading) { 
       setIsPageLoading(false); 
@@ -68,6 +70,7 @@ export default function MyTicketsPage() {
 
       if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
+      if (filters.type !== 'all' && ticket.type !== filters.type) return false; // Filter by type
       if (filters.searchTerm) {
         const term = filters.searchTerm.toLowerCase();
         if (!ticket.title.toLowerCase().includes(term) && !ticket.description.toLowerCase().includes(term) && !ticket.id.toLowerCase().includes(term)) {
@@ -79,7 +82,7 @@ export default function MyTicketsPage() {
   }, [tickets, filters]);
 
 
-  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
+  if (authLoading || (isPageLoading && canViewPage)) { 
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -89,7 +92,7 @@ export default function MyTicketsPage() {
           </div>
           { canViewPage && <Skeleton className="h-10 w-40" /> }
         </div>
-        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
+        <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_, i) => <Skeleton key={`filter-skel-mytickets-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card> {/* Adjusted skeleton count for filters */}
         <Card className="bg-card shadow-lg rounded-xl">
           <CardHeader>
             <Skeleton className="h-6 w-1/2" />
@@ -105,7 +108,7 @@ export default function MyTicketsPage() {
     );
   }
 
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) { 
      return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
             <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
@@ -158,4 +161,3 @@ export default function MyTicketsPage() {
     </div>
   );
 }
-

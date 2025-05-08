@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect } from 'react';
@@ -18,7 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/auth-context';
 import { updateJiraTicketAction } from '@/app/actions/jira-actions';
-import type { JiraTicket, JiraTicketStatus, JiraTicketPriority } from '@/services/jira';
+import type { JiraTicket, JiraTicketStatus, JiraTicketPriority, JiraTicketType } from '@/services/jira'; // Added JiraTicketType
+import { JIRA_TICKET_TYPES } from '@/services/jira'; // Import defined types
 import type { UserDoc as ServiceUser } from '@/services/users';
 import { Edit, Loader2 } from 'lucide-react';
 
@@ -33,16 +35,18 @@ const adminTicketActionSchema = z.object({
   newPriority: z.custom<JiraTicketPriority>((val) => ticketPriorityOptions.includes(val as JiraTicketPriority), {
     message: "Invalid priority selected.",
   }),
-  newAssigneeId: z.string().optional(), // Allows "all", specific ID, or UNASSIGNED_VALUE
-  // Comment field removed
+  newType: z.custom<JiraTicketType>((val) => JIRA_TICKET_TYPES.includes(val as JiraTicketType), { // Added type validation
+    message: "Invalid type selected.",
+  }),
+  newAssigneeId: z.string().optional(), 
 });
 
 type AdminTicketActionFormValues = z.infer<typeof adminTicketActionSchema>;
 
 interface TicketAdminActionsProps {
   ticket: JiraTicket;
-  users: ServiceUser[]; // For assignee dropdown
-  onTicketUpdate: () => void; // Callback to refresh parent component
+  users: ServiceUser[]; 
+  onTicketUpdate: () => void; 
 }
 
 export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdminActionsProps) {
@@ -54,8 +58,8 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
     defaultValues: {
       newStatus: ticket.status,
       newPriority: ticket.priority,
+      newType: ticket.type, // Added type
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
-      // comment: "", // Default value for comment removed
     },
   });
 
@@ -63,8 +67,8 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
     form.reset({
       newStatus: ticket.status,
       newPriority: ticket.priority,
+      newType: ticket.type, // Added type
       newAssigneeId: ticket.assigneeId || UNASSIGNED_VALUE,
-      // comment: "", // Reset for comment removed
     });
   }, [ticket, form]);
 
@@ -78,7 +82,8 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       newStatus?: JiraTicketStatus;
       newAssigneeId?: string;
       newPriority?: JiraTicketPriority;
-      comment?: string; // Keep comment in updates object if other logic might add it
+      newType?: JiraTicketType; // Added newType
+      comment?: string; 
     } = {};
 
     let changed = false;
@@ -90,12 +95,15 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
       updates.newPriority = values.newPriority;
       changed = true;
     }
+    if (values.newType !== ticket.type) { // Added type change check
+      updates.newType = values.newType;
+      changed = true;
+    }
     const assigneeToSubmit = values.newAssigneeId === UNASSIGNED_VALUE ? "" : values.newAssigneeId;
     if (assigneeToSubmit !== (ticket.assigneeId || "")) { 
         updates.newAssigneeId = assigneeToSubmit;
         changed = true;
     }
-    // Comment logic removed from here
     
     if (!changed) {
         toast({ title: "No Changes", description: "No changes detected to update.", variant: "default"});
@@ -109,7 +117,7 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
         title: "Ticket Updated",
         description: `Ticket ${result.ticket.id} has been successfully updated.`,
       });
-      onTicketUpdate(); // Refresh parent
+      onTicketUpdate(); 
     } else {
       toast({
         title: "Update Failed",
@@ -128,13 +136,13 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
           <Edit className="h-5 w-5 text-primary" /> Manage Ticket
         </CardTitle>
         <CardDescription>
-          Update status, priority, or assignee.
+          Update status, priority, type, or assignee.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <FormField
                 control={form.control}
                 name="newStatus"
@@ -173,6 +181,24 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
               />
               <FormField
                 control={form.control}
+                name="newType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {JIRA_TICKET_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="newAssigneeId"
                 render={({ field }) => (
                   <FormItem>
@@ -191,7 +217,6 @@ export function TicketAdminActions({ ticket, users, onTicketUpdate }: TicketAdmi
                 )}
               />
             </div>
-            {/* Comment FormField removed */}
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Update Ticket

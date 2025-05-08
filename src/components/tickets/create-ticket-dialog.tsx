@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, type ChangeEvent, useEffect, type ReactNode } from 'react';
@@ -34,7 +35,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { createJiraTicketAction } from "@/app/actions/jira-actions";
-import type { JiraTicketBranch, JiraTicketPriority, JiraTicketProvider } from "@/services/jira";
+import type { JiraTicketBranch, JiraTicketPriority, JiraTicketProvider, JiraTicketType } from "@/services/jira"; // Added JiraTicketType
+import { JIRA_TICKET_TYPES } from "@/services/jira"; // Import defined types
 import { Plus, FileUp, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { getOrganizations, type Organization } from '@/services/users';
@@ -60,26 +62,26 @@ const createTicketFormSchemaBase = z.object({
   priority: z.enum(ticketPriorities, {
     required_error: "Seleccione una prioridad.",
   }),
+  type: z.enum(JIRA_TICKET_TYPES as [JiraTicketType, ...JiraTicketType[]], { // Ensure Zod enum gets a non-empty array
+    required_error: "Seleccione un tipo de ticket.",
+  }),
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
   requestingUserEmail: z.string().email().optional(), 
 });
 
-// Admin/SuperUser can select provider and branch
 const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
   provider: z.string().optional(), 
   branch: z.enum(ticketBranches).optional(),
 });
 
-// Client can also select branch (environment)
 const clientCreateTicketFormSchema = createTicketFormSchemaBase.extend({
-  provider: z.string().optional(), // Will be auto-filled from user.company for client
+  provider: z.string().optional(), 
   branch: z.enum(ticketBranches, { required_error: "Seleccione un ambiente/branch."}),
 });
 
 
 type AdminOrSuperUserFormValues = z.infer<typeof adminOrSuperUserCreateTicketFormSchema>;
 type ClientFormValues = z.infer<typeof clientCreateTicketFormSchema>;
-// This type now correctly covers both scenarios.
 export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & ClientFormValues>;
 
 
@@ -107,9 +109,10 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       title: "",
       description: "",
       priority: undefined,
+      type: undefined,
       requestingUserId: user?.username || "",
       requestingUserEmail: user?.email || "",
-      provider: isAdminOrSuperUser ? undefined : user?.company || undefined, // Auto-fill for client
+      provider: isAdminOrSuperUser ? undefined : user?.company || undefined, 
       branch: undefined,
     },
   });
@@ -120,6 +123,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
         title: "",
         description: "",
         priority: undefined,
+        type: undefined,
         requestingUserId: user.username,
         requestingUserEmail: user.email,
         provider: isAdminOrSuperUser ? undefined : user.company || undefined,
@@ -185,7 +189,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     if (isAdminOrSuperUser) {
         branchForAction = values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch;
     } else if (isClient) {
-        branchForAction = values.branch; // Client must select a branch/environment
+        branchForAction = values.branch; 
     }
 
 
@@ -193,12 +197,12 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       title: values.title!,
       description: values.description!,
       priority: values.priority!,
+      type: values.type!, // Added type
       requestingUserId: user.username!,
       requestingUserEmail: user.email,
       provider: providerForAction, 
       branch: branchForAction, 
       attachmentNames: attachmentNames,
-      // assigneeId will be undefined by default, allowing SuperUser to assign it.
     };
 
     const result = await createJiraTicketAction(ticketDataForAction);
@@ -309,30 +313,57 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Prioridad</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione prioridad" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ticketPriorities.map(priority => (
-                        <SelectItem key={priority} value={priority}>
-                          {priority}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prioridad</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione prioridad" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ticketPriorities.map(priority => (
+                          <SelectItem key={priority} value={priority}>
+                            {priority}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Ticket</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {JIRA_TICKET_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
 
             {isAdminOrSuperUser && (
               <>
@@ -404,7 +435,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
             {isClient && (
                  <FormField
                     control={form.control}
-                    name="branch" // Clients select branch (environment)
+                    name="branch" 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Ambiente</FormLabel>
@@ -428,7 +459,6 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                   />
             )}
               
-            {/* Attachment field for all roles that can create tickets */}
             <FormItem>
               <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
               <FormControl>
@@ -479,4 +509,3 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     </Dialog>
   );
 }
-

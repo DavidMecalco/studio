@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { Dispatch, SetStateAction } from 'react';
@@ -8,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter, RotateCcw, Search } from 'lucide-react';
-import type { JiraTicketStatus, JiraTicketPriority } from '@/services/jira';
+import type { JiraTicketStatus, JiraTicketPriority, JiraTicketType } from '@/services/jira'; // Added JiraTicketType
+import { JIRA_TICKET_TYPES } from '@/services/jira'; // Import defined types
 import type { UserDoc as ServiceUser } from '@/services/users';
 import { format, subDays } from 'date-fns';
 
@@ -19,20 +21,23 @@ export interface AdminTicketFilters {
   dateTo: string;
   status: JiraTicketStatus | 'all';
   priority: JiraTicketPriority | 'all';
-  assigneeId: string | 'all'; // User ID of the assignee, or UNASSIGNED_ASSIGNEE_FILTER_VALUE
-  requestingClient: string | 'all'; // Organization name (provider)
+  type: JiraTicketType | 'all'; // Added type filter
+  assigneeId: string | 'all'; 
+  requestingClient: string | 'all'; 
   searchTerm: string;
 }
 
 interface AdminTicketFilterBarProps {
   filters: AdminTicketFilters;
   onFiltersChange: Dispatch<SetStateAction<AdminTicketFilters>>;
-  users: ServiceUser[]; // For assignee and potentially requesting user filters
-  organizations: string[]; // For client/organization filter
+  users: ServiceUser[]; 
+  organizations: string[]; 
 }
 
-const ticketStatuses: Array<JiraTicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno'];
+const ticketStatuses: Array<JiraTicketStatus | 'all'> = ['all', 'Abierto', 'Pendiente', 'En Progreso', 'Resuelto', 'Cerrado', 'En espera del visto bueno', 'Reabierto'];
 const ticketPriorities: Array<JiraTicketPriority | 'all'> = ['all', 'Alta', 'Media', 'Baja'];
+const ticketTypesForFilter: Array<JiraTicketType | 'all'> = ['all', ...JIRA_TICKET_TYPES];
+
 
 export function AdminTicketFilterBar({ filters, onFiltersChange, users, organizations }: AdminTicketFilterBarProps) {
 
@@ -42,10 +47,11 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
 
   const resetFilters = () => {
     onFiltersChange({
-      dateFrom: '', // format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-      dateTo: '', // format(new Date(), 'yyyy-MM-dd'),
+      dateFrom: '', 
+      dateTo: '', 
       status: 'all',
       priority: 'all',
+      type: 'all', // Reset type filter
       assigneeId: 'all',
       requestingClient: 'all',
       searchTerm: '',
@@ -58,7 +64,7 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
         <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5" /> Filter Jira Tickets</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end"> {/* Adjusted grid for more filters */}
           <div>
             <Label htmlFor="adminTicketsDateFromFilter" className="text-sm font-medium">From</Label>
             <Input id="adminTicketsDateFromFilter" type="date" value={filters.dateFrom} onChange={(e) => handleInputChange('dateFrom', e.target.value)} />
@@ -82,6 +88,15 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
               <SelectTrigger id="adminTicketsPriorityFilter"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ticketPriorities.map(priority => <SelectItem key={priority} value={priority}>{priority === 'all' ? 'All Priorities' : priority}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="adminTicketsTypeFilter" className="text-sm font-medium">Type</Label>
+            <Select value={filters.type} onValueChange={(val) => handleInputChange('type', val)}>
+              <SelectTrigger id="adminTicketsTypeFilter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ticketTypesForFilter.map(type => <SelectItem key={type} value={type}>{type === 'all' ? 'All Types' : type}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -128,4 +143,3 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
     </Card>
   );
 }
-

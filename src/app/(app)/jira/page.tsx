@@ -1,30 +1,32 @@
 
+
 "use client"; 
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getJiraTickets, type JiraTicket } from '@/services/jira'; // Removed unused type imports
+import { getJiraTickets, type JiraTicket } from '@/services/jira'; 
 import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Ticket, AlertTriangle } from 'lucide-react'; // Removed unused Users icon
+import { Ticket, AlertTriangle } from 'lucide-react'; 
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminTicketFilterBar, type AdminTicketFilters, UNASSIGNED_ASSIGNEE_FILTER_VALUE } from '@/components/tickets/admin-ticket-filter-bar';
-import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
+import { format, parseISO, isWithinInterval } from 'date-fns'; 
 
 export default function JiraPage() {
   const { user, loading: authLoading } = useAuth();
   const [allTickets, setAllTickets] = useState<JiraTicket[]>([]);
   const [usersForFilter, setUsersForFilter] = useState<ServiceUser[]>([]);
   const [organizationsForFilter, setOrganizationsForFilter] = useState<Organization[]>([]);
-  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed isLoading to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const [filters, setFilters] = useState<AdminTicketFilters>({
     dateFrom: '', 
     dateTo: '', 
     status: 'all',
     priority: 'all',
-    assigneeId: 'all', // Default to all, allowing to see unassigned ones
+    type: 'all', // Added type filter
+    assigneeId: 'all', 
     requestingClient: 'all',
     searchTerm: '',
   });
@@ -33,7 +35,7 @@ export default function JiraPage() {
 
   useEffect(() => {
     async function fetchPageData() {
-      if (authLoading || !canViewPage || !user) { // Ensure user is available
+      if (authLoading || !canViewPage || !user) { 
         setIsPageLoading(false);
         return;
       }
@@ -52,7 +54,7 @@ export default function JiraPage() {
       }
       setIsPageLoading(false);
     }
-    if (canViewPage && !authLoading && user) { // Trigger fetch when auth is done and user is present
+    if (canViewPage && !authLoading && user) { 
       fetchPageData();
     } else if (!authLoading) {
       setIsPageLoading(false); 
@@ -76,13 +78,12 @@ export default function JiraPage() {
 
       if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
+      if (filters.type !== 'all' && ticket.type !== filters.type) return false; // Filter by type
       
       if (filters.assigneeId !== 'all') {
         if (filters.assigneeId === UNASSIGNED_ASSIGNEE_FILTER_VALUE) {
-          // An unassigned ticket has assigneeId as undefined.
           if (ticket.assigneeId !== undefined && ticket.assigneeId !== null && ticket.assigneeId !== '') return false;
         } else {
-          // A specific assignee is selected.
           if (ticket.assigneeId !== filters.assigneeId) return false;
         }
       }
@@ -95,10 +96,11 @@ export default function JiraPage() {
           ticket.id,
           ticket.title,
           ticket.description,
-          ticket.assigneeId || '', // Handle undefined assigneeId
+          ticket.type, // Add type to searchable content
+          ticket.assigneeId || '', 
           ticket.requestingUserId,
-          ticket.provider || '', // Handle undefined provider
-          ticket.branch || '' // Handle undefined branch
+          ticket.provider || '', 
+          ticket.branch || '' 
         ].join(' ').toLowerCase();
         if (!searchableContent.includes(term)) return false;
       }
@@ -107,7 +109,7 @@ export default function JiraPage() {
   }, [allTickets, filters]);
 
 
-  if (authLoading || (isPageLoading && canViewPage)) { // Combined loading check
+  if (authLoading || (isPageLoading && canViewPage)) { 
     return (
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -116,7 +118,7 @@ export default function JiraPage() {
             <Skeleton className="h-4 w-full" />
           </div>
         </div>
-         <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(5)].map((_, i) => <Skeleton key={`filter-skel-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
+         <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">{[...Array(7)].map((_, i) => <Skeleton key={`filter-skel-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card> {/* Adjusted skeleton count for filters */}
         <Card className="bg-card shadow-lg rounded-xl">
           <CardHeader>
             <Skeleton className="h-6 w-1/2" />
@@ -132,7 +134,7 @@ export default function JiraPage() {
     );
   }
   
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) { 
      return (
         <div className="space-y-8 text-center py-10">
             <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
@@ -176,11 +178,10 @@ export default function JiraPage() {
             tickets={filteredTickets} 
             title="" 
             showRequestingUser={true} 
-            showAssignee={true} // Ensure assignee (or lack thereof) is shown
+            showAssignee={true} 
             />
         </CardContent>
       </Card>
     </div>
   );
 }
-
