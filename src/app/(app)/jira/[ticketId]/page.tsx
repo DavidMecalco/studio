@@ -38,7 +38,7 @@ async function fetchTicketDetails(ticketId: string): Promise<TicketDetailsData |
       return null;
     }
     const [commits, users] = await Promise.all([
-        getGitHubCommits(ticket.id),
+        getGitHubCommits(ticket.id), // Get commits specific to this ticket ID
         getUsers() 
     ]);
     return { ticket, commits, users };
@@ -60,9 +60,11 @@ export default function TicketDetailPage() {
 
   const refreshTicketData = () => {
     if (ticketId) {
+        setIsLoading(true); // Set loading true before refetch
         fetchTicketDetails(ticketId)
             .then(data => setTicketData(data))
-            .catch(error => console.error("Failed to refresh ticket data:", error));
+            .catch(error => console.error("Failed to refresh ticket data:", error))
+            .finally(() => setIsLoading(false)); // Set loading false after fetch attempt
     }
   };
 
@@ -147,7 +149,7 @@ export default function TicketDetailPage() {
 
   const { ticket, commits, users: allUsers } = ticketData;
 
-  const canManageTicketCommits = user?.role === 'admin'; 
+  const canManageTicketCommits = user?.role === 'admin' || user?.role === 'superuser'; // Superusers can also commit
   const canManageTicketAdminActions = user?.role === 'admin' || user?.role === 'superuser';
   const canInteractWithTicket = !!user; 
 
@@ -294,7 +296,11 @@ export default function TicketDetailPage() {
       {canManageTicketCommits && ticketId && ticketData?.ticket && (
         <>
             <Separator className="my-8" />
-            <CommitChangesForm ticketId={ticketId} currentTicketStatus={ticketData.ticket.status} />
+            <CommitChangesForm 
+                ticketId={ticketId} 
+                currentTicketStatus={ticketData.ticket.status}
+                allCommits={commits} // Pass all commits related to the ticket/project
+            />
         </>
       )}
     </div>

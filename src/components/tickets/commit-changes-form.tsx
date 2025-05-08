@@ -13,10 +13,12 @@ import { useToast } from "@/hooks/use-toast";
 import { createCommitAndPushAction } from "@/app/actions/github-actions";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { GitCommit, Loader2 } from "lucide-react";
+import { GitCommit, Loader2, RefreshCcw } from "lucide-react";
 import type { JiraTicketStatus } from "@/services/jira";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"; // Added Form imports
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Added Select imports
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
+import type { GitHubCommit } from "@/services/github";
+import { Separator } from "@/components/ui/separator";
 
 const availableBranches = ["dev", "main", "staging", "qa", "fix/current-issue", "feat/new-feature"] as const;
 
@@ -32,12 +34,15 @@ type CommitFormValues = z.infer<typeof commitFormSchema>;
 interface CommitChangesFormProps {
   ticketId: string;
   currentTicketStatus: JiraTicketStatus;
+  allCommits?: GitHubCommit[]; // Added to receive all commits for the ticket/repo
 }
 
-export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChangesFormProps) {
+export function CommitChangesForm({ ticketId, currentTicketStatus, allCommits = [] }: CommitChangesFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCommitForRestore, setSelectedCommitForRestore] = useState<string | null>(null);
+  const [isRestoringCommit, setIsRestoringCommit] = useState(false);
 
   const form = useForm<CommitFormValues>({
     resolver: zodResolver(commitFormSchema),
@@ -80,6 +85,23 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
     }
     setIsSubmitting(false);
   }
+
+  const handleRestoreCommit = async () => {
+    if (!selectedCommitForRestore || !user) {
+      toast({ title: "Error", description: "Seleccione un commit y asegúrese de estar autenticado.", variant: "destructive" });
+      return;
+    }
+    setIsRestoringCommit(true);
+    // Simulate server action
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast({
+      title: "Restauración a Commit (Simulada)",
+      description: `Se ha simulado la restauración al commit ${selectedCommitForRestore.substring(0,7)}. En un caso real, se crearía una nueva rama 'restore-${ticketId}-${selectedCommitForRestore.substring(0,4)}' o se revertirían los cambios.`,
+      duration: 5000,
+    });
+    setIsRestoringCommit(false);
+    setSelectedCommitForRestore(null);
+  };
   
   return (
     <Card className="shadow-md rounded-lg">
@@ -122,7 +144,7 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
                   <Label htmlFor="branch">Rama (Branch)</Label>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value} // Ensure value is controlled
                     disabled={isSubmitting}
                   >
                     <FormControl>
@@ -155,7 +177,54 @@ export function CommitChangesForm({ ticketId, currentTicketStatus }: CommitChang
             Los cambios se enviarán (simuladamente) al repositorio asociado con este ticket.
         </p>
       </CardFooter>
+
+      {allCommits && allCommits.length > 0 && (
+        <>
+          <Separator className="my-6" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <RefreshCcw className="h-5 w-5 text-primary" /> Trabajar con Commit Anterior
+            </CardTitle>
+            <CardDescription>
+              Seleccione un commit para ver su estado, crear una nueva rama desde él, o restaurar (revertir) a esta versión (simulado).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormItem>
+              <Label htmlFor="selectCommitForRestore">Seleccionar Commit para Restaurar/Trabajar</Label>
+              <Select
+                value={selectedCommitForRestore || ""}
+                onValueChange={setSelectedCommitForRestore}
+                disabled={isRestoringCommit}
+              >
+                <SelectTrigger id="selectCommitForRestore">
+                  <SelectValue placeholder="Elija un commit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCommits.map((commit) => (
+                    <SelectItem key={commit.sha} value={commit.sha}>
+                      {commit.sha.substring(0, 7)} - {commit.message.length > 50 ? `${commit.message.substring(0, 47)}...` : commit.message}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+            <Button
+              onClick={handleRestoreCommit}
+              disabled={!selectedCommitForRestore || isRestoringCommit}
+              variant="outline"
+            >
+              {isRestoringCommit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+              {isRestoringCommit ? "Restaurando..." : "Restaurar/Revertir a este Commit (Simulado)"}
+            </Button>
+          </CardContent>
+          <CardFooter>
+            <p className="text-xs text-muted-foreground">
+                Esta acción simulará la restauración o creación de una rama desde el commit seleccionado.
+            </p>
+          </CardFooter>
+        </>
+      )}
     </Card>
   );
 }
-
