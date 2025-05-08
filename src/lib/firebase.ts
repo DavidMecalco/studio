@@ -17,8 +17,8 @@ let isFirebaseProperlyConfigured = true;
 // Check if the project ID is configured, as this is a common cause for "projects//" errors.
 if (!firebaseConfig.projectId) {
   isFirebaseProperlyConfigured = false;
-  const errorMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly.";
-  console.error(errorMessage);
+  const warningMessage = "Firebase project ID is not configured. Please ensure the NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is set correctly. The application will fall back to using localStorage for mock data if available.";
+  console.warn(warningMessage); // Changed from console.error
   // In a client-side environment, throwing an error here might be too disruptive.
   // For a server-side context or build process, an error throw is appropriate.
   // Since this runs in both contexts in Next.js, logging an error is a safer default.
@@ -68,7 +68,11 @@ if (isFirebaseProperlyConfigured) {
     }
   }
 } else {
-  console.warn("Firebase was not initialized due to missing Project ID. App will rely on localStorage for mock data if available.");
+  // This message is already covered by the console.warn above if projectId is missing.
+  // If isFirebaseProperlyConfigured is false due to other reasons (like initError), this might be relevant.
+  if (firebaseConfig.projectId) { // Only log this if projectId was present but init failed.
+      console.warn("Firebase was not initialized despite Project ID being present. App will rely on localStorage for mock data if available.");
+  }
   // app and db remain null
 }
 
@@ -76,4 +80,3 @@ if (isFirebaseProperlyConfigured) {
 // const auth: Auth | null = app ? getAuth(app) : null; // Uncomment if Firebase Auth is used
 
 export { app, db, isFirebaseProperlyConfigured /*, auth */ };
-
