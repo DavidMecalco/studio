@@ -1,4 +1,3 @@
-
 "use server";
 
 import type { Ticket, TicketStatus, TicketProvider, TicketBranch, CreateTicketData, TicketPriority, TicketType } from "@/services/tickets";
@@ -91,7 +90,7 @@ export async function updateTicketAction(
       
       return { success: true, ticket: updatedTicket };
     } else {
-      return { success: false, error: "Failed to update ticket. Ticket not found or API error." };
+      return { success: false, error: "Failed to update ticket. Ticket not found or an error occurred with the data service." };
     }
   } catch (error) {
     console.error("Error updating Ticket:", error);
@@ -180,7 +179,7 @@ export async function createTicketAction(
       // when Firebase isn't configured.
       const errorMsg = !isFirebaseProperlyConfigured 
                        ? "No se pudo crear el ticket localmente. Verifique la consola para errores de almacenamiento." 
-                       : "No se pudo crear el ticket. Error de la API o almacenamiento.";
+                       : "No se pudo crear el ticket. Error del servicio de datos o almacenamiento.";
       return { success: false, error: errorMsg };
     }
   } catch (error) {
@@ -246,7 +245,7 @@ export async function addCommentToTicketAction(
 
       return { success: true, ticket: updatedTicket };
     } else {
-      return { success: false, error: "Failed to add comment. Ticket not found or API error." };
+      return { success: false, error: "Failed to add comment. Ticket not found or an error occurred with the data service." };
     }
   } catch (error) {
     console.error("Error adding comment to Ticket:", error);
@@ -254,4 +253,5 @@ export async function addCommentToTicketAction(
     return { success: false, error: errorMessage };
   }
 }
+
 

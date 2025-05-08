@@ -1,4 +1,3 @@
-
 import { db, isFirebaseProperlyConfigured } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, query, where, writeBatch, type CollectionReference, type DocumentData, orderBy, limit } from 'firebase/firestore';
 import { getOrganizations, type Organization } from './users'; // Import Organization type and getter
@@ -516,9 +515,14 @@ export async function createTicket(ticketData: CreateTicketData): Promise<Ticket
       return newTicket;
     } catch (error) {
       console.error("Error creating Ticket in Firestore, attempting localStorage only: ", error);
+      // Fall through to localStorage logic if Firestore fails
     }
   }
 
+  // This block will execute if:
+  // 1. Firebase is not configured OR
+  // 2. We are on the client-side and Firestore operations failed (or offline) OR
+  // 3. We are on the server-side and Firebase is not configured (no localStorage here).
   if (typeof window !== 'undefined') { // Client-side or Firebase failed/offline
     try {
       console.warn(
@@ -529,12 +533,13 @@ export async function createTicket(ticketData: CreateTicketData): Promise<Ticket
       
       const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
       let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-      tickets.unshift(newTicket);
+      tickets.unshift(newTicket); // Add to the beginning of the array
       localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
       console.log(`Ticket ${newTicketId} created in localStorage only.`);
       return newTicket;
     } catch (e) {
       console.error("Error creating ticket in localStorage:", e);
+      // If localStorage fails, we return null. The action will handle the error message.
       return null; 
     }
   } else { // Server-side
@@ -709,3 +714,4 @@ export async function addAttachmentsToTicket(
   console.error("Cannot add attachments: No persistent storage available.");
   return null;
 }
+
