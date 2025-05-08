@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Ticket, AlertTriangle } from 'lucide-react'; // Removed unused Users icon
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AdminTicketFilterBar, type AdminTicketFilters } from '@/components/tickets/admin-ticket-filter-bar';
+import { AdminTicketFilterBar, type AdminTicketFilters, UNASSIGNED_ASSIGNEE_FILTER_VALUE } from '@/components/tickets/admin-ticket-filter-bar';
 import { format, parseISO, isWithinInterval } from 'date-fns'; // Removed unused subDays
 
 export default function JiraPage() {
@@ -76,7 +76,17 @@ export default function JiraPage() {
 
       if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
-      if (filters.assigneeId !== 'all' && ticket.assigneeId !== filters.assigneeId) return false;
+      
+      if (filters.assigneeId !== 'all') {
+        if (filters.assigneeId === UNASSIGNED_ASSIGNEE_FILTER_VALUE) {
+          // An unassigned ticket has assigneeId as undefined.
+          if (ticket.assigneeId !== undefined) return false;
+        } else {
+          // A specific assignee is selected.
+          if (ticket.assigneeId !== filters.assigneeId) return false;
+        }
+      }
+
       if (filters.requestingClient !== 'all' && ticket.provider !== filters.requestingClient) return false;
       
       if (filters.searchTerm) {

@@ -12,12 +12,14 @@ import type { JiraTicketStatus, JiraTicketPriority } from '@/services/jira';
 import type { UserDoc as ServiceUser } from '@/services/users';
 import { format, subDays } from 'date-fns';
 
+export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = "__UNASSIGNED_ASSIGNEE__";
+
 export interface AdminTicketFilters {
   dateFrom: string;
   dateTo: string;
   status: JiraTicketStatus | 'all';
   priority: JiraTicketPriority | 'all';
-  assigneeId: string | 'all'; // User ID of the assignee
+  assigneeId: string | 'all'; // User ID of the assignee, or UNASSIGNED_ASSIGNEE_FILTER_VALUE
   requestingClient: string | 'all'; // Organization name (provider)
   searchTerm: string;
 }
@@ -90,7 +92,7 @@ export function AdminTicketFilterBar({ filters, onFiltersChange, users, organiza
               <SelectContent>
                 <SelectItem value="all">All Assignees</SelectItem>
                 {users.filter(u => u.role === 'admin' || u.role === 'superuser').map(user => <SelectItem key={user.id} value={user.id}>{user.name} ({user.username})</SelectItem>)}
-                <SelectItem value="">-- Unassigned --</SelectItem>
+                <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>-- Unassigned --</SelectItem>
               </SelectContent>
             </Select>
           </div>
