@@ -53,7 +53,7 @@ const orgsToSeed: Organization[] = [
   { id: 'other-company', name: 'Other Company', githubRepository: 'maximo-generic' },
 ];
 
-async function ensureMockDataSeeded(): Promise<void> {
+export async function ensureMockDataSeeded(): Promise<void> {
   if (typeof window === 'undefined') { 
     return;
   }

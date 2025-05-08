@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ensureMockDataSeeded } from '@/services/users'; // Import ensureMockDataSeeded
 
 export interface User {
   id: string; // Unique ID, can be username or a generated UID
@@ -33,21 +34,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('authUser');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser) as User;
-        if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.email && parsedUser.role && parsedUser.name) { // Added email check
-           setUser(parsedUser);
-        } else {
-            localStorage.removeItem('authUser');
+    const initializeAuth = async () => {
+      // Ensure mock data (including the list of all users for login) is seeded
+      await ensureMockDataSeeded(); 
+
+      const storedUser = localStorage.getItem('authUser');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser) as User;
+          if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.email && parsedUser.role && parsedUser.name) {
+             setUser(parsedUser);
+          } else {
+              localStorage.removeItem('authUser');
+          }
+        } catch (e) {
+          console.error("Failed to parse stored user:", e);
+          localStorage.removeItem('authUser');
         }
-      } catch (e) {
-        console.error("Failed to parse stored user:", e);
-        localStorage.removeItem('authUser');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    
+    initializeAuth();
   }, []);
 
   const login = async (email: string, passwordAttempt: string, redirectPath: string = '/') => {
@@ -60,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const allUsers: User[] = JSON.parse(allUsersString);
             // Find user by email and "check" password
-            // Added check for u.email before calling toLowerCase()
             authenticatedUser = allUsers.find(u => u.email && u.email.toLowerCase() === email.toLowerCase() && u.password === passwordAttempt) || null;
         } catch (e) {
             console.error("Error parsing mock users from localStorage during login", e);
@@ -103,4 +110,3 @@ export function useAuth() {
   }
   return context;
 }
-
