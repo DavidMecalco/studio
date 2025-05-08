@@ -51,8 +51,8 @@ export async function updateTicketAction(
     const updatedTicket = await updateTicketServiceCall(ticketId, userIdPerformingAction, updates);
     if (updatedTicket) {
       revalidatePath("/(app)/dashboard", "page");
-      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); // Updated path
-      revalidatePath("/(app)/tickets", "page"); // Updated path
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); 
+      revalidatePath("/(app)/tickets", "page"); 
       revalidatePath("/(app)/my-tickets", "page");
 
       if (isFirebaseProperlyConfigured) {
@@ -176,7 +176,12 @@ export async function createTicketAction(
 
       return { success: true, ticket: newTicket };
     } else {
-      return { success: false, error: "No se pudo crear el ticket. Error de la API." };
+      // If newTicket is null, it implies an issue with local creation (e.g., localStorage error or mock server issue)
+      // when Firebase isn't configured.
+      const errorMsg = !isFirebaseProperlyConfigured 
+                       ? "No se pudo crear el ticket localmente. Verifique la consola para errores de almacenamiento." 
+                       : "No se pudo crear el ticket. Error de la API o almacenamiento.";
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
     console.error("Error creating Ticket:", error);
@@ -213,7 +218,7 @@ export async function addCommentToTicketAction(
   try {
     const updatedTicket = await addCommentToTicketService(ticketId, userIdPerformingAction, commentText, attachmentNames);
     if (updatedTicket) {
-      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); // Updated path
+      revalidatePath(`/(app)/tickets/${ticketId}`, "page"); 
 
       if (isFirebaseProperlyConfigured) {
         const performingUser = await getUserById(userIdPerformingAction);
