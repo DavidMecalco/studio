@@ -60,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const allUsers: User[] = JSON.parse(allUsersString);
             // Find user by email and "check" password
-            authenticatedUser = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === passwordAttempt) || null;
+            // Added check for u.email before calling toLowerCase()
+            authenticatedUser = allUsers.find(u => u.email && u.email.toLowerCase() === email.toLowerCase() && u.password === passwordAttempt) || null;
         } catch (e) {
             console.error("Error parsing mock users from localStorage during login", e);
         }
@@ -102,3 +103,4 @@ export function useAuth() {
   }
   return context;
 }
+
