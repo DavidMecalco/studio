@@ -84,6 +84,8 @@ interface CreateTicketDialogProps {
     triggerButton?: ReactNode; // Optional trigger button
 }
 
+const NONE_VALUE_SENTINEL = "__NONE_SENTINEL__";
+
 export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -170,7 +172,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     if (user.role === 'client') {
         providerForAction = user.company;
     } else if (user.role === 'admin' || user.role === 'superuser') {
-        providerForAction = values.provider;
+        providerForAction = values.provider; // This will be undefined if "Ninguna" was selected thanks to onValueChange
     }
 
     const ticketDataForAction = {
@@ -179,7 +181,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
       priority: values.priority!,
       requestingUserId: user.username!,
       provider: providerForAction, 
-      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined,
+      branch: (user.role === 'admin' || user.role === 'superuser') ? values.branch : undefined, // This will be undefined if "Ninguna" was selected
       attachmentNames: (user.role === 'admin' || user.role === 'superuser') ? attachmentNames : [],
     };
 
@@ -289,7 +291,7 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Prioridad</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccione prioridad" />
@@ -317,14 +319,19 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Organización (Proveedor)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <Select 
+                            onValueChange={(selectedValue) => {
+                                field.onChange(selectedValue === NONE_VALUE_SENTINEL ? undefined : selectedValue);
+                            }} 
+                            value={field.value || NONE_VALUE_SENTINEL}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione organización" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                             <SelectItem value="">-- Ninguna --</SelectItem>
+                             <SelectItem value={NONE_VALUE_SENTINEL}>-- Ninguna --</SelectItem>
                             {organizations.map(org => (
                               <SelectItem key={org.id} value={org.name}>
                                 {org.name}
@@ -342,14 +349,19 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Branch</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select 
+                            onValueChange={(selectedValue) => {
+                                field.onChange(selectedValue === NONE_VALUE_SENTINEL ? undefined : selectedValue);
+                            }} 
+                            value={field.value || NONE_VALUE_SENTINEL}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione branch" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                             <SelectItem value="">-- Ninguna --</SelectItem>
+                             <SelectItem value={NONE_VALUE_SENTINEL}>-- Ninguna --</SelectItem>
                             {ticketBranches.map(branch => (
                               <SelectItem key={branch} value={branch}>
                                 {branch}
@@ -415,3 +427,5 @@ export function CreateTicketDialog({ triggerButton }: CreateTicketDialogProps) {
     </Dialog>
   );
 }
+
+    
