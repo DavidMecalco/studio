@@ -323,29 +323,10 @@ export async function updateTicket(
   updates: TicketUpdatePayload
 ): Promise<Ticket | null> {
   
-  if (!isFirebaseProperlyConfigured || !db || !ticketsCollectionRef) {
-    console.error(
-      `[${SERVICE_NAME}] (updateTicket): Cannot update ticket ${ticketId}. `+
-      `isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}, db: ${!!db}, ticketsCollectionRef: ${!!ticketsCollectionRef}. ` +
-      `Firebase not properly configured, or db/collection instance is null.`
-    );
-    return null;
-  }
-  
-  let currentTicket: Ticket | null = null;
-  try {
-    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-    const docSnap = await getDoc(ticketDocRef);
-    if (docSnap.exists()) {
-        currentTicket = docSnap.data() as Ticket;
-    }
-  } catch (e) {
-      console.error(`[${SERVICE_NAME}] (updateTicket): Error fetching ticket ${ticketId} from Firestore before update:`, e);
-      return null; 
-  }
+  const currentTicket = await getTicketById(ticketId);
 
   if (!currentTicket) {
-    console.error(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} not found in Firestore.`);
+    console.error(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} not found.`);
     return null;
   }
 
@@ -425,28 +406,81 @@ export async function updateTicket(
     history: [...(currentTicket.history || []), ...historyEntriesToAdd],
   };
 
+  // Attempt to save to Firestore
+  if (isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
+    try {
+      const ticketDocRef = doc(ticketsCollectionRef, ticketId);
+      await setDoc(ticketDocRef, updatedTicketData);
+      console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in Firestore successfully.`);
 
-  try {
-    const ticketDocRef = doc(ticketsCollectionRef, ticketId);
-    await setDoc(ticketDocRef, updatedTicketData);
-    console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in Firestore.`);
-    
-    if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
         try {
-            const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-            let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
-            const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-            if (ticketIndex > -1) tickets[ticketIndex] = updatedTicketData; else tickets.push(updatedTicketData);
-            localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
-            console.log(`[${SERVICE_NAME}] (updateTicket): Local ticket cache updated after Firestore update.`);
+          const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+          let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+          const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+          if (ticketIndex > -1) {
+            tickets[ticketIndex] = updatedTicketData;
+          } else {
+            tickets.push(updatedTicketData);
+          }
+          localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+          console.log(`[${SERVICE_NAME}] (updateTicket): Local ticket cache updated after successful Firestore update.`);
         } catch (e) {
-            console.warn(`[${SERVICE_NAME}] (updateTicket): Failed to update localStorage cache for ticket ${ticketId} after Firestore update. Error:`, e);
+          console.warn(`[${SERVICE_NAME}] (updateTicket): Failed to update localStorage cache for ticket ${ticketId} after Firestore success. Error:`, e);
         }
+      }
+      return updatedTicketData;
+
+    } catch (firestoreError) {
+      console.error(`[${SERVICE_NAME}] (updateTicket): Error updating Ticket ${ticketId} in Firestore: `, firestoreError);
+      if (typeof window !== 'undefined') {
+        console.warn(`[${SERVICE_NAME}] (updateTicket): Firestore update failed for ${ticketId}. Attempting localStorage update only.`);
+        try {
+          const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+          let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+          const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+          if (ticketIndex > -1) {
+            tickets[ticketIndex] = updatedTicketData;
+          } else {
+            console.warn(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} not found in localStorage cache during fallback update, adding it.`);
+            tickets.push(updatedTicketData);
+          }
+          localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+          console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in localStorage (Firestore update failed).`);
+          return updatedTicketData;
+        } catch (localStorageError) {
+          console.error(`[${SERVICE_NAME}] (updateTicket): CRITICAL - Error updating ticket ${ticketId} in localStorage after Firestore failure. Error: `, localStorageError);
+          return null; 
+        }
+      } else {
+        return null;
+      }
     }
-    return updatedTicketData;
-  } catch (error) {
-    console.error(`[${SERVICE_NAME}] (updateTicket): Error updating Ticket ${ticketId} in Firestore: `, error);
-    return null; 
+  } else {
+    // Firebase not configured, attempt localStorage update only (if in client environment)
+    if (typeof window !== 'undefined') {
+      console.warn(`[${SERVICE_NAME}] (updateTicket): Firebase not configured. Attempting localStorage update for ticket ${ticketId}.`);
+      try {
+        const storedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+        let tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
+        const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+        if (ticketIndex > -1) {
+          tickets[ticketIndex] = updatedTicketData;
+        } else {
+          console.warn(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} not found in localStorage cache (Firebase not configured), adding it.`);
+          tickets.push(updatedTicketData);
+        }
+        localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+        console.log(`[${SERVICE_NAME}] (updateTicket): Ticket ${ticketId} updated in localStorage (Firebase not configured).`);
+        return updatedTicketData;
+      } catch (localStorageError) {
+        console.error(`[${SERVICE_NAME}] (updateTicket): Error updating ticket ${ticketId} in localStorage (Firebase not configured). Error: `, localStorageError);
+        return null;
+      }
+    } else {
+      console.error(`[${SERVICE_NAME}] (updateTicket): Cannot update ticket ${ticketId}. Firebase not configured and not in client environment for localStorage fallback.`);
+      return null;
+    }
   }
 }
 
