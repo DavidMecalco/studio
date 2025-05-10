@@ -41,7 +41,7 @@ if (db) { // Only initialize collection refs if db is available
 
 
 const MOCK_DATA_SEEDED_FLAG_V5 = 'mock_data_seeded_v5'; // Incremented version for reseeding if needed
-const LOCAL_STORAGE_USERS_KEY = 'firestore_mock_users_cache_v5';
+export const LOCAL_STORAGE_USERS_KEY = 'firestore_mock_users_cache_v5';
 const LOCAL_STORAGE_ORGS_KEY = 'firestore_mock_orgs_cache_v5';
 
 const usersToSeed: UserDoc[] = [
@@ -83,8 +83,10 @@ export async function ensureMockDataSeeded(): Promise<void> {
             const adminDoc = await getDoc(doc(usersCollectionRef, 'admin'));
             if (adminDoc.exists()) firestoreUsersSeeded = true;
         } else if (isFirebaseProperlyConfigured) {
-            firestoreUsersSeeded = false;
+            // If Firebase is configured but collection ref is null, implies an init issue.
+            firestoreUsersSeeded = false; 
         } else {
+             // If Firebase is NOT configured, we consider "Firestore" seeding as not applicable/skipped for this check.
              firestoreUsersSeeded = true; 
         }
 
@@ -109,12 +111,12 @@ export async function ensureMockDataSeeded(): Promise<void> {
   }
   
   if (!isSeededInLocalStorage) {
-    console.log(`[${SERVICE_NAME}] Attempting to seed initial mock data (v5) to localStorage...`);
+    console.log(`[${SERVICE_NAME}] Attempting to seed initial mock data (v5) to localStorage for users and organizations...`);
     try {
         localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
         localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
         localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V5, 'true');
-        console.log(`[${SERVICE_NAME}] Mock data (v5) seeded to localStorage. Seeding flag set.`);
+        console.log(`[${SERVICE_NAME}] Mock data (v5) for users and organizations seeded to localStorage. Seeding flag set.`);
     } catch (e) {
         console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed initial mock data (v5) to localStorage. Local fallback may not work. Error:`, e);
     }
@@ -152,12 +154,12 @@ export async function ensureMockDataSeeded(): Promise<void> {
       
       if (firestoreNeedsFullSeeding) {
         await batch.commit();
-        console.log(`[${SERVICE_NAME}] Initial data (v5) committed to Firestore.`);
+        console.log(`[${SERVICE_NAME}] Initial data (v5) for users/orgs committed to Firestore.`);
       } else {
         // console.log(`[${SERVICE_NAME}] Firestore already contains key mock data (v5) or relevant collections not available/configured for seeding. Skipping Firestore seed part if applicable.`);
       }
     } catch (error) {
-      console.warn(`[${SERVICE_NAME}] Error during Firestore seeding (v5) (client might be offline or other Firestore issue): `, error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore seeding (v5) for users/orgs (client might be offline or other Firestore issue): `, error);
     }
   } else if (typeof window !== 'undefined') { 
     let reason = "";
@@ -168,7 +170,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
     else if (!usersCollectionRef) reason += "Users collection reference is null. ";
     else if (!organizationsCollectionRef) reason += "Organizations collection reference is null. ";
     
-    // console.log(`[${SERVICE_NAME}] Skipping Firestore seeding operations (v5). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore seeding operations for users/orgs (v5). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 

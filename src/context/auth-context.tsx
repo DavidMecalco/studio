@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ensureMockDataSeeded } from '@/services/users'; // Import ensureMockDataSeeded
+import { ensureMockDataSeeded, LOCAL_STORAGE_USERS_KEY } from '@/services/users'; // Import ensureMockDataSeeded and LOCAL_STORAGE_USERS_KEY
 
 export interface User {
   id: string; // Unique ID, can be username or a generated UID
@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.email && parsedUser.role && parsedUser.name) {
              setUser(parsedUser);
           } else {
+              console.warn("Stored user data is incomplete or malformed. Clearing stored user.");
               localStorage.removeItem('authUser');
           }
         } catch (e) {
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     let authenticatedUser: User | null = null;
-    const allUsersString = localStorage.getItem('firestore_mock_users'); 
+    const allUsersString = localStorage.getItem(LOCAL_STORAGE_USERS_KEY); // Use the correct key from users service
     
     if (allUsersString) {
         try {
@@ -72,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (e) {
             console.error("Error parsing mock users from localStorage during login", e);
         }
+    } else {
+        console.warn(`localStorage item with key "${LOCAL_STORAGE_USERS_KEY}" not found during login attempt.`);
     }
     
     if (authenticatedUser) {
