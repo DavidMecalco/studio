@@ -12,11 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth-context";
-import { LogOut, User as UserIcon, UserCog, ShieldCheck } from "lucide-react"; 
+import { LogOut, User as UserIcon, UserCog, ShieldCheck, Moon, Sun } from "lucide-react"; 
 import Link from "next/link";
+import { useTheme } from "@/context/theme-context";
 
 export function UserNav() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   if (!isAuthenticated) {
     return (
@@ -70,8 +72,19 @@ export function UserNav() {
             </Link>
           </DropdownMenuItem>
         )}
-        {/* Separator only if there was a profile link */}
+        
         {(user.role === 'client' || user.role === 'admin' || user.role === 'superuser') && <DropdownMenuSeparator />}
+        
+        <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+          {theme === 'light' ? (
+            <Moon className="mr-2 h-4 w-4" />
+          ) : (
+            <Sun className="mr-2 h-4 w-4" />
+          )}
+          <span>Switch to {theme === 'light' ? 'Dark' : 'Light'} Mode</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
@@ -80,4 +93,3 @@ export function UserNav() {
     </DropdownMenu>
   );
 }
-

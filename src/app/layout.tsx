@@ -5,6 +5,7 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/auth-context';
+import { ThemeProvider } from '@/context/theme-context'; // Import ThemeProvider
 
 const fontSans = FontSans({
   subsets: ['latin'],
@@ -29,10 +30,12 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <AuthProvider>
-          {children}
-          <Toaster />
-        </AuthProvider>
+        <ThemeProvider> {/* Wrap AuthProvider and children with ThemeProvider */}
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
