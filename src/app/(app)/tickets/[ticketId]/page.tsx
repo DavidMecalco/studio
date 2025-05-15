@@ -192,7 +192,15 @@ export default function TicketDetailPage() {
             {canManageTicketAdminActions && allUsers.length > 0 && (
                 <>
                     <Separator/>
-                    <TicketAdminActions ticket={ticket} users={allUsers} onTicketUpdate={refreshTicketData} />
+                     <div className="pt-2">
+                        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-foreground">
+                            <Edit className="h-5 w-5 text-primary" /> Manage Ticket
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Update status, priority, type, or assignee.
+                        </p>
+                        <TicketAdminActions ticket={ticket} users={allUsers} onTicketUpdate={refreshTicketData} />
+                    </div>
                 </>
             )}
 
@@ -312,6 +320,17 @@ function TicketDetailLoadingSkeleton() {
             <Skeleton className="h-20 w-full rounded-md" /> {/* Description Content */}
           </div>
           
+          <Skeleton className="h-px w-full" /> {/* Admin Actions Skeleton (if applicable) */}
+          <div className="pt-2 space-y-3">
+            <Skeleton className="h-6 w-1/3 mb-1" /> {/* Admin Actions Title */}
+            <Skeleton className="h-4 w-3/4 mb-3" /> {/* Admin Actions Description */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => <Skeleton key={`admin-action-item-${i}`} className="h-10 w-full" />)}
+            </div>
+            <Skeleton className="h-10 w-1/4" /> {/* Update button */}
+          </div>
+
+
           <Skeleton className="h-px w-full" />
           <div>
             <Skeleton className="h-6 w-1/3 mb-3" /> {/* Associated Commits Title */}
@@ -344,8 +363,14 @@ function TicketDetailLoadingSkeleton() {
             <Skeleton className="h-24 w-full" /> {/* Commit message textarea */}
             <Skeleton className="h-10 w-full" /> {/* Branch select */}
             <Skeleton className="h-10 w-1/3" /> {/* Submit button */}
+            <Skeleton className="h-px w-full my-3" />
+            <Skeleton className="h-6 w-1/2 mb-1" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-10 w-full" /> {/* Restore commit select */}
+            <Skeleton className="h-10 w-2/5" /> {/* Restore button */}
         </CardContent>
       </Card>
     </div>
   );
 }
+

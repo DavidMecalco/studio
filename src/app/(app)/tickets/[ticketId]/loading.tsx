@@ -41,8 +41,16 @@ export default function TicketDetailLoading() {
             <Skeleton className="h-20 w-full rounded-md" /> {/* Description Content */}
           </div>
           
-          <Skeleton className="h-px w-full" /> {/* Admin Actions Skeleton (if applicable) */}
-          <Skeleton className="h-32 w-full rounded-md" />
+          <Skeleton className="h-px w-full" /> 
+           <div className="pt-2 space-y-3"> {/* Admin Actions Skeleton */}
+            <Skeleton className="h-6 w-1/3 mb-1" /> {/* Admin Actions Title */}
+            <Skeleton className="h-4 w-3/4 mb-3" /> {/* Admin Actions Description */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => <Skeleton key={`admin-action-item-skel-${i}`} className="h-10 w-full" />)}
+            </div>
+            <Skeleton className="h-10 w-1/4" /> {/* Update button */}
+          </div>
+
 
           <Skeleton className="h-px w-full" />
           <div>
@@ -87,3 +95,4 @@ export default function TicketDetailLoading() {
     </div>
   );
 }
+
