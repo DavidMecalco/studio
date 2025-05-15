@@ -9,8 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from '@/context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CompanyLogo from '@/components/layout/company-logo';
-import { Mail, Lock } from 'lucide-react';
-import Image from 'next/image';
+import { Mail, Lock, Loader2 } from 'lucide-react'; // Added Loader2
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -45,18 +44,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <div className="mb-8 w-full max-w-sm">
-        <Image
-          src="https://placehold.co/600x200.png"
-          alt="Maximo Version Portal Banner"
-          width={600}
-          height={200}
-          className="w-full h-auto rounded-lg object-cover shadow-lg"
-          priority
-          data-ai-hint="enterprise technology"
-        />
-      </div>
-      <Card className="w-full max-w-sm shadow-xl">
+      {/* Banner removed from here */}
+      <Card className="w-full max-w-sm shadow-xl mt-8"> {/* Added mt-8 for spacing after banner removal */}
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
             <CompanyLogo className="h-12 w-auto" />
@@ -100,7 +89,14 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
             </Button>
           </form>
         </CardContent>
