@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from '@/context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CompanyLogo from '@/components/layout/company-logo';
-import { Mail, Lock, Loader2 } from 'lucide-react'; // Added Loader2
+import { Mail, Lock, Loader2, LogIn } from 'lucide-react'; 
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,67 +43,78 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      {/* Banner removed from here */}
-      <Card className="w-full max-w-sm shadow-xl mt-8"> {/* Added mt-8 for spacing after banner removal */}
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <CompanyLogo className="h-12 w-auto" />
-          </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>Enter your email and password to access your account.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="pl-10"
-                />
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 p-4 selection:bg-primary/20">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <CompanyLogo className="mx-auto h-16 w-auto mb-6 text-primary" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome to Maximo Portal
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Your gateway to efficient Maximo version management.
+          </p>
+        </div>
+
+        <Card className="shadow-2xl rounded-xl border-border/50">
+          <CardHeader className="p-6 sm:p-8">
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <LogIn className="h-6 w-6 text-primary" /> Secure Login
+            </CardTitle>
+            <CardDescription>Enter your credentials to access your dashboard.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 sm:p-8 pt-0">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="pl-10 h-11 text-base"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="pl-10"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                 <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="pl-10 h-11 text-base"
+                  />
+                </div>
               </div>
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Logging in...
-                </>
-              ) : (
-                'Login'
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-       <p className="mt-4 text-center text-sm text-muted-foreground">
-        Hint: Use any seeded email and its corresponding password (e.g., `admin@portal.com` / `password`).
-      </p>
+              {error && <p className="text-sm text-destructive font-medium text-center py-2 px-3 bg-destructive/10 rounded-md">{error}</p>}
+              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+         <p className="mt-6 text-center text-sm text-muted-foreground">
+          Hint: Use any seeded email and its corresponding password (e.g., `admin@portal.com` / `password`).
+        </p>
+      </div>
     </div>
   );
 }
+
