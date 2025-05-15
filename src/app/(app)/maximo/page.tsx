@@ -14,14 +14,14 @@ export default function MaximoManagementPage() {
   const canViewPage = user?.role === 'admin' || user?.role === 'superuser';
 
   // Show skeleton if auth is loading OR if page content is loading and user has permission
-  if (authLoading || (!authLoading && canViewPage && !user)) { // Simpler loading condition, adjust if page has its own data fetching state
+  if (authLoading || (!authLoading && canViewPage && !user)) { 
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-2">
           <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-7 w-64" /> {/* Adjusted width for title */}
         </div>
-        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-4/5" /> {/* Adjusted width for description */}
         <Card>
           <CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader>
           <CardContent><Skeleton className="h-40 w-full" /></CardContent>
@@ -35,7 +35,7 @@ export default function MaximoManagementPage() {
     );
   }
 
-  if (!canViewPage && !authLoading) { // Check after auth completes
+  if (!canViewPage && !authLoading) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -45,17 +45,16 @@ export default function MaximoManagementPage() {
     );
   }
   
-  // If user is loaded and has permission, render the page content
   if (canViewPage && user) {
       return (
         <div className="space-y-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                <Server className="h-8 w-8 text-primary" /> Maximo Management
+                <Server className="h-8 w-8 text-primary" /> Maximo Configuration & File Management
               </h1>
               <p className="text-muted-foreground">
-                Upload configurations and manage files for Maximo.
+                Upload specific Maximo configurations (scripts, XMLs) or manage general project files.
               </p>
             </div>
           </div>
@@ -69,6 +68,6 @@ export default function MaximoManagementPage() {
       );
   }
   
-  // Fallback, should ideally not be reached if logic above is correct
   return null; 
 }
+

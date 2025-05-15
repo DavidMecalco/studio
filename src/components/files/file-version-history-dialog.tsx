@@ -19,7 +19,7 @@ import { useAuth } from '@/context/auth-context';
 import { History, GitCommit, User, CalendarDays, RefreshCcw, Loader2, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '../ui/separator';
+import { Separator } from '@/components/ui/separator'; // Corrected import path
 
 interface FileVersionHistoryDialogProps {
   fileName: string;
@@ -60,7 +60,7 @@ export function FileVersionHistoryDialog({
     }
     setIsRestoring(version.id);
     const result = await restoreFileVersionAction(
-      user.username,
+      user.id, // Changed from user.username to user.id for consistency
       fileName,
       version.id,
       version.commitSha,
@@ -134,15 +134,15 @@ export function FileVersionHistoryDialog({
                         ) : (
                           <RefreshCcw className="mr-2 h-4 w-4" />
                         )}
-                        {index === 0 ? "Es Actual" : (isRestoring === version.id ? "Restaurando..." : "Restaurar esta Versión")}
+                        {index === 0 ? "Current Version" : (isRestoring === version.id ? "Restoring..." : "Restore this Version")}
                       </Button>
                   </div>
+                  {version.message && <p className="mt-2 text-sm font-medium text-card-foreground">{version.message}</p>}
                   <Separator className="my-3"/>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    {version.message && <p className="font-medium text-card-foreground">{version.message}</p>}
-                    <p className="flex items-center gap-1"><GitCommit className="h-4 w-4" /> Commit: <span className="font-mono text-xs">{version.commitSha}</span></p>
-                    <p className="flex items-center gap-1"><User className="h-4 w-4" /> Author: {version.author}</p>
-                    <p className="flex items-center gap-1"><CalendarDays className="h-4 w-4" /> Date: {format(parseISO(version.timestamp), "PPP p")}</p>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1"><GitCommit className="h-3.5 w-3.5" /> Commit: <span className="font-mono">{version.commitSha}</span></p>
+                    <p className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> Author: {version.author}</p>
+                    <p className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> Date: {format(parseISO(version.timestamp), "PPP p")}</p>
                   </div>
                 </li>
               ))}
@@ -159,3 +159,4 @@ export function FileVersionHistoryDialog({
     </Dialog>
   );
 }
+
