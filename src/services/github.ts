@@ -40,47 +40,56 @@ if (db) {
   console.warn(`[SERVICE_INIT ${SERVICE_NAME}] Firestore db instance is null. commitsCollectionRef not initialized. isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}`);
 }
 
-const MOCK_GITHUB_SEEDED_FLAG_V6 = 'mock_github_seeded_v6'; 
-const LOCAL_STORAGE_GITHUB_KEY = 'firestore_mock_github_commits_cache_v6'; 
+const MOCK_GITHUB_SEEDED_FLAG_V7 = 'mock_github_seeded_v7'; // Incremented version
+const LOCAL_STORAGE_GITHUB_KEY = 'firestore_mock_github_commits_cache_v7'; // Incremented version
 
-const getRandomPastDateISO = () => {
-  const now = new Date();
-  const randomDaysAgo = Math.floor(Math.random() * 30);
-  now.setDate(now.getDate() - randomDaysAgo);
-  return now.toISOString();
+const getDateDaysAgo = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString();
 };
 
 const commitsToSeed: GitHubCommit[] = [
     {
-      sha: 'a1b2c3d4e5f6', message: 'Feat: Implement user authentication module', author: 'alice-wonderland',
-      url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6', date: getRandomPastDateISO(),
-      filesChanged: ['auth.py', 'user_model.py'], ticketId: 'MAS-001', branch: 'dev' 
+      sha: 'a1b2c3d4e5f6', message: 'MAS-001: Feat: Implementar dashboard de cliente TLA', author: 'admin',
+      url: 'https://github.com/example/repo/commit/a1b2c3d4e5f6', date: getDateDaysAgo(2),
+      filesChanged: ['dashboard_tla.tsx', 'data_service_tla.ts'], ticketId: 'MAS-001', branch: 'feat/tla-dashboard' 
     },
     {
-      sha: 'f6e5d4c3b2a1', message: 'Fix: Resolve issue in payment processing', author: 'bob-the-builder',
-      url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1', date: getRandomPastDateISO(),
-      filesChanged: ['payment.js', 'checkout.xml'], ticketId: 'MAS-002', branch: 'main' 
+      sha: 'f6e5d4c3b2a1', message: 'MAS-002: Fix: Corregir cálculo en reporte financiero FEMA', author: 'alice-wonderland',
+      url: 'https://github.com/example/repo/commit/f6e5d4c3b2a1', date: getDateDaysAgo(1),
+      filesChanged: ['report_fema.py', 'test_report_fema.py'], ticketId: 'MAS-002', branch: 'fix/fema-report-calc' 
     },
     {
-      sha: 'c7g8h9i0j1k2', message: 'Chore: Update dependencies and configuration', author: 'admin',
-      url: 'https://github.com/example/repo/commit/c7g8h9i0j1k2', date: getRandomPastDateISO(),
-      branch: 'dev'
+      sha: 'c7g8h9i0j1k2', message: 'Chore: Actualizar dependencias de CI', author: 'dave-grohl',
+      url: 'https://github.com/example/repo/commit/c7g8h9i0j1k2', date: getDateDaysAgo(3),
+      branch: 'devops', filesChanged: ['package.json', 'Jenkinsfile']
     },
     {
-      sha: 'l3m4n5o6p7q8', message: 'Docs: Add API documentation for new endpoints', author: 'alice-wonderland',
-      url: 'https://github.com/example/repo/commit/l3m4n5o6p7q8', date: getRandomPastDateISO(),
-      branch: 'docs'
+      sha: 'l3m4n5o6p7q8', message: 'MAS-004: Hotfix: Resolver error crítico API OtherCompany', author: 'bob-the-builder',
+      url: 'https://github.com/example/repo/commit/l3m4n5o6p7q8', date: getDateDaysAgo(0),
+      branch: 'hotfix/othercompany-api', filesChanged: ['integration_other_company.java'], ticketId: 'MAS-004'
     },
     {
-      sha: 'r9s0t1u2v3w4', message: 'Refactor: Optimize database query performance', author: 'bob-the-builder',
+      sha: 'r9s0t1u2v3w4', message: 'MAS-005: Refactor: Optimizar queries en GovSector', author: 'carol-danvers',
       url: 'https://github.com/example/repo/commit/r9s0t1u2v3w4',
-      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      filesChanged: ['query_optimizer.sql'], ticketId: 'MAS-003', branch: 'perf-opt' 
+      date: getDateDaysAgo(8),
+      filesChanged: ['govsector_queries.sql', 'report_builder.py'], ticketId: 'MAS-005', branch: 'perf/govsector-db' 
     },
     {
-      sha: 'x5y6z7a8b9c0', message: 'Style: Improve UI consistency across pages', author: 'admin',
+      sha: 'x5y6z7a8b9c0', message: 'MAS-007: Style: Ajustar estilos de login TLA', author: 'admin',
       url: 'https://github.com/example/repo/commit/x5y6z7a8b9c0',
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), branch: 'ui-fixes'
+      date: getDateDaysAgo(4), branch: 'fix/tla-login-style', filesChanged: ['login.css', 'auth_tla.tsx'], ticketId: 'MAS-007'
+    },
+    {
+      sha: '0a9b8c7d6e5f', message: 'MAS-001: Feat: Agregar paginación a tabla de tickets TLA', author: 'admin',
+      url: 'https://github.com/example/repo/commit/0a9b8c7d6e5f', date: getDateDaysAgo(1),
+      filesChanged: ['ticket_table_tla.tsx'], ticketId: 'MAS-001', branch: 'feat/tla-dashboard'
+    },
+    {
+      sha: '1f2e3d4c5b6a', message: 'MAS-002: Test: Cobertura de pruebas para cálculo FEMA', author: 'alice-wonderland',
+      url: 'https://github.com/example/repo/commit/1f2e3d4c5b6a', date: getDateDaysAgo(0),
+      filesChanged: ['test_report_fema_edge_cases.py'], ticketId: 'MAS-002', branch: 'fix/fema-report-calc'
     }
 ];
 
@@ -92,13 +101,13 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
     return;
   }
 
-  const isSeededInLocalStorage = localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V6) === 'true';
+  const isSeededInLocalStorage = localStorage.getItem(MOCK_GITHUB_SEEDED_FLAG_V7) === 'true';
 
    if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && commitsCollectionRef) {
     try {
         const firstCommit = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
         if (firstCommit.exists()) {
-            // console.log(`[${SERVICE_NAME}] Mock data (v6) already confirmed in Firestore. Skipping further seeding checks.`);
+            // console.log(`[${SERVICE_NAME}] Mock data (v7) already confirmed in Firestore. Skipping further seeding checks.`);
             return;
         }
     } catch(e) {
@@ -107,10 +116,10 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
   }
 
   if (!isSeededInLocalStorage) {
-    console.log(`[${SERVICE_NAME}] Attempting to seed GitHub mock data (v6) to localStorage...`);
+    console.log(`[${SERVICE_NAME}] Attempting to seed GitHub mock data (v7) to localStorage...`);
     localStorage.setItem(LOCAL_STORAGE_GITHUB_KEY, JSON.stringify(commitsToSeed));
-    localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V6, 'true');
-    console.log(`[${SERVICE_NAME}] GitHub mock data (v6) seeded to localStorage. Seeding flag set.`);
+    localStorage.setItem(MOCK_GITHUB_SEEDED_FLAG_V7, 'true');
+    console.log(`[${SERVICE_NAME}] GitHub mock data (v7) seeded to localStorage. Seeding flag set.`);
   }
   
 
@@ -119,17 +128,17 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
       const firstCommitSnap = await getDoc(doc(commitsCollectionRef, commitsToSeed[0].sha));
       if (!firstCommitSnap.exists()) {
         const batch = writeBatch(db);
-        console.log(`[${SERVICE_NAME}] Preparing to seed GitHub commits to Firestore (v6)...`);
+        console.log(`[${SERVICE_NAME}] Preparing to seed GitHub commits to Firestore (v7)...`);
         for (const commitData of commitsToSeed) {
           batch.set(doc(commitsCollectionRef, commitData.sha), commitData);
         }
         await batch.commit();
-        console.log(`[${SERVICE_NAME}] Initial GitHub commits (v6) committed to Firestore.`);
+        console.log(`[${SERVICE_NAME}] Initial GitHub commits (v7) committed to Firestore.`);
       } else {
-        // console.log(`[${SERVICE_NAME}] Firestore already contains key GitHub mock data (v6). Skipping Firestore GitHub seed.`);
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key GitHub mock data (v7). Skipping Firestore GitHub seed.`);
       }
     } catch (error) {
-      console.warn(`[${SERVICE_NAME}] Error during Firestore GitHub seeding (v6): `, error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore GitHub seeding (v7): `, error);
     }
   } else if (typeof window !== 'undefined'){
     let reason = "";
@@ -137,7 +146,7 @@ async function ensureGitHubMockDataSeeded(): Promise<void> {
     else if (!db) reason += "Firestore db instance is null. ";
     else if (!commitsCollectionRef) reason += "commitsCollectionRef is null. ";
     else if (!navigator.onLine) reason += "Client is offline. ";
-    // console.log(`[${SERVICE_NAME}] Skipping Firestore GitHub seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore GitHub seeding (v7). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 
@@ -157,9 +166,15 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
       if (ticketIdOrProjectId === "ALL_PROJECTS") {
         q = query(commitsCollectionRef, orderBy("date", "desc"), limit(50)); 
       } else {
+        // Assuming ticketIdOrProjectId is a ticket ID if it contains '-', otherwise it's a project/repo ID
         if (ticketIdOrProjectId.includes('-')) { 
              q = query(commitsCollectionRef, where("ticketId", "==", ticketIdOrProjectId), orderBy("date", "desc"));
         } else { 
+            // This is a simplification. In a real app, you'd query by a project/repo field.
+            // For mock, we'll filter by messages or branch containing the project ID.
+            // This part is tricky with Firestore unless commits have a dedicated 'projectId' field.
+            // For now, this query might return 0 if no ticketId matches and it's not "ALL_PROJECTS".
+            // Local filtering below will handle non-ticketId cases.
             q = query(commitsCollectionRef, where("ticketId", "==", `dummy-value-for-repo-${ticketIdOrProjectId}`), orderBy("date", "desc"));
         }
       }
@@ -188,6 +203,7 @@ export async function getGitHubCommits(ticketIdOrProjectId: string): Promise<Git
         console.warn(`[${SERVICE_NAME}] Fetching GitHub commits for ${ticketIdOrProjectId} from localStorage (Firestore unavailable or offline).`);
         let commits: GitHubCommit[] = JSON.parse(storedCommits);
         if (ticketIdOrProjectId !== "ALL_PROJECTS") {
+          // Filter by ticketId OR if message/branch contains the ID (as a fallback for project ID search)
           commits = commits.filter(commit => commit.ticketId === ticketIdOrProjectId || commit.message.includes(ticketIdOrProjectId) || commit.branch?.includes(ticketIdOrProjectId));
         }
         return commits.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());

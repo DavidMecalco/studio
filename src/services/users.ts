@@ -40,20 +40,24 @@ if (db) { // Only initialize collection refs if db is available
 }
 
 
-const MOCK_DATA_SEEDED_FLAG_V5 = 'mock_data_seeded_v5'; // Incremented version for reseeding if needed
-export const LOCAL_STORAGE_USERS_KEY = 'firestore_mock_users_cache_v5';
-const LOCAL_STORAGE_ORGS_KEY = 'firestore_mock_orgs_cache_v5';
+const MOCK_DATA_SEEDED_FLAG_V6 = 'mock_data_seeded_v6'; // Incremented version
+export const LOCAL_STORAGE_USERS_KEY = 'firestore_mock_users_cache_v6'; // Incremented version
+const LOCAL_STORAGE_ORGS_KEY = 'firestore_mock_orgs_cache_v6'; // Incremented version
 
 const usersToSeed: UserDoc[] = [
   { id: 'admin', username: 'admin', name: 'Administrator Portal', email: 'admin@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: '555-0000', position: 'System Administrator' },
   { id: 'superuser', username: 'superuser', name: 'Super Usuario Portal', email: 'superuser@portal.com', password: 'password', role: 'superuser', company: 'System Corp', phone: '555-9999', position: 'System Super User' },
-  { id: 'client-tla1', username: 'client-tla1', name: 'Cliente TLA Primario', email: 'client.tla1@example.com', password: 'password', role: 'client', company: 'TLA', phone: '555-0101', position: 'Client User' },
-  { id: 'client-fema1', username: 'client-fema1', name: 'Cliente FEMA Primario', email: 'client.fema1@example.com', password: 'password', role: 'client', company: 'FEMA', phone: '555-0202', position: 'Client User' },
-  { id: 'client-generic1', username: 'client-generic1', name: 'Cliente Genérico Uno', email: 'client.generic1@example.com', password: 'password', role: 'client', company: 'Other Company', phone: '555-0303', position: 'Client User' },
+  { id: 'client-tla1', username: 'client-tla1', name: 'Cliente TLA Principal', email: 'client.tla1@example.com', password: 'password', role: 'client', company: 'TLA', phone: '555-0101', position: 'Project Lead' },
+  { id: 'client-fema1', username: 'client-fema1', name: 'Cliente FEMA Principal', email: 'client.fema1@example.com', password: 'password', role: 'client', company: 'FEMA', phone: '555-0202', position: 'IT Manager' },
+  { id: 'client-generic1', username: 'client-generic1', name: 'Cliente Genérico Uno', email: 'client.generic1@example.com', password: 'password', role: 'client', company: 'Other Company', phone: '555-0303', position: 'Operations Head' },
   { id: 'client-tla2', username: 'client-tla2', name: 'Cliente TLA Secundario', email: 'client.tla2@example.com', password: 'password', role: 'client', company: 'TLA', phone: '555-0102', position: 'Client Contact' },
   { id: 'another-admin', username: 'another-admin', name: 'Técnico Secundario', email: 'tech2@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: '555-0001', position: 'Technician' },
   { id: 'alice-wonderland', username: 'alice-wonderland', name: 'Alice Wonderland', email: 'alice@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
-  { id: 'bob-the-builder', username: 'bob-the-builder', name: 'Bob The Builder', email: 'bob@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Developer' },
+  { id: 'bob-the-builder', username: 'bob-the-builder', name: 'Bob The Builder', email: 'bob@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'Lead Developer' },
+  { id: 'carol-danvers', username: 'carol-danvers', name: 'Carol Danvers', email: 'carol@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: '555-0003', position: 'Senior Technician' },
+  { id: 'dave-grohl', username: 'dave-grohl', name: 'Dave Grohl', email: 'dave@portal.com', password: 'password', role: 'admin', company: 'Maximo Corp', phone: 'N/A', position: 'DevOps Engineer' },
+  { id: 'client-gov1', username: 'client-gov1', name: 'Cliente Sector Gobierno', email: 'client.gov1@example.com', password: 'password', role: 'client', company: 'GovSector', phone: '555-0404', position: 'Procurement Officer' },
+  { id: 'client-energy1', username: 'client-energy1', name: 'Cliente Sector Energia', email: 'client.energy1@example.com', password: 'password', role: 'client', company: 'EnergyCorp', phone: '555-0505', position: 'Field Operations Manager' },
 ];
 
 const orgsToSeed: Organization[] = [
@@ -62,6 +66,8 @@ const orgsToSeed: Organization[] = [
   { id: 'system-corp', name: 'System Corp' },
   { id: 'maximo-corp', name: 'Maximo Corp' },
   { id: 'other-company', name: 'Other Company', githubRepository: 'maximo-generic' },
+  { id: 'govsector', name: 'GovSector', githubRepository: 'maximo-gov' },
+  { id: 'energycorp', name: 'EnergyCorp', githubRepository: 'maximo-energy' },
 ];
 
 export async function ensureMockDataSeeded(): Promise<void> {
@@ -72,7 +78,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
     return;
   }
 
-  const isSeededInLocalStorage = localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V5) === 'true';
+  const isSeededInLocalStorage = localStorage.getItem(MOCK_DATA_SEEDED_FLAG_V6) === 'true';
 
   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db) {
     try {
@@ -101,7 +107,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
         }
         
         if (firestoreUsersSeeded && firestoreOrgsSeeded) {
-            // console.log(`[${SERVICE_NAME}] Mock data (v5) already confirmed in Firestore or not applicable. Skipping further seeding checks.`);
+            // console.log(`[${SERVICE_NAME}] Mock data (v6) already confirmed in Firestore or not applicable. Skipping further seeding checks.`);
             return; 
         }
 
@@ -111,14 +117,14 @@ export async function ensureMockDataSeeded(): Promise<void> {
   }
   
   if (!isSeededInLocalStorage) {
-    console.log(`[${SERVICE_NAME}] Attempting to seed initial mock data (v5) to localStorage for users and organizations...`);
+    console.log(`[${SERVICE_NAME}] Attempting to seed initial mock data (v6) to localStorage for users and organizations...`);
     try {
         localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(usersToSeed));
         localStorage.setItem(LOCAL_STORAGE_ORGS_KEY, JSON.stringify(orgsToSeed));
-        localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V5, 'true');
-        console.log(`[${SERVICE_NAME}] Mock data (v5) for users and organizations seeded to localStorage. Seeding flag set.`);
+        localStorage.setItem(MOCK_DATA_SEEDED_FLAG_V6, 'true');
+        console.log(`[${SERVICE_NAME}] Mock data (v6) for users and organizations seeded to localStorage. Seeding flag set.`);
     } catch (e) {
-        console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed initial mock data (v5) to localStorage. Local fallback may not work. Error:`, e);
+        console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed initial mock data (v6) to localStorage. Local fallback may not work. Error:`, e);
     }
   }
 
@@ -132,7 +138,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
         const adminUserDocSnap = await getDoc(doc(usersCollectionRef, "admin"));
         if (!adminUserDocSnap.exists()) {
           firestoreNeedsFullSeeding = true;
-          console.log(`[${SERVICE_NAME}] Preparing to seed users to Firestore (v5)...`);
+          console.log(`[${SERVICE_NAME}] Preparing to seed users to Firestore (v6)...`);
           for (const userData of usersToSeed) {
             const { id, ...dataToSeed } = userData; 
             batch.set(doc(usersCollectionRef, id), dataToSeed);
@@ -144,7 +150,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
         const tlaOrgDocSnap = await getDoc(doc(organizationsCollectionRef, "tla"));
         if (!tlaOrgDocSnap.exists()) {
           firestoreNeedsFullSeeding = true;
-          console.log(`[${SERVICE_NAME}] Preparing to seed organizations to Firestore (v5)...`);
+          console.log(`[${SERVICE_NAME}] Preparing to seed organizations to Firestore (v6)...`);
           for (const orgData of orgsToSeed) {
              const { id, ...dataToSeed } = orgData; 
             batch.set(doc(organizationsCollectionRef, id), dataToSeed);
@@ -154,12 +160,12 @@ export async function ensureMockDataSeeded(): Promise<void> {
       
       if (firestoreNeedsFullSeeding) {
         await batch.commit();
-        console.log(`[${SERVICE_NAME}] Initial data (v5) for users/orgs committed to Firestore.`);
+        console.log(`[${SERVICE_NAME}] Initial data (v6) for users/orgs committed to Firestore.`);
       } else {
-        // console.log(`[${SERVICE_NAME}] Firestore already contains key mock data (v5) or relevant collections not available/configured for seeding. Skipping Firestore seed part if applicable.`);
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key mock data (v6) or relevant collections not available/configured for seeding. Skipping Firestore seed part if applicable.`);
       }
     } catch (error) {
-      console.warn(`[${SERVICE_NAME}] Error during Firestore seeding (v5) for users/orgs (client might be offline or other Firestore issue): `, error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore seeding (v6) for users/orgs (client might be offline or other Firestore issue): `, error);
     }
   } else if (typeof window !== 'undefined') { 
     let reason = "";
@@ -170,7 +176,7 @@ export async function ensureMockDataSeeded(): Promise<void> {
     else if (!usersCollectionRef) reason += "Users collection reference is null. ";
     else if (!organizationsCollectionRef) reason += "Organizations collection reference is null. ";
     
-    // console.log(`[${SERVICE_NAME}] Skipping Firestore seeding operations for users/orgs (v5). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore seeding operations for users/orgs (v6). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 
@@ -250,7 +256,7 @@ export async function getUserById(userId: string): Promise<UserDoc | undefined> 
     if (storedUsers) {
       try {
         const users: UserDoc[] = JSON.parse(storedUsers);
-        const user = users.find(u => u.id === userId);
+        const user = users.find(u => u.id === userId || u.username === userId);
         if (user) {
             console.warn(`[${SERVICE_NAME}] Fetching user ${userId} from localStorage (Firestore unavailable or offline, or server-side access failed).`);
             return user;
@@ -280,7 +286,7 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
       try {
         const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
         let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-        const userIndex = users.findIndex(u => u.id === userData.id);
+        const userIndex = users.findIndex(u => u.id === userData.id || u.username === userData.username);
         const userToCache: UserDoc = { ...userData, password: userData.password! }; 
         if (userIndex > -1) users[userIndex] = userToCache; else users.push(userToCache);
         localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
@@ -307,7 +313,7 @@ export async function createUserInFirestoreService(userData: AuthContextUserType
         try {
             const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
             let users: UserDoc[] = storedUsers ? JSON.parse(storedUsers) : [];
-            const userIndex = users.findIndex(u => u.id === userData.id);
+            const userIndex = users.findIndex(u => u.id === userData.id || u.username === userData.username);
             const userToCache: UserDoc = { ...userData, password: userData.password! }; 
             if (userIndex > -1) users[userIndex] = userToCache; else users.push(userToCache);
             localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
@@ -468,4 +474,3 @@ export async function getOrganizationById(orgId: string): Promise<Organization |
   console.warn(`[${SERVICE_NAME}] Organization ${orgId} not found. (Server-side context and Firestore is unavailable/not configured).`);
   return undefined;
 }
-

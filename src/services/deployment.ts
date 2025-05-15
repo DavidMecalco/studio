@@ -28,34 +28,52 @@ if (db) {
   console.warn(`[SERVICE_INIT ${SERVICE_NAME}] Firestore db instance is null. deploymentLogsCollectionRef not initialized. isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}`);
 }
 
-const MOCK_DEPLOYMENT_SEEDED_FLAG_V5 = 'mock_deployment_seeded_v5';
-const LOCAL_STORAGE_DEPLOYMENTS_KEY = 'firestore_mock_deployments_cache_v5';
+const MOCK_DEPLOYMENT_SEEDED_FLAG_V6 = 'mock_deployment_seeded_v6'; // Incremented version
+const LOCAL_STORAGE_DEPLOYMENTS_KEY = 'firestore_mock_deployments_cache_v6'; // Incremented version
+
+const getDateDaysAgo = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString();
+};
 
 const deploymentsToSeed: DeploymentLogEntry[] = [
     {
         id: 'deploy-1',
-        timestamp: '2024-07-25T10:00:00Z',
+        timestamp: getDateDaysAgo(2),
         userId: 'admin',
-        filesDeployed: [
-          { name: 'script_ABC.py', version: '1.2', type: 'script' },
-          { name: 'config_XYZ.xml', type: 'xml' },
-        ],
-        environment: 'DEV',
-        status: 'Success',
-        resultCode: '200',
-        ticketIds: ['MAS-001'], // Updated to local ticket ID format
-      },
-      {
+        filesDeployed: [ { name: 'script_ABC.py', version: '1.2', type: 'script' }, { name: 'config_XYZ.xml', type: 'xml' } ],
+        environment: 'DEV', status: 'Success', resultCode: '200', ticketIds: ['MAS-001'],
+    },
+    {
         id: 'deploy-2',
-        timestamp: '2024-07-26T14:30:00Z',
+        timestamp: getDateDaysAgo(1),
         userId: 'another-admin',
         filesDeployed: [{ name: 'report_finance.rptdesign', type: 'report' }],
-        environment: 'QA',
-        status: 'Failure',
-        resultCode: '500',
-        message: 'Database connection timeout during deployment.',
-        ticketIds: ['MAS-002'], // Updated to local ticket ID format
-      },
+        environment: 'QA', status: 'Failure', resultCode: '500',
+        message: 'Database connection timeout during deployment.', ticketIds: ['MAS-002'],
+    },
+    {
+        id: 'deploy-3',
+        timestamp: getDateDaysAgo(0),
+        userId: 'bob-the-builder',
+        filesDeployed: [{ name: 'hotfix_api_integration.py', version: '1.0.1', type: 'script' }],
+        environment: 'PROD', status: 'Success', resultCode: '200', ticketIds: ['MAS-004'],
+    },
+    {
+        id: 'deploy-4',
+        timestamp: getDateDaysAgo(10),
+        userId: 'carol-danvers',
+        filesDeployed: [{ name: 'training_material_update.zip', type: 'other' }, { name: 'user_guide_v3.pdf', type: 'other' }],
+        environment: 'Other', status: 'Success', resultCode: 'N/A', ticketIds: ['MAS-006'], message: 'Training materials uploaded to portal.'
+    },
+    {
+        id: 'deploy-5',
+        timestamp: getDateDaysAgo(3),
+        userId: 'admin',
+        filesDeployed: [{ name: 'login_module_patch.py', version: '2.1.1', type: 'script'}],
+        environment: 'PROD', status: 'In Progress', ticketIds: ['MAS-007'], message: 'Rolling out patch for login issue.'
+    }
 ];
 
 async function ensureDeploymentMockDataSeeded(): Promise<void> {
@@ -66,13 +84,13 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
     return;
   }
 
-  const isSeededInLocalStorage = localStorage.getItem(MOCK_DEPLOYMENT_SEEDED_FLAG_V5) === 'true';
+  const isSeededInLocalStorage = localStorage.getItem(MOCK_DEPLOYMENT_SEEDED_FLAG_V6) === 'true';
 
   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && deploymentLogsCollectionRef) {
       try {
         const firstLog = await getDoc(doc(deploymentLogsCollectionRef, deploymentsToSeed[0].id));
         if (firstLog.exists()) {
-            // console.log(`[${SERVICE_NAME}] Mock data (v5) already confirmed in Firestore. Skipping further seeding checks.`);
+            // console.log(`[${SERVICE_NAME}] Mock data (v6) already confirmed in Firestore. Skipping further seeding checks.`);
             return;
         }
     } catch (e) {
@@ -81,10 +99,10 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
   }
 
   if (!isSeededInLocalStorage) {
-    console.log(`[${SERVICE_NAME}] Attempting to seed Deployment mock data (v5) to localStorage...`);
+    console.log(`[${SERVICE_NAME}] Attempting to seed Deployment mock data (v6) to localStorage...`);
     localStorage.setItem(LOCAL_STORAGE_DEPLOYMENTS_KEY, JSON.stringify(deploymentsToSeed));
-    localStorage.setItem(MOCK_DEPLOYMENT_SEEDED_FLAG_V5, 'true');
-    console.log(`[${SERVICE_NAME}] Deployment mock data (v5) seeded to localStorage. Seeding flag set.`);
+    localStorage.setItem(MOCK_DEPLOYMENT_SEEDED_FLAG_V6, 'true');
+    console.log(`[${SERVICE_NAME}] Deployment mock data (v6) seeded to localStorage. Seeding flag set.`);
   }
   
 
@@ -93,17 +111,17 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
       const firstLogSnap = await getDoc(doc(deploymentLogsCollectionRef, deploymentsToSeed[0].id));
       if (!firstLogSnap.exists()) {
         const batch = writeBatch(db);
-        console.log(`[${SERVICE_NAME}] Preparing to seed Deployment logs to Firestore (v5)...`);
+        console.log(`[${SERVICE_NAME}] Preparing to seed Deployment logs to Firestore (v6)...`);
         for (const logData of deploymentsToSeed) {
           batch.set(doc(deploymentLogsCollectionRef, logData.id), logData);
         }
         await batch.commit();
-        console.log(`[${SERVICE_NAME}] Initial Deployment logs (v5) committed to Firestore.`);
+        console.log(`[${SERVICE_NAME}] Initial Deployment logs (v6) committed to Firestore.`);
       } else {
-        // console.log(`[${SERVICE_NAME}] Firestore already contains key Deployment mock data (v5). Skipping Firestore Deployment seed.`);
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key Deployment mock data (v6). Skipping Firestore Deployment seed.`);
       }
     } catch (error) {
-      console.warn(`[${SERVICE_NAME}] Error during Firestore Deployment seeding (v5): `, error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore Deployment seeding (v6): `, error);
     }
   } else if (typeof window !== 'undefined'){
     let reason = "";
@@ -111,7 +129,7 @@ async function ensureDeploymentMockDataSeeded(): Promise<void> {
     else if (!db) reason += "Firestore db instance is null. ";
     else if (!deploymentLogsCollectionRef) reason += "deploymentLogsCollectionRef is null. ";
     else if (!navigator.onLine) reason += "Client is offline. ";
-    // console.log(`[${SERVICE_NAME}] Skipping Firestore Deployment seeding (v5). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore Deployment seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 

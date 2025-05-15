@@ -84,62 +84,110 @@ if (db) { // Only initialize if db is available
    console.warn(`[SERVICE_INIT ${SERVICE_NAME}] Firestore db instance is null. ticketsCollectionRef not initialized. isFirebaseProperlyConfigured: ${isFirebaseProperlyConfigured}`);
 }
 
-const MOCK_TICKETS_SEEDED_FLAG_V6 = 'mock_tickets_seeded_v6';
-const LOCAL_STORAGE_TICKETS_KEY = 'firestore_mock_tickets_cache_v6';
+const MOCK_TICKETS_SEEDED_FLAG_V7 = 'mock_tickets_seeded_v7'; // Incremented version
+const LOCAL_STORAGE_TICKETS_KEY = 'firestore_mock_tickets_cache_v7'; // Incremented version
+
+const getDateDaysAgo = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString();
+};
 
 const ticketsToSeed: Ticket[] = [
     {
         id: 'MAS-001',
-        title: 'Implement local feature X',
-        description: 'Details about local feature X implementation.',
-        status: 'En Progreso',
-        type: 'Nueva Funcionalidad',
-        assigneeId: 'admin',
-        lastUpdated: '2024-07-28T10:00:00Z',
-        provider: 'TLA',
-        branch: 'DEV',
-        priority: 'Media',
-        requestingUserId: 'client-tla1',
-        githubRepository: 'maximo-tla',
-        attachmentNames: ['script_ABC.py', 'config_XYZ.xml'],
+        title: 'Implementar dashboard de cliente TLA',
+        description: 'Desarrollar un dashboard personalizado para el cliente TLA con KPIs de sus tickets.',
+        status: 'En Progreso', type: 'Nueva Funcionalidad', assigneeId: 'admin',
+        lastUpdated: getDateDaysAgo(2), provider: 'TLA', branch: 'DEV', priority: 'Media',
+        requestingUserId: 'client-tla1', githubRepository: 'maximo-tla',
+        attachmentNames: ['requerimientos_dashboard_tla.docx', 'mockup_v1.png'],
         history: [
-          { id: 'hist-1', timestamp: '2024-07-28T09:00:00Z', userId: 'client-tla1', action: 'Created', toStatus: 'Abierto', toType: 'Nueva Funcionalidad', details: 'Ticket Creado', ticketId: 'MAS-001' },
-          { id: 'hist-2', timestamp: '2024-07-28T10:00:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Estado cambiado a En Progreso', ticketId: 'MAS-001' },
+          { id: 'hist-1-1', timestamp: getDateDaysAgo(5), userId: 'client-tla1', action: 'Created', toStatus: 'Abierto', toType: 'Nueva Funcionalidad', details: 'Ticket Creado por cliente TLA', ticketId: 'MAS-001' },
+          { id: 'hist-1-2', timestamp: getDateDaysAgo(4), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a admin', ticketId: 'MAS-001' },
+          { id: 'hist-1-3', timestamp: getDateDaysAgo(2), userId: 'admin', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Inicio de desarrollo', ticketId: 'MAS-001' },
         ],
-      },
-      {
+    },
+    {
         id: 'MAS-002',
-        title: 'Fix local bug Y',
-        description: 'Users are unable to perform action Y.',
-        status: 'Resuelto',
-        type: 'Bug',
-        assigneeId: 'admin',
-        lastUpdated: '2024-07-27T15:30:00Z',
-        provider: 'FEMA',
-        branch: 'QA',
-        priority: 'Alta',
-        requestingUserId: 'client-fema1',
-        githubRepository: 'maximo-fema',
-        attachmentNames: ['debug_log.txt', 'screenshot_error.png'],
+        title: 'Corregir error de cálculo en reporte FEMA',
+        description: 'El reporte de costos para FEMA muestra totales incorrectos en la sección de materiales.',
+        status: 'Resuelto', type: 'Bug', assigneeId: 'alice-wonderland',
+        lastUpdated: getDateDaysAgo(1), provider: 'FEMA', branch: 'PROD', priority: 'Alta',
+        requestingUserId: 'client-fema1', githubRepository: 'maximo-fema',
+        attachmentNames: ['reporte_con_error.pdf', 'calculo_correcto.xlsx'],
         history: [
-          { id: 'hist-3', timestamp: '2024-07-27T14:00:00Z', userId: 'client-fema1', action: 'Created', toStatus: 'Abierto', toType: 'Bug', details: 'Ticket Creado', ticketId: 'MAS-002' },
-          { id: 'hist-4', timestamp: '2024-07-27T15:30:00Z', userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Estado cambiado a Resuelto', ticketId: 'MAS-002' },
+          { id: 'hist-2-1', timestamp: getDateDaysAgo(7), userId: 'client-fema1', action: 'Created', toStatus: 'Abierto', toType: 'Bug', details: 'Reporte de Bug por cliente FEMA', ticketId: 'MAS-002' },
+          { id: 'hist-2-2', timestamp: getDateDaysAgo(6), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a alice-wonderland', ticketId: 'MAS-002' },
+          { id: 'hist-2-3', timestamp: getDateDaysAgo(3), userId: 'alice-wonderland', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'En espera del visto bueno', details: 'Corrección implementada, pendiente de QA', ticketId: 'MAS-002' },
+          { id: 'hist-2-4', timestamp: getDateDaysAgo(1), userId: 'client-fema1', action: 'Status Changed', fromStatus: 'En espera del visto bueno', toStatus: 'Resuelto', details: 'Validado por el cliente', ticketId: 'MAS-002' },
         ],
-      },
-      {
+    },
+    {
         id: 'MAS-003',
-        title: 'Setup new local environment',
-        description: 'Configure local environment for testing.',
-        status: 'Abierto',
-        type: 'Tarea',
-        lastUpdated: '2024-07-29T09:00:00Z',
-        provider: 'System Corp',
-        priority: 'Media',
+        title: 'Configurar nuevo ambiente de Staging',
+        description: 'Crear y configurar un ambiente de Staging para pruebas pre-productivas.',
+        status: 'Abierto', type: 'Tarea', assigneeId: 'dave-grohl',
+        lastUpdated: getDateDaysAgo(0), provider: 'System Corp', priority: 'Media',
         requestingUserId: 'superuser',
         history: [
-          { id: 'hist-5', timestamp: '2024-07-29T09:00:00Z', userId: 'superuser', action: 'Created', toStatus: 'Abierto', toType: 'Tarea', details: 'Ticket Creado', ticketId: 'MAS-003' },
+          { id: 'hist-3-1', timestamp: getDateDaysAgo(0), userId: 'superuser', action: 'Created', toStatus: 'Abierto', toType: 'Tarea', details: 'Ticket Creado por superuser', ticketId: 'MAS-003' },
+          { id: 'hist-3-2', timestamp: getDateDaysAgo(0), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a dave-grohl', ticketId: 'MAS-003' },
         ],
-      },
+    },
+    {
+        id: 'MAS-004',
+        title: 'Hotfix: Falla crítica en API de integración OtherCompany',
+        description: 'La API de integración con OtherCompany dejó de responder, afectando la sincronización de datos.',
+        status: 'En Progreso', type: 'Hotfix', assigneeId: 'bob-the-builder',
+        lastUpdated: getDateDaysAgo(0), provider: 'Other Company', branch: 'PROD', priority: 'Alta',
+        requestingUserId: 'client-generic1', githubRepository: 'maximo-generic',
+        history: [
+            { id: 'hist-4-1', timestamp: getDateDaysAgo(0), userId: 'client-generic1', action: 'Created', toStatus: 'Abierto', toType: 'Hotfix', details: 'Reporte Urgente por Other Company', ticketId: 'MAS-004' },
+            { id: 'hist-4-2', timestamp: getDateDaysAgo(0), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a bob-the-builder', ticketId: 'MAS-004' },
+            { id: 'hist-4-3', timestamp: getDateDaysAgo(0), userId: 'bob-the-builder', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Investigación iniciada', ticketId: 'MAS-004' },
+        ]
+    },
+    {
+        id: 'MAS-005',
+        title: 'Mejora de rendimiento en módulo de reportes GovSector',
+        description: 'Optimizar consultas y lógica del módulo de reportes para reducir tiempos de carga.',
+        status: 'Pendiente', type: 'Nueva Funcionalidad',
+        lastUpdated: getDateDaysAgo(10), provider: 'GovSector', branch: 'DEV', priority: 'Baja',
+        requestingUserId: 'client-gov1', githubRepository: 'maximo-gov',
+        history: [
+            { id: 'hist-5-1', timestamp: getDateDaysAgo(10), userId: 'client-gov1', action: 'Created', toStatus: 'Abierto', toType: 'Nueva Funcionalidad', details: 'Solicitud de mejora por GovSector', ticketId: 'MAS-005' },
+            { id: 'hist-5-2', timestamp: getDateDaysAgo(9), userId: 'superuser', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'Pendiente', details: 'Pendiente de asignación de recursos', ticketId: 'MAS-005' }
+        ]
+    },
+    {
+        id: 'MAS-006',
+        title: 'Capacitación sobre nuevas funcionalidades para EnergyCorp',
+        description: 'Agendar y realizar sesión de capacitación para el equipo de EnergyCorp sobre las últimas actualizaciones del portal.',
+        status: 'Cerrado', type: 'Tarea', assigneeId: 'carol-danvers',
+        lastUpdated: getDateDaysAgo(15), provider: 'EnergyCorp', priority: 'Media',
+        requestingUserId: 'superuser', githubRepository: 'maximo-energy',
+        history: [
+            { id: 'hist-6-1', timestamp: getDateDaysAgo(20), userId: 'superuser', action: 'Created', toStatus: 'Abierto', toType: 'Tarea', details: 'Creación de tarea de capacitación', ticketId: 'MAS-006' },
+            { id: 'hist-6-2', timestamp: getDateDaysAgo(19), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a carol-danvers', ticketId: 'MAS-006' },
+            { id: 'hist-6-3', timestamp: getDateDaysAgo(18), userId: 'carol-danvers', action: 'Status Changed', fromStatus: 'Abierto', toStatus: 'En Progreso', details: 'Preparando material', ticketId: 'MAS-006' },
+            { id: 'hist-6-4', timestamp: getDateDaysAgo(15), userId: 'carol-danvers', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Cerrado', details: 'Capacitación completada exitosamente.', ticketId: 'MAS-006' }
+        ]
+    },
+     {
+        id: 'MAS-007',
+        title: 'Issue: Login intermitente para usuarios TLA',
+        description: 'Algunos usuarios de TLA reportan problemas para iniciar sesión de forma intermitente.',
+        status: 'Reabierto', type: 'Issue', assigneeId: 'admin',
+        lastUpdated: getDateDaysAgo(1), provider: 'TLA', branch: 'PROD', priority: 'Alta',
+        requestingUserId: 'client-tla2', githubRepository: 'maximo-tla',
+        history: [
+            { id: 'hist-7-1', timestamp: getDateDaysAgo(12), userId: 'client-tla2', action: 'Created', toStatus: 'Abierto', toType: 'Issue', details: 'Reporte de Issue por cliente TLA', ticketId: 'MAS-007' },
+            { id: 'hist-7-2', timestamp: getDateDaysAgo(11), userId: 'superuser', action: 'Assignee Changed', details: 'Asignado a admin', ticketId: 'MAS-007' },
+            { id: 'hist-7-3', timestamp: getDateDaysAgo(8), userId: 'admin', action: 'Status Changed', fromStatus: 'En Progreso', toStatus: 'Resuelto', details: 'Solución implementada y probada.', ticketId: 'MAS-007' },
+            { id: 'hist-7-4', timestamp: getDateDaysAgo(1), userId: 'client-tla2', action: 'Status Changed', fromStatus: 'Resuelto', toStatus: 'Reabierto', details: 'El problema persiste para algunos usuarios.', ticketId: 'MAS-007' }
+        ]
+    },
 ];
 
 async function ensureTicketsMockDataSeeded(): Promise<void> {
@@ -150,13 +198,13 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
     return;
   }
 
-  const isSeededInLocalStorage = localStorage.getItem(MOCK_TICKETS_SEEDED_FLAG_V6) === 'true';
+  const isSeededInLocalStorage = localStorage.getItem(MOCK_TICKETS_SEEDED_FLAG_V7) === 'true';
 
   if (isSeededInLocalStorage && isFirebaseProperlyConfigured && db && ticketsCollectionRef) {
     try {
         const firstTicket = await getDoc(doc(ticketsCollectionRef, ticketsToSeed[0].id));
         if (firstTicket.exists()) {
-            // console.log(`[${SERVICE_NAME}] Mock data (v6) already confirmed in Firestore. Skipping further seeding checks.`);
+            // console.log(`[${SERVICE_NAME}] Mock data (v7) already confirmed in Firestore. Skipping further seeding checks.`);
             return;
         }
     } catch (e) {
@@ -165,11 +213,11 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
   }
 
   if (!isSeededInLocalStorage) {
-    console.log(`[${SERVICE_NAME}] Attempting to seed Tickets mock data (v6) to localStorage...`);
+    console.log(`[${SERVICE_NAME}] Attempting to seed Tickets mock data (v7) to localStorage...`);
     try {
       localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(ticketsToSeed));
-      localStorage.setItem(MOCK_TICKETS_SEEDED_FLAG_V6, 'true');
-      console.log(`[${SERVICE_NAME}] Tickets mock data (v6) seeded to localStorage. Seeding flag set.`);
+      localStorage.setItem(MOCK_TICKETS_SEEDED_FLAG_V7, 'true');
+      console.log(`[${SERVICE_NAME}] Tickets mock data (v7) seeded to localStorage. Seeding flag set.`);
     } catch (e) {
       console.error(`[${SERVICE_NAME}] CRITICAL - Failed to seed Tickets mock data to localStorage. Local fallback may not work. Error:`, e);
     }
@@ -181,17 +229,17 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
       const firstTicketSnap = await getDoc(doc(ticketsCollectionRef, ticketsToSeed[0].id));
       if (!firstTicketSnap.exists()) {
         const batch = writeBatch(db);
-        console.log(`[${SERVICE_NAME}] Preparing to seed Tickets to Firestore (v6)...`);
+        console.log(`[${SERVICE_NAME}] Preparing to seed Tickets to Firestore (v7)...`);
         for (const ticketData of ticketsToSeed) {
           batch.set(doc(ticketsCollectionRef, ticketData.id), ticketData);
         }
         await batch.commit();
-        console.log(`[${SERVICE_NAME}] Initial Tickets (v6) committed to Firestore.`);
+        console.log(`[${SERVICE_NAME}] Initial Tickets (v7) committed to Firestore.`);
       } else {
-        // console.log(`[${SERVICE_NAME}] Firestore already contains key Tickets mock data (v6). Skipping Firestore Tickets seed.`);
+        // console.log(`[${SERVICE_NAME}] Firestore already contains key Tickets mock data (v7). Skipping Firestore Tickets seed.`);
       }
     } catch (error) {
-      console.warn(`[${SERVICE_NAME}] Error during Firestore Tickets seeding (v6): `, error);
+      console.warn(`[${SERVICE_NAME}] Error during Firestore Tickets seeding (v7): `, error);
     }
   } else if (typeof window !== 'undefined'){
     let reason = "";
@@ -199,7 +247,7 @@ async function ensureTicketsMockDataSeeded(): Promise<void> {
     else if (!db) reason += "Firestore db instance is null. ";
     else if (!ticketsCollectionRef) reason += "ticketsCollectionRef is null. ";
     else if (!navigator.onLine) reason += "Client is offline. ";
-    // console.log(`[${SERVICE_NAME}] Skipping Firestore Tickets seeding (v6). ${reason}Will rely on localStorage if already seeded there.`);
+    // console.log(`[${SERVICE_NAME}] Skipping Firestore Tickets seeding (v7). ${reason}Will rely on localStorage if already seeded there.`);
   }
 }
 
@@ -800,4 +848,3 @@ export async function addAttachmentsToTicket(
      return null;
   }
 }
-
