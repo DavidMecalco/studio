@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
-import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; 
 import { getUsers, type UserDoc as ServiceUser, getOrganizations, type Organization } from '@/services/users';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Ticket as TicketIconLucide, AlertTriangle } from 'lucide-react'; 
@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AdminTicketFilterBar, type AdminTicketFilters, UNASSIGNED_ASSIGNEE_FILTER_VALUE } from '@/components/tickets/admin-ticket-filter-bar';
 import { format, parseISO, isWithinInterval } from 'date-fns'; 
 
-export default function TicketsPage() { // Renamed from JiraPage
+export default function TicketsPage() {
   const { user, loading: authLoading } = useAuth();
   const [allTickets, setAllTickets] = useState<LocalTicket[]>([]);
   const [usersForFilter, setUsersForFilter] = useState<ServiceUser[]>([]);
@@ -41,7 +41,7 @@ export default function TicketsPage() { // Renamed from JiraPage
       setIsPageLoading(true);
       try {
         const [tickets, fetchedUsers, fetchedOrgs] = await Promise.all([
-            getTickets(), // Use local getTickets
+            getTickets(), 
             getUsers(),
             getOrganizations()
         ]);
@@ -113,19 +113,19 @@ export default function TicketsPage() { // Renamed from JiraPage
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <Skeleton className="h-8 w-3/4 mb-1" />
+            <Skeleton className="h-8 w-3/4 mb-2" />
             <Skeleton className="h-4 w-full" />
           </div>
         </div>
-         <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">{[...Array(7)].map((_, i) => <Skeleton key={`filter-skel-${i}`} className="h-10 w-full" />)}</div><Skeleton className="h-10 w-32" /></CardContent></Card>
-        <Card className="bg-card shadow-lg rounded-xl">
+         <Card className="shadow-lg rounded-xl"><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end">{[...Array(7)].map((_, i) => <Skeleton key={`filter-skel-${i}`} className="h-10 w-full" />)}</div> <div className="md:col-span-2 lg:col-span-3 xl:col-span-full"><Skeleton className="h-10 w-full" /></div> <Skeleton className="h-10 w-36" /></CardContent></Card>
+        <Card className="bg-card shadow-xl rounded-xl">
           <CardHeader>
             <Skeleton className="h-6 w-1/2" />
             <Skeleton className="h-4 w-3/4" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={`list-skel-${i}`} className="h-10 w-full" />)}
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={`list-skel-${i}`} className="h-12 w-full" />)}
             </div>
           </CardContent>
         </Card>
@@ -135,23 +135,25 @@ export default function TicketsPage() { // Renamed from JiraPage
   
   if (!canViewPage && !authLoading) { 
      return (
-        <div className="space-y-8 text-center py-10">
-            <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
-            <h1 className="text-2xl font-semibold">Access Denied</h1>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
+            <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
+            <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
             <p className="text-muted-foreground">This page is for admin or superuser users only.</p>
         </div>
      )
   }
+
+  const viewTitle = user?.role === 'admin' ? 'Admin/Technician View' : 'Super User View';
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <TicketIconLucide className="h-8 w-8 text-primary" /> Tickets ({user?.role === 'admin' ? 'Admin/Technician' : 'Super User'} View)
+            <TicketIconLucide className="h-8 w-8 text-primary" /> Gestión de Tickets ({viewTitle})
           </h1>
           <p className="text-muted-foreground">
-            Track and manage latest updates and issues. {user?.role === 'admin' ? 'Technicians can view assigned tickets and manage development.' : 'Super users can oversee all tickets, including unassigned ones, and assign them to technicians.'}
+            Rastree y gestione las últimas actualizaciones y problemas. {user?.role === 'admin' ? 'Los técnicos pueden ver los tickets asignados y gestionar el desarrollo.' : 'Los superusuarios pueden supervisar todos los tickets, incluidos los no asignados, y asignarlos a los técnicos.'}
           </p>
         </div>
       </div>
@@ -163,13 +165,13 @@ export default function TicketsPage() { // Renamed from JiraPage
         organizations={organizationsForFilter.map(org => org.name)} 
       />
 
-      <Card className="bg-card shadow-lg rounded-xl">
+      <Card className="bg-card shadow-xl rounded-xl border-border">
         <CardHeader>
           <CardTitle>
-            All Tickets 
+            Todos los Tickets 
           </CardTitle>
           <CardDescription>
-            Browse and manage all available tickets. Click 'View' to see details and manage development. Superusers can assign unassigned tickets.
+            Navegue y gestione todos los tickets disponibles. Haga clic en 'Ver' para ver detalles y gestionar el desarrollo. Los superusuarios pueden asignar tickets no asignados.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -178,10 +180,22 @@ export default function TicketsPage() { // Renamed from JiraPage
             title="" 
             showRequestingUser={true} 
             showAssignee={true} 
+            onTicketActionSuccess={() => { // Refresh data on action
+                if (canViewPage && user) {
+                    setIsPageLoading(true);
+                    Promise.all([getTickets(), getUsers(), getOrganizations()])
+                        .then(([tickets, fetchedUsers, fetchedOrgs]) => {
+                            setAllTickets(tickets);
+                            setUsersForFilter(fetchedUsers);
+                            setOrganizationsForFilter(fetchedOrgs);
+                        })
+                        .catch(error => console.error("Error refetching data for Tickets page:", error))
+                        .finally(() => setIsPageLoading(false));
+                }
+            }}
             />
         </CardContent>
       </Card>
     </div>
   );
 }
-

@@ -1,53 +1,70 @@
 
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 
 export default function TicketDetailLoading() {
   return (
     <div className="space-y-8">
-      <Skeleton className="h-8 w-32 mb-4" /> {/* Back button */}
+      <Skeleton className="h-8 w-32 mb-6" /> {/* Back button */}
       
-      <Card className="shadow-lg rounded-xl">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+      <Card className="shadow-xl rounded-xl border-border">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
             <div className="flex-1">
-              <Skeleton className="h-7 w-3/4 mb-1" /> {/* Title */}
+              <Skeleton className="h-8 w-3/4 mb-2" /> {/* Title */}
               <Skeleton className="h-4 w-1/2" /> {/* ID */}
             </div>
-            <div className="flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
-              <Skeleton className="h-7 w-24" /> {/* Status Badge */}
-              <Skeleton className="h-5 w-20" /> {/* Priority Badge */}
-              <Skeleton className="h-5 w-28" /> {/* Type Badge */}
+            <div className="flex flex-col items-start sm:items-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
+              <Skeleton className="h-7 w-28" /> {/* Status Badge */}
+              <Skeleton className="h-5 w-24" /> {/* Priority Badge */}
+              <Skeleton className="h-5 w-32" /> {/* Type Badge */}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={`info-skel-${i}`}>
-                <Skeleton className="h-4 w-1/3 mb-1" /> {/* Label */}
-                <Skeleton className="h-5 w-2/3" /> {/* Value */}
+        <CardContent className="pt-4 space-y-6">
+          <Skeleton className="h-px w-full" /> {/* Separator */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 py-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={`info-skel-${i}`} className="flex items-start gap-2">
+                <Skeleton className="h-5 w-5 rounded-full mt-1" />
+                <div>
+                  <Skeleton className="h-4 w-24 mb-1.5" /> {/* Label */}
+                  <Skeleton className="h-5 w-36" /> {/* Value */}
+                </div>
               </div>
             ))}
           </div>
           
-          <Separator />
-          <Skeleton className="h-6 w-1/4 mb-2" /> {/* Description Title */}
-          <Skeleton className="h-16 w-full" /> {/* Description Content */}
+          <Skeleton className="h-px w-full" />
+          <div>
+            <Skeleton className="h-6 w-1/4 mb-2" /> {/* Description Title */}
+            <Skeleton className="h-20 w-full rounded-md" /> {/* Description Content */}
+          </div>
           
-          <Separator />
-          <Skeleton className="h-6 w-1/3 mb-2" /> {/* Associated Commits Title */}
-          <Skeleton className="h-40 w-full" /> {/* Commits List Skeleton */}
+          <Skeleton className="h-px w-full" /> {/* Admin Actions Skeleton (if applicable) */}
+          <Skeleton className="h-32 w-full rounded-md" />
+
+          <Skeleton className="h-px w-full" />
+          <div>
+            <Skeleton className="h-6 w-1/3 mb-3" /> {/* Associated Commits Title */}
+            <Skeleton className="h-40 w-full rounded-md" /> {/* Commits List Skeleton */}
+          </div>
           
-          <Separator />
-          <Skeleton className="h-6 w-1/3 mb-2" /> {/* History Title */}
-          <Skeleton className="h-20 w-full" /> {/* History List Skeleton */}
+          <Skeleton className="h-px w-full" />
+          <div>
+            <Skeleton className="h-6 w-1/3 mb-3" /> {/* History Title */}
+            <Skeleton className="h-32 w-full rounded-md" /> {/* History List Skeleton */}
+          </div>
           
-          <Separator />
-          <Skeleton className="h-6 w-1/3 mb-2" /> {/* Comments Title */}
-          <Skeleton className="h-24 w-full" /> {/* Comment Form Skeleton */}
+          <Skeleton className="h-px w-full" />
+          <div>
+            <Skeleton className="h-6 w-1/3 mb-3" /> {/* Comments Title */}
+            <Skeleton className="h-28 w-full rounded-md" /> {/* Comment Form Skeleton */}
+          </div>
         </CardContent>
+         <CardFooter className="pt-4 border-t">
+            <Skeleton className="h-3 w-24" />
+         </CardFooter>
       </Card>
 
       {/* CommitChangesForm Skeleton */}
@@ -57,9 +74,14 @@ export default function TicketDetailLoading() {
             <Skeleton className="h-4 w-3/4" />
         </CardHeader>
         <CardContent className="space-y-4">
-            <Skeleton className="h-20 w-full" /> {/* Commit message textarea */}
+            <Skeleton className="h-24 w-full" /> {/* Commit message textarea */}
             <Skeleton className="h-10 w-full" /> {/* Branch select */}
             <Skeleton className="h-10 w-1/3" /> {/* Submit button */}
+            <Skeleton className="h-px w-full my-3" />
+            <Skeleton className="h-6 w-1/2 mb-1" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-10 w-full" /> {/* Restore commit select */}
+            <Skeleton className="h-10 w-2/5" /> {/* Restore button */}
         </CardContent>
       </Card>
     </div>

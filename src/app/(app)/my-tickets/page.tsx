@@ -5,13 +5,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { TicketList } from '@/components/tickets/ticket-list';
 import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ListChecks, AlertTriangle, PlusCircle } from 'lucide-react';
+import { ListChecks, AlertTriangle, PlusCircle, Search } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsFilterBar, type MyTicketsFilters } from '@/components/tickets/my-tickets-filter-bar';
-import { format, parseISO, isWithinInterval } from 'date-fns'; 
+import { format, parseISO, isWithinInterval, subDays } from 'date-fns'; 
 import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function MyTicketsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -122,10 +123,10 @@ export default function MyTicketsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <ListChecks className="h-8 w-8 text-primary" /> My Tickets
+            <ListChecks className="h-8 w-8 text-primary" /> Mis Tickets
           </h1>
           <p className="text-muted-foreground">
-            View and track your submitted tickets.
+            Visualice y gestione los tickets que ha enviado.
           </p>
         </div>
         {user?.role === 'client' && (
@@ -133,20 +134,20 @@ export default function MyTicketsPage() {
             triggerButton={
               <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Create New Ticket
+                Crear Nuevo Ticket
               </Button>
             }
-            onTicketCreated={fetchUserTickets} // Refresh ticket list on creation
+            onTicketCreated={fetchUserTickets} 
           />
         )}
       </div>
 
       <MyTicketsFilterBar filters={filters} onFiltersChange={setFilters} />
 
-      <Card className="bg-card shadow-lg rounded-xl">
+      <Card className="bg-card shadow-xl rounded-xl border-border">
         <CardHeader>
-          <CardTitle>Your Submitted Tickets</CardTitle>
-          <CardDescription>Below is a list of tickets you have created. You can reopen closed or resolved tickets.</CardDescription>
+          <CardTitle>Sus Tickets Enviados</CardTitle>
+          <CardDescription>A continuación se muestra una lista de los tickets que ha creado. Puede reabrir tickets cerrados o resueltos.</CardDescription>
         </CardHeader>
         <CardContent>
           <TicketList 
@@ -161,4 +162,3 @@ export default function MyTicketsPage() {
     </div>
   );
 }
-
