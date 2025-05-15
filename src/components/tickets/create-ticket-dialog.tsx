@@ -33,26 +33,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createTicketAction } from "@/app/actions/ticket-actions"; 
-import type { TicketBranch, TicketPriority, TicketProvider, TicketType } from "@/services/tickets"; 
-import { TICKET_TYPES } from "@/services/tickets"; 
-import { Plus, FileUp, Loader2, PlusCircle } from 'lucide-react';
+import { createTicketAction } from "@/app/actions/ticket-actions";
+import type { TicketBranch, TicketPriority, TicketProvider, TicketType } from "@/services/tickets";
+import { TICKET_TYPES } from "@/services/tickets";
+import { Plus, FileUp, Loader2, PlusCircle, XIcon } from 'lucide-react'; // Added XIcon
 import { useAuth } from '@/context/auth-context';
 import { getOrganizations, type Organization } from '@/services/users';
 
 
-const ticketBranches: TicketBranch[] = ['DEV', 'QA', 'PROD']; 
-const ticketPriorities: TicketPriority[] = ['Alta', 'Media', 'Baja']; 
+const ticketBranches: TicketBranch[] = ['DEV', 'QA', 'PROD'];
+const ticketPriorities: TicketPriority[] = ['Alta', 'Media', 'Baja'];
 
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 
-  'application/pdf', 
-  'application/msword', 
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-  'text/plain', 
-  'application/vnd.ms-excel', 
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  'image/jpeg', 'image/png', 'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip', // Added zip
+  '.py', '.xml', '.rptdesign', '.js', '.json', '.java' // Common code/config extensions
 ];
 
 const createTicketFormSchemaBase = z.object({
@@ -61,18 +63,18 @@ const createTicketFormSchemaBase = z.object({
   priority: z.enum(ticketPriorities, {
     required_error: "Seleccione una prioridad.",
   }),
-  type: z.enum(TICKET_TYPES as [TicketType, ...TicketType[]]), 
+  type: z.enum(TICKET_TYPES as [TicketType, ...TicketType[]]),
   requestingUserId: z.string().min(1, "El usuario solicitante es obligatorio."),
-  requestingUserEmail: z.string().email().optional(), 
+  requestingUserEmail: z.string().email().optional(),
 });
 
 const adminOrSuperUserCreateTicketFormSchema = createTicketFormSchemaBase.extend({
-  provider: z.string().optional(), 
+  provider: z.string().optional(),
   branch: z.enum(ticketBranches).optional(),
 });
 
 const clientCreateTicketFormSchema = createTicketFormSchemaBase.extend({
-  provider: z.string().optional(), 
+  provider: z.string().optional(),
   branch: z.enum(ticketBranches, { required_error: "Seleccione un ambiente/branch."}),
 });
 
@@ -83,7 +85,7 @@ export type CreateTicketDialogFormValues = Partial<AdminOrSuperUserFormValues & 
 
 
 interface CreateTicketDialogProps {
-    triggerButton?: ReactNode; 
+    triggerButton?: ReactNode;
     onTicketCreated?: () => void; // Callback to refresh list
 }
 
@@ -110,7 +112,7 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
       type: undefined,
       requestingUserId: user?.username || "",
       requestingUserEmail: user?.email || "",
-      provider: isAdminOrSuperUser ? undefined : user?.company || undefined, 
+      provider: isAdminOrSuperUser ? undefined : user?.company || undefined,
       branch: undefined,
     },
   });
@@ -128,7 +130,7 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
         branch: undefined,
       });
     }
-    if (isOpen && isAdminOrSuperUser) { 
+    if (isOpen && isAdminOrSuperUser) {
         getOrganizations().then(setOrganizations).catch(err => {
             console.error("Failed to fetch organizations for ticket dialog", err);
             toast({title: "Error", description: "Could not load organizations.", variant: "destructive"});
@@ -149,17 +151,22 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
           });
           return false;
         }
-        if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        // Basic MIME type check + extension check for more robust validation
+        const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+        const isAllowedMime = ALLOWED_MIME_TYPES.includes(file.type);
+        const isAllowedExtension = ALLOWED_MIME_TYPES.includes(fileExtension);
+
+        if (!isAllowedMime && !isAllowedExtension) {
            toast({
             title: "Tipo de Archivo No Permitido",
-            description: `El tipo de archivo de "${file.name}" no está permitido.`,
+            description: `El tipo de archivo de "${file.name}" no está permitido. (${file.type || fileExtension})`,
             variant: "destructive",
           });
           return false;
         }
         return true;
       });
-      setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5)); 
+      setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 5));
     }
   };
 
@@ -175,19 +182,19 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
     setIsSubmitting(true);
 
     const attachmentNames = selectedFiles.map(file => file.name);
-    
-    let providerForAction: TicketProvider | undefined = undefined; 
+
+    let providerForAction: TicketProvider | undefined = undefined;
     if (isClient) {
-        providerForAction = user.company; 
+        providerForAction = user.company;
     } else if (isAdminOrSuperUser) {
-        providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider; 
+        providerForAction = values.provider === NONE_VALUE_SENTINEL ? undefined : values.provider;
     }
 
-    let branchForAction: TicketBranch | undefined = undefined; 
+    let branchForAction: TicketBranch | undefined = undefined;
     if (isAdminOrSuperUser) {
         branchForAction = values.branch === NONE_VALUE_SENTINEL ? undefined : values.branch;
     } else if (isClient) {
-        branchForAction = values.branch; 
+        branchForAction = values.branch;
     }
 
 
@@ -198,12 +205,12 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
       type: values.type!,
       requestingUserId: user.username!,
       requestingUserEmail: user.email,
-      provider: providerForAction, 
-      branch: branchForAction, 
+      provider: providerForAction,
+      branch: branchForAction,
       attachmentNames: attachmentNames,
     };
 
-    const result = await createTicketAction(ticketDataForAction); 
+    const result = await createTicketAction(ticketDataForAction);
 
     if (result.success && result.ticket) {
       toast({
@@ -225,8 +232,8 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
     }
     setIsSubmitting(false);
   }
-  
-  if (!user) return null; 
+
+  if (!user) return null;
 
   const defaultFabTrigger = (
      <Button
@@ -239,26 +246,34 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        {triggerButton ? ( 
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+            form.reset();
+            setSelectedFiles([]);
+        }
+    }}>
+        {triggerButton ? (
             <DialogTrigger asChild>
                 {triggerButton}
             </DialogTrigger>
-        ) : ( 
+        ) : (
             <DialogTrigger asChild>
                 {defaultFabTrigger}
             </DialogTrigger>
-        ) 
+        )
         }
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>Crear Nuevo Ticket</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <PlusCircle className="h-6 w-6 text-primary" /> Crear Nuevo Ticket
+          </DialogTitle>
           <DialogDescription>
             Complete los detalles a continuación para crear un nuevo ticket.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-2">
             <FormField
               control={form.control}
               name="title"
@@ -272,7 +287,7 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="requestingUserId"
@@ -313,8 +328,8 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
                 </FormItem>
               )}
             />
-            
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="priority"
@@ -352,7 +367,7 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {TICKET_TYPES.map(type => ( 
+                        {TICKET_TYPES.map(type => (
                           <SelectItem key={type} value={type}>
                             {type}
                           </SelectItem>
@@ -368,17 +383,17 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
 
             {isAdminOrSuperUser && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="provider" 
+                    name="provider"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Organización (Proveedor)</FormLabel>
-                        <Select 
+                        <Select
                             onValueChange={(selectedValue) => {
                                 field.onChange(selectedValue === NONE_VALUE_SENTINEL ? undefined : selectedValue);
-                            }} 
+                            }}
                             value={field.value || NONE_VALUE_SENTINEL}
                         >
                           <FormControl>
@@ -405,10 +420,10 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Branch/Ambiente</FormLabel>
-                        <Select 
+                        <Select
                             onValueChange={(selectedValue) => {
                                 field.onChange(selectedValue === NONE_VALUE_SENTINEL ? undefined : selectedValue);
-                            }} 
+                            }}
                             value={field.value || NONE_VALUE_SENTINEL}
                         >
                           <FormControl>
@@ -436,7 +451,7 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
             {isClient && (
                  <FormField
                     control={form.control}
-                    name="branch" 
+                    name="branch"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Ambiente</FormLabel>
@@ -459,31 +474,31 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
                     )}
                   />
             )}
-              
+
             <FormItem>
-              <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB cada uno)</FormLabel>
+              <FormLabel htmlFor="attachments">Adjuntos (opcional, máx. 5 archivos, 5MB c/u)</FormLabel>
               <FormControl>
-                <div className="flex items-center gap-2">
-                    <Input
-                        id="attachments"
-                        type="file"
-                        multiple
-                        onChange={handleFileChange}
-                        className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                        accept={ALLOWED_MIME_TYPES.join(',')}
-                        disabled={selectedFiles.length >= 5}
-                    />
-                      <FileUp className="h-5 w-5 text-muted-foreground" />
-                </div>
+                <Input
+                    id="attachments"
+                    type="file"
+                    multiple
+                    onChange={handleFileChange}
+                    className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    accept={ALLOWED_MIME_TYPES.join(',')} // Updated to allow more general types
+                    disabled={selectedFiles.length >= 5}
+                />
               </FormControl>
                 {selectedFiles.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-sm font-medium">Archivos seleccionados:</p>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                <div className="mt-2 space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Archivos seleccionados ({selectedFiles.length}/5):</p>
+                  <ul className="space-y-1">
                     {selectedFiles.map(file => (
-                      <li key={file.name} className="flex justify-between items-center">
-                        <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file.name)} className="text-destructive">X</Button>
+                      <li key={file.name} className="flex justify-between items-center text-xs p-1.5 border rounded-md bg-muted/50">
+                        <span className="truncate max-w-[200px] sm:max-w-[300px]">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(file.name)} className="text-destructive hover:bg-destructive/10 h-5 w-5">
+                          <XIcon className="h-3 w-3" />
+                          <span className="sr-only">Remove {file.name}</span>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -495,12 +510,12 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
               <FormMessage />
             </FormItem>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { form.reset(); setSelectedFiles([]); setIsOpen(false); }} disabled={isSubmitting}>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => { setIsOpen(false); }} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                 {isSubmitting ? "Creando Ticket..." : "Crear Ticket"}
               </Button>
             </DialogFooter>
@@ -511,3 +526,4 @@ export function CreateTicketDialog({ triggerButton, onTicketCreated }: CreateTic
   );
 }
 
+    
