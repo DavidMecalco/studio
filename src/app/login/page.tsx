@@ -10,6 +10,7 @@ import { useAuth } from '@/context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CompanyLogo from '@/components/layout/company-logo';
 import { Mail, Lock } from 'lucide-react';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -44,6 +45,17 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <div className="mb-8 w-full max-w-sm">
+        <Image
+          src="https://placehold.co/600x200.png"
+          alt="Maximo Version Portal Banner"
+          width={600}
+          height={200}
+          className="w-full h-auto rounded-lg object-cover shadow-lg"
+          priority
+          data-ai-hint="enterprise technology"
+        />
+      </div>
       <Card className="w-full max-w-sm shadow-xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
