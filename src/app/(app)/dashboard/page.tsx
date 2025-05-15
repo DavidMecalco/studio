@@ -5,11 +5,10 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, Briefcase, ListChecks, LineChart as AnalyticsIcon, Users, Settings, PieChartIcon } from 'lucide-react';
+import { ArrowRight, Ticket, Github, Server, CheckCircle2, ClipboardList, GitMerge, ListChecks, LineChart as AnalyticsIcon, Users, Settings, PieChartIcon, LayoutDashboard as DashboardIcon } from 'lucide-react';
 import Image from 'next/image';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-// import { TicketManagementCard } from '@/components/dashboard/ticket-management-card'; // This component was removed
-import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; // Updated import
+import { getTickets, type Ticket as LocalTicket } from '@/services/tickets'; 
 import { getGitHubCommits, type GitHubCommit } from '@/services/github';
 import { getUsers, type UserDoc as ServiceUser } from '@/services/users'; 
 import { subWeeks, isAfter, format, parseISO } from 'date-fns';
@@ -18,8 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MyTicketsOverTimeChart } from '@/components/analytics/charts/my-tickets-over-time-chart';
 
 interface DashboardData {
-  tickets: LocalTicket[]; // Updated type
-  allTickets?: LocalTicket[]; // Updated type
+  tickets: LocalTicket[]; 
+  allTickets?: LocalTicket[]; 
   githubCommits: GitHubCommit[];
   users: ServiceUser[];
   
@@ -36,7 +35,7 @@ interface DashboardData {
 async function fetchDashboardData(userId?: string, userRole?: 'admin' | 'client' | 'superuser'): Promise<DashboardData | null> {
   try {
     const [allTicketsFromService, githubCommits, users] = await Promise.all([
-      getTickets(), // Use local getTickets
+      getTickets(), 
       getGitHubCommits("ALL_PROJECTS"), 
       getUsers(), 
     ]);
@@ -116,11 +115,9 @@ export default function DashboardOverviewPage() {
     
     return (
       <div className="space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <Skeleton className="h-8 w-72 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
+        <div className="pb-6 border-b">
+          <Skeleton className="h-10 w-3/4 mb-2" />
+          <Skeleton className="h-5 w-1/2" />
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => <KpiCardSkeleton key={`kpi-skel-${i}`}/>)}
@@ -128,8 +125,8 @@ export default function DashboardOverviewPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(skeletonNavCardsCount)].map((_, i) => <NavCardSkeleton key={`nav-skel-${i}`}/>)}
         </div>
-        {/* TicketManagementCardSkeleton was here, but the component was removed */}
         {isClientUser && <ChartSkeleton />}
+         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -139,8 +136,6 @@ export default function DashboardOverviewPage() {
   }
 
   const { 
-    tickets, // Renamed from jiraTickets
-    users, 
     closedTicketsCount, 
     pendingTicketsCount, 
     commitsLastWeekCount,
@@ -154,211 +149,211 @@ export default function DashboardOverviewPage() {
   const isSuperUser = user?.role === 'superuser';
   const isClient = user?.role === 'client';
 
+  const welcomeTitle = isClient 
+      ? "Client Dashboard" 
+      : isAdmin ? "Administrator Dashboard"
+      : isSuperUser ? "Super User Dashboard"
+      : "Maximo Version Portal";
+
+  const welcomeDescription = isClient 
+      ? "Manage your requests and track ticket progress." 
+      : isAdmin ? "Your operations hub for Maximo version management."
+      : isSuperUser ? "System administration and configuration portal."
+      : "Your central control panel.";
+
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Bienvenido al Portal Maximo</h1>
-          <p className="text-muted-foreground">
-            {isClient 
-              ? "Gestione sus solicitudes y seguimiento de tickets." 
-              : isAdmin ? "Su centro de operaciones para la gestión de versiones de Maximo."
-              : isSuperUser ? "Portal de administración y configuración del sistema Maximo."
-              : "Su panel de control central."}
-          </p>
+    <div className="space-y-10">
+      <section className="pb-8 border-b">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
+          <DashboardIcon className="h-10 w-10 text-primary" />
+          {welcomeTitle}
+        </h1>
+        <p className="text-xl text-muted-foreground">
+          {welcomeDescription}
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-6">Key Performance Indicators</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {(isAdmin || isSuperUser) && (
+            <>
+              <KpiCard
+                title="Global Closed Tickets"
+                value={closedTicketsCount ?? 0}
+                icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+                description="Total completed tickets."
+                className="shadow-lg rounded-xl"
+              />
+              <KpiCard
+                title="Global Pending Tickets"
+                value={pendingTicketsCount ?? 0}
+                icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
+                description="Active tickets or awaiting action."
+                className="shadow-lg rounded-xl"
+              />
+              <KpiCard
+                title="Commits (Last Week)"
+                value={commitsLastWeekCount ?? 0}
+                icon={<GitMerge className="h-5 w-5 text-blue-500" />}
+                description="Recent activity in repositories."
+                className="shadow-lg rounded-xl"
+              />
+            </>
+          )}
+          {isClient && (
+            <>
+              <KpiCard
+                title="My Total Tickets"
+                value={myTotalTicketsCount ?? 0}
+                icon={<Ticket className="h-5 w-5 text-accent" />}
+                description="Total tickets you have submitted."
+                className="shadow-lg rounded-xl"
+              />
+              <KpiCard
+                title="My Active Tickets"
+                value={myActiveTicketsCount ?? 0}
+                icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
+                description="Open, in-progress, or pending tickets."
+                className="shadow-lg rounded-xl"
+              />
+              <KpiCard
+                title="My Closed Tickets"
+                value={myClosedTicketsCount ?? 0}
+                icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+                description="Tickets that have been resolved or closed."
+                className="shadow-lg rounded-xl"
+              />
+            </>
+          )}
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(isAdmin || isSuperUser) && (
-          <>
-            <KpiCard
-              title="Tickets Cerrados (Global)"
-              value={closedTicketsCount ?? 0}
-              icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
-              description="Total de tickets completados."
-              className="shadow-lg rounded-xl"
-            />
-            <KpiCard
-              title="Tickets Pendientes (Global)"
-              value={pendingTicketsCount ?? 0}
-              icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
-              description="Tickets activos o esperando acción."
-              className="shadow-lg rounded-xl"
-            />
-            <KpiCard
-              title="Commits (Última Semana)"
-              value={commitsLastWeekCount ?? 0}
-              icon={<GitMerge className="h-5 w-5 text-blue-500" />}
-              description="Actividad reciente en repositorios."
-              className="shadow-lg rounded-xl"
-            />
-          </>
-        )}
-        {isClient && (
-          <>
-            <KpiCard
-              title="Mis Tickets Totales"
-              value={myTotalTicketsCount ?? 0}
-              icon={<Ticket className="h-5 w-5 text-accent" />}
-              description="Total de tickets que ha enviado."
-              className="shadow-lg rounded-xl"
-            />
-            <KpiCard
-              title="Mis Tickets Activos"
-              value={myActiveTicketsCount ?? 0}
-              icon={<ClipboardList className="h-5 w-5 text-yellow-500" />}
-              description="Tickets abiertos, en progreso o pendientes."
-              className="shadow-lg rounded-xl"
-            />
-            <KpiCard
-              title="Mis Tickets Cerrados"
-              value={myClosedTicketsCount ?? 0}
-              icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
-              description="Tickets que han sido resueltos o cerrados."
-              className="shadow-lg rounded-xl"
-            />
-          </>
-        )}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {isClient && (
-            <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl gap-2">
-                  <ListChecks className="h-6 w-6 text-accent" />
-                  Mis Tickets
-                </CardTitle>
-                <CardDescription>Vea y gestione sus tickets enviados.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Acceda al historial de sus tickets y cree nuevas solicitudes.
-                </p>
-                <Button asChild>
-                  <Link href="/my-tickets">
-                    Ir a Mis Tickets <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-        )}
-        {(isAdmin || isSuperUser) && (
-          <>
-            <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl gap-2">
-                  <Ticket className="h-6 w-6 text-accent" />
-                  Tickets
-                </CardTitle>
-                <CardDescription>Seguimiento de incidencias y progreso.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Vea, gestione y monitorice los tickets relacionados con los proyectos Maximo.
-                </p>
-                <Button asChild>
-                  <Link href="/tickets"> 
-                    Ir a Tickets <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl gap-2">
-                  <Github className="h-6 w-6 text-accent" />
-                  Commits de GitHub
-                </CardTitle>
-                <CardDescription>Monitorice cambios en el código.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Revise los commits recientes y siga el progreso del desarrollo.
-                </p>
-                <Button asChild>
-                  <Link href="/github">
-                    Ver Commits de GitHub <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl gap-2">
-                  <Server className="h-6 w-6 text-accent" />
-                  Gestión de Maximo
-                </CardTitle>
-                <CardDescription>Suba configuraciones y gestione archivos.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Acceda a herramientas para subir configuraciones de Maximo.
-                </p>
-                <Button asChild>
-                  <Link href="/maximo">
-                    Gestionar Maximo <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-            
-            {isSuperUser && (
-                <>
-                 <Card className="bg-card shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-xl gap-2">
-                        <AnalyticsIcon className="h-6 w-6 text-accent" />
-                        Analytics
-                        </CardTitle>
-                        <CardDescription>Visualice métricas y rendimiento.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                        Acceda a los dashboards de analítica y reportes del sistema.
-                        </p>
-                        <Button asChild>
-                        <Link href="/analytics">
-                            Ir a Analytics <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                </>
-            )}
-          </>
-        )}
-      </div>
+      <section>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-6">Quick Access</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {isClient && (
+              <ActionCard 
+                href="/my-tickets"
+                icon={<ListChecks className="h-7 w-7 text-primary" />}
+                title="My Tickets"
+                description="View and manage your submitted tickets and create new requests."
+              />
+          )}
+          {(isAdmin || isSuperUser) && (
+            <>
+              <ActionCard 
+                href="/tickets"
+                icon={<Ticket className="h-7 w-7 text-primary" />}
+                title="Ticket Management"
+                description="Monitor and manage all project-related tickets."
+              />
+              <ActionCard 
+                href="/github"
+                icon={<Github className="h-7 w-7 text-primary" />}
+                title="GitHub Commits"
+                description="Review recent code changes and track development progress."
+              />
+              <ActionCard 
+                href="/maximo"
+                icon={<Server className="h-7 w-7 text-primary" />}
+                title="Maximo Configurations"
+                description="Upload and manage Maximo configuration files and scripts."
+              />
+              
+              {isSuperUser && (
+                  <>
+                    <ActionCard 
+                        href="/analytics"
+                        icon={<AnalyticsIcon className="h-7 w-7 text-primary" />}
+                        title="Analytics Dashboard"
+                        description="Access system metrics, performance reports, and data visualizations."
+                    />
+                    <ActionCard 
+                        href="/user-management"
+                        icon={<Users className="h-7 w-7 text-primary" />}
+                        title="User Management"
+                        description="Create and manage user accounts and their permissions."
+                    />
+                     <ActionCard 
+                        href="/organization-management"
+                        icon={<Settings className="h-7 w-7 text-primary" />}
+                        title="Organization Setup"
+                        description="Manage organizations and linked GitHub repositories."
+                    />
+                  </>
+              )}
+            </>
+          )}
+        </div>
+      </section>
       
       {isClient && myTicketsOverTime && (
-        <MyTicketsOverTimeChart data={myTicketsOverTime} />
+        <section>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-6">My Ticket Creation Trend</h2>
+            <MyTicketsOverTimeChart data={myTicketsOverTime} />
+        </section>
       )}
 
-      <Card className="bg-card shadow-lg rounded-xl overflow-hidden">
-        <CardContent className="p-0">
-          <div className="relative h-64 w-full">
-            <Image
-              src="https://picsum.photos/1200/400"
-              alt="Abstract technology background"
-              fill 
-              style={{objectFit:"cover"}} 
-              priority 
-              data-ai-hint="technology abstract"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-6">
-              <h2 className="text-2xl font-semibold text-white">
-                Manténgase al día con el Portal de Versiones Maximo
-              </h2>
+      <section>
+        <Card className="bg-card shadow-xl rounded-xl overflow-hidden border-border">
+          <CardContent className="p-0">
+            <div className="relative h-72 w-full">
+              <Image
+                src="https://placehold.co/1200x400.png" 
+                alt="Modern abstract technology background"
+                fill 
+                style={{objectFit:"cover"}} 
+                priority 
+                data-ai-hint="technology abstract"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex flex-col justify-end p-8">
+                <h3 className="text-3xl font-semibold text-white mb-2">
+                  Streamline Your Maximo Workflow
+                </h3>
+                <p className="text-lg text-primary-foreground/80 max-w-2xl">
+                  Utilize the Maximo Version Portal to enhance collaboration, track progress, and ensure efficient deployments.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
+}
+
+interface ActionCardProps {
+    href: string;
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+}
+
+function ActionCard({ href, icon, title, description }: ActionCardProps) {
+    return (
+        <Card className="bg-card shadow-lg rounded-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 border-border/80">
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
+                   {icon}
+                </div>
+                <div className="flex-1">
+                    <CardTitle className="text-xl font-semibold text-foreground">{title}</CardTitle>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+            <p className="text-muted-foreground text-sm leading-relaxed">
+                {description}
+            </p>
+            <Button asChild variant="outline" className="w-full sm:w-auto border-primary/50 text-primary hover:bg-primary/5 hover:text-primary">
+                <Link href={href}>
+                    Go to {title} <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+            </Button>
+            </CardContent>
+        </Card>
+    );
 }
 
 
@@ -377,20 +372,22 @@ const KpiCardSkeleton = () => (
 
 const NavCardSkeleton = () => (
     <Card className="bg-card shadow-lg rounded-xl">
-        <CardHeader>
-            <Skeleton className="h-6 w-3/4 mb-1" />
-            <Skeleton className="h-4 w-1/2" />
+        <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
+             <Skeleton className="h-12 w-12 rounded-full" />
+             <div className="flex-1 mt-1">
+                <Skeleton className="h-6 w-3/4 mb-1" />
+            </div>
         </CardHeader>
-        <CardContent>
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-full mb-4" />
-            <Skeleton className="h-10 w-32" />
+        <CardContent className="space-y-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-10 w-36" />
         </CardContent>
     </Card>
 );
 
 const ChartSkeleton = () => (
-    <Card>
+    <Card className="shadow-lg rounded-xl">
         <CardHeader>
             <Skeleton className="h-6 w-1/2 mb-1" />
             <Skeleton className="h-4 w-3/4" />
@@ -400,4 +397,3 @@ const ChartSkeleton = () => (
         </CardContent>
     </Card>
 );
-
